@@ -117,8 +117,7 @@ export default function Home() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=2400&q=88')"
+            backgroundImage: "url('/hero-bus.jpg')"
           }}
           aria-hidden="true"
         />
