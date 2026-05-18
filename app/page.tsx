@@ -129,10 +129,10 @@ export default function Home() {
           <p className="text-sm font-black tracking-[0.32em] text-[#ffe4a3] drop-shadow-[0_3px_12px_rgba(0,0,0,0.75)] sm:text-base">
             雲驛旅行社｜浮雲輕旅
           </p>
-          <h1 className="mt-5 text-4xl font-black leading-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)] sm:text-6xl lg:text-7xl">
+          <h1 className="mt-5 text-4xl font-black leading-tight text-[#ffe600] drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)] sm:text-6xl lg:text-7xl">
             專業包車旅遊服務
           </h1>
-          <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-[#fff1c7] drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:text-2xl">
+          <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-[#ff3b30] drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:text-2xl">
             企業接待｜機場接送｜環島旅遊｜客製行程
           </p>
           <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-start">
