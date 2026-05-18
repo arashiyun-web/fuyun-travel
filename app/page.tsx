@@ -112,7 +112,7 @@ export default function Home() {
 
       <section
         id="top"
-        className="relative flex min-h-screen items-start justify-end overflow-hidden px-4 pt-24 text-right text-white sm:px-8 lg:px-14"
+        className="relative flex min-h-screen items-start justify-start overflow-hidden px-4 pt-24 text-left text-white sm:px-8 lg:px-14"
       >
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -122,10 +122,10 @@ export default function Home() {
           aria-hidden="true"
         />
         <div className="absolute inset-0 bg-[#1f1f1f]/36" />
-        <div className="absolute inset-0 bg-gradient-to-l from-[#1f1f1f]/72 via-[#1f1f1f]/18 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#1f1f1f]/72 via-[#1f1f1f]/18 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#1f1f1f]/90 to-transparent" />
 
-        <div className="relative mt-10 flex max-w-2xl flex-col items-end sm:mt-14 lg:mt-16">
+        <div className="relative mt-10 flex max-w-2xl flex-col items-start sm:mt-14 lg:mt-16">
           <p className="text-sm font-black tracking-[0.32em] text-[#ffe4a3] drop-shadow-[0_3px_12px_rgba(0,0,0,0.75)] sm:text-base">
             雲驛旅行社｜浮雲輕旅
           </p>
@@ -135,7 +135,7 @@ export default function Home() {
           <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-[#fff1c7] drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:text-2xl">
             企業接待｜機場接送｜環島旅遊｜客製行程
           </p>
-          <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-end">
+          <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-start">
             <a
               href="#contact"
               className="inline-flex h-14 items-center justify-center rounded-md bg-[#c8ad72] px-8 text-base font-black text-[#242424] shadow-[0_18px_50px_rgba(0,0,0,0.22)] transition hover:bg-[#d6bd83]"
