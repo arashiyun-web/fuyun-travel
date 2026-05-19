@@ -4,6 +4,7 @@ import {
   Car,
   CheckCircle2,
   Earth,
+  ExternalLink,
   Luggage,
   Map,
   MessageCircle,
@@ -17,6 +18,7 @@ import InquiryForm from "@/components/InquiryForm";
 
 const lineUrl = process.env.NEXT_PUBLIC_LINE_URL || "https://line.me/R/ti/p/@yourlineid";
 const phone = process.env.NEXT_PUBLIC_PHONE || "0906528185";
+const facebookUrl = "https://www.facebook.com/share/g/1NPbXN8THD/";
 
 const services = [
   {
@@ -148,6 +150,15 @@ export default function Home() {
             >
               加入 LINE
             </a>
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-md border border-white/35 bg-white/12 px-8 text-base font-black text-white backdrop-blur transition hover:bg-white/22"
+            >
+              Facebook
+              <ExternalLink size={18} />
+            </a>
           </div>
         </div>
       </section>
@@ -260,6 +271,15 @@ export default function Home() {
                 <Phone size={19} />
                 {phone}
               </a>
+              <a
+                href={facebookUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-13 items-center justify-center gap-2 rounded-md border border-white/20 px-5 py-4 font-black text-white transition hover:bg-white/10"
+              >
+                <ExternalLink size={19} />
+                Facebook 社團
+              </a>
               <div className="flex items-start gap-3 rounded-md border border-white/12 bg-white/6 p-4 text-white/74">
                 <Luggage className="mt-1 shrink-0 text-[#d9c38f]" size={20} />
                 <p className="leading-7">企業接待、機場接送、環島旅遊、客製行程皆可詢問。</p>
@@ -280,7 +300,18 @@ export default function Home() {
       <footer className="bg-[#242424] px-4 py-8 text-white sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 text-sm text-white/68 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-semibold text-white">雲驛旅行社｜浮雲輕旅</p>
-          <p>企業接待｜機場接送｜環島旅遊｜客製行程</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <p>企業接待｜機場接送｜環島旅遊｜客製行程</p>
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-semibold text-white transition hover:text-[#d9c38f]"
+            >
+              Facebook 社團
+              <ExternalLink size={14} />
+            </a>
+          </div>
         </div>
       </footer>
     </main>
