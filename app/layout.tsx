@@ -1,35 +1,30 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fuyuntravel.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "雲驛旅行社｜浮雲輕旅｜專業包車旅遊服務",
-    template: "%s｜雲驛旅行社｜浮雲輕旅"
+    default: "浮雲旅遊｜專業包車旅遊服務",
+    template: "%s｜浮雲旅遊"
   },
   description:
-    "雲驛旅行社｜浮雲輕旅提供台灣專業包車旅遊服務，包含企業接待、機場接送、環島旅遊、客製行程與高品質小團旅遊。",
+    "浮雲旅遊提供台灣包車、企業接待、機場接送與精選行程報名服務，結合專業車隊與客製化旅遊安排。",
   keywords: [
+    "浮雲旅遊",
     "台灣包車",
     "包車旅遊",
-    "雲驛旅行社",
-    "浮雲輕旅",
-    "企業包車",
-    "商務接待",
-    "客製旅遊",
-    "小團高品質",
     "遊覽車",
-    "企業接送",
-    "新北包車",
-    "板橋包車"
+    "企業接待",
+    "機場接送",
+    "行程報名"
   ],
   openGraph: {
-    title: "雲驛旅行社｜浮雲輕旅｜專業包車旅遊服務",
-    description: "企業接待、機場接送、環島旅遊、客製行程與高品質台灣包車服務。",
+    title: "浮雲旅遊｜專業包車旅遊服務",
+    description: "台灣包車、企業接待、機場接送與精選行程報名服務。",
     url: siteUrl,
-    siteName: "雲驛旅行社｜浮雲輕旅",
+    siteName: "浮雲旅遊",
     locale: "zh_TW",
     type: "website"
   },
@@ -42,7 +37,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b1f3a"
+  themeColor: "#2f2f2f"
 };
 
 export default function RootLayout({
