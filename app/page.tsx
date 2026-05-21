@@ -151,14 +151,12 @@ export default function Home() {
 
               return isInternalRoute ? (
                 <Link key={entry.title} href={entry.href} className={className}>
-                  <p className="text-sm font-black tracking-[0.2em]">入口</p>
-                  <h2 className="mt-3 text-2xl font-black">{entry.title}</h2>
+                  <h2 className="text-2xl font-black">{entry.title}</h2>
                   <p className="mt-2 text-sm font-semibold opacity-80">{entry.text}</p>
                 </Link>
               ) : (
                 <a key={entry.title} href={entry.href} className={className}>
-                  <p className="text-sm font-black tracking-[0.2em]">入口</p>
-                  <h2 className="mt-3 text-2xl font-black">{entry.title}</h2>
+                  <h2 className="text-2xl font-black">{entry.title}</h2>
                   <p className="mt-2 text-sm font-semibold opacity-80">{entry.text}</p>
                 </a>
               );
