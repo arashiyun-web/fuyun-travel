@@ -1,8 +1,15 @@
 import Link from "next/link";
 
 type SiteHeaderProps = {
-  active?: "home" | "itineraries";
+  active?: "home" | "services" | "fleet" | "itineraries" | "contact";
 };
+
+const navItems = [
+  { href: "/services", label: "服務", key: "services" },
+  { href: "/fleet", label: "車型", key: "fleet" },
+  { href: "/itineraries", label: "行程", key: "itineraries" },
+  { href: "/contact", label: "聯絡", key: "contact" }
+] as const;
 
 export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
   return (
@@ -16,27 +23,21 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
         </Link>
 
         <div className="hidden items-center gap-8 text-sm font-semibold text-[#3d3d3d] md:flex">
-          <Link href="/#services" className="transition hover:text-[#b89b5e]">
-            服務
-          </Link>
-          <Link href="/#vehicles" className="transition hover:text-[#b89b5e]">
-            車型
-          </Link>
-          <Link
-            href="/itineraries"
-            className={`transition hover:text-[#b89b5e] ${
-              active === "itineraries" ? "text-[#b89b5e]" : ""
-            }`}
-          >
-            行程
-          </Link>
-          <Link href="/#contact" className="transition hover:text-[#b89b5e]">
-            聯絡
-          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={`transition hover:text-[#b89b5e] ${
+                active === item.key ? "text-[#b89b5e]" : ""
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
 
         <Link
-          href={active === "itineraries" ? "/#contact" : "#contact"}
+          href="/contact/inquiry"
           className="rounded-md bg-[#2f2f2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#b89b5e]"
         >
           立即詢價
