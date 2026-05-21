@@ -50,9 +50,6 @@ export default function Home() {
             <h1 className="mt-5 text-4xl font-black leading-tight text-[#ffe600] drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)] sm:text-6xl lg:text-7xl">
               專業包車旅遊服務
             </h1>
-            <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-[#fff7dc] drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:text-2xl">
-              第一層只保留主要入口。點選車子下方的方塊後，先進第二層分類頁，再進第三層查看完整內容或報名。
-            </p>
             <div className="mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-start">
               <Link
                 href="/contact/inquiry"
