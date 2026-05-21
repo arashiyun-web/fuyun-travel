@@ -5,10 +5,10 @@ import SiteHeader from "@/components/SiteHeader";
 const facebookUrl = "https://www.facebook.com/share/g/1NPbXN8THD/";
 
 const entryCards = [
-  { title: "服務", text: "第 2 層選服務，第 3 層看完整內容", href: "/services" },
-  { title: "車型", text: "第 2 層選車型，第 3 層看車款說明", href: "/fleet" },
-  { title: "行程", text: "第 2 層看行程，第 3 層報名選位", href: "/itineraries" },
-  { title: "聯絡", text: "第 2 層選方式，第 3 層填表聯繫", href: "/contact" }
+  { title: "服務", text: "包車、接送、企業接待", href: "/services" },
+  { title: "車型", text: "大型車、中巴、商務車", href: "/fleet" },
+  { title: "行程", text: "精選旅遊、報名選位", href: "/itineraries" },
+  { title: "聯絡", text: "LINE、電話、表單詢價", href: "/contact" }
 ];
 
 export default function Home() {
