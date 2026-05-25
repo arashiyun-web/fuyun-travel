@@ -436,4 +436,35 @@ th { color: var(--muted); font-size: .86rem; }
   .tour-grid, .form-grid { grid-template-columns: 1fr; }
   .card-footer, .metric-grid { flex-direction: column; align-items: stretch; }
   .entry-actions { grid-template-columns: 1fr; }
+  .entry-hero { padding-inline: 18px; }
+  .entry-copy h2 {
+    max-width: 100%;
+    white-space: normal;
+    font-size: clamp(2.6rem, 12vw, 3.4rem);
+  }
+  .checkout-with-seats {
+    width: calc(100% - 24px);
+    margin-top: 24px;
+  }
+  .checkout-with-seats > form.card {
+    min-width: 0;
+  }
+  .bus-seat-layer {
+    min-width: 0;
+    overflow-x: auto;
+    padding: 14px;
+  }
+  .seat-layer-header {
+    min-width: 600px;
+  }
+  .bus-front,
+  .bus-columns,
+  .bus-seat-map,
+  .seat-selected-box {
+    min-width: 600px;
+  }
+  .bus-columns,
+  .bus-seat-map {
+    grid-template-columns: repeat(5, minmax(104px, 1fr));
+  }
 }
