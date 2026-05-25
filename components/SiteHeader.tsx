@@ -42,6 +42,12 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
         >
           立即詢價
         </Link>
+        <a
+          href="/platform/index.html?v=official-test#home"
+          className="rounded-md border border-[#c40000] px-4 py-2 text-sm font-bold text-[#242424] transition hover:bg-white"
+        >
+          測試平台
+        </a>
       </nav>
     </header>
   );
