@@ -1227,7 +1227,7 @@ function bind() {
       login(user.username, user.password);
     });
   });
-  $("#register-button").addEventListener("click", () => {
+  $("#register-button")?.addEventListener("click", () => {
     const name = $("#register-name").value.trim();
     const username = $("#register-username").value.trim();
     const password = $("#register-password").value;

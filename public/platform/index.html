@@ -105,25 +105,12 @@
       <section id="login-view" class="view auth-page">
         <form id="login-form" class="login-card">
           <p class="eyebrow">Secure Access</p>
-          <h2>登入 / 註冊</h2>
+          <h2>登入</h2>
           <p class="muted">顧客可下單與評價；Admin/Editor 會進入後台權限模式。</p>
           <label>帳號 <input name="username" autocomplete="username" required /></label>
           <label>密碼 <input name="password" type="password" autocomplete="current-password" required /></label>
           <button class="primary-button" type="submit">登入</button>
-          <div class="quick-login-row">
-            <button class="secondary-button" type="button" data-route="#preview">功能預覽</button>
-            <button class="secondary-button" type="button" data-demo-login="customer">顧客登入</button>
-            <button class="secondary-button" type="button" data-demo-login="admin">Admin 登入</button>
-            <button class="secondary-button" type="button" data-demo-login="editor">Editor 登入</button>
-          </div>
           <p id="login-message" class="form-message"></p>
-          <div class="register-box">
-            <strong>註冊新會員</strong>
-            <input id="register-name" placeholder="姓名" />
-            <input id="register-username" placeholder="帳號" />
-            <input id="register-password" type="password" placeholder="密碼至少 6 碼" />
-            <button class="secondary-button" id="register-button" type="button">建立顧客會員</button>
-          </div>
         </form>
       </section>
 
@@ -141,6 +128,6 @@
     <div id="notification-panel" class="notification-panel hidden"></div>
     <div id="toast-root" class="toast-root"></div>
 
-    <script src="./app.js?v=bus-seat-map-exact-v1"></script>
+    <script src="./app.js?v=login-only-v1"></script>
   </body>
 </html>
