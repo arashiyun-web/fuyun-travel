@@ -122,7 +122,18 @@ let state = {
   serviceWorkerRegistration: null,
   filters: { themes: new Set(), regions: new Set(), durations: new Set(), q: "" },
 };
-state.users = state.users.map((user) => (user.username === "admin" ? { ...user, password: "admin" } : user));
+function ensureSystemUser(account) {
+  const existing = state.users.find((user) => user.username === account.username || user.id === account.id);
+  if (existing) {
+    Object.assign(existing, account);
+    return;
+  }
+  state.users.unshift({ ...account });
+}
+
+ensureSystemUser({ id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" });
+ensureSystemUser({ id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" });
+ensureSystemUser({ id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" });
 save("users");
 state.user = state.users.find((u) => u.id === sessionStorage.getItem(STORE.session)) || null;
 syncMemberNotificationConsents();
