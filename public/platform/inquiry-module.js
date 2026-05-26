@@ -1,25 +1,15 @@
 (function () {
-  const STORE_INQUIRIES = "fuyun-secure-inquiries-v1";
-  const STORE_AUDIT = "fuyun-secure-audit-v1";
+  const API_URL = "/api/inquiry";
   const STATUSES = ["New", "Quoted", "Confirmed", "Cancelled"];
   const VEHICLES = ["43-seat Big Bus", "20-seat Medium Bus", "9-seat Luxury Van"];
   const TRIP_TYPES = ["Single-day Tour", "Multi-day Tour", "Point-to-Point Transfer"];
 
+  let inquiryCache = [];
+  let auditCache = [];
+  let loadingInquiries = false;
+
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-
-  function readStore(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function writeStore(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
 
   function sanitize(value) {
     return String(value || "")
@@ -29,50 +19,40 @@
       .slice(0, 600);
   }
 
-  function maskPhone(phone) {
-    const clean = sanitize(phone);
-    if (clean.length <= 4) return "****";
-    return clean.slice(0, 3) + "****" + clean.slice(-3);
+  function apiHeaders() {
+    const session = sessionStorage.getItem("travel-commerce-session-v1") || "platform-user";
+    return {
+      "Content-Type": "application/json",
+      "x-fuyun-user": session,
+    };
   }
 
-  function currentUserLabel() {
-    const sessionId = sessionStorage.getItem("travel-commerce-session-v1") || "guest";
-    return sessionId;
-  }
-
-  function addAudit(action, inquiryId) {
-    const logs = readStore(STORE_AUDIT, []);
-    logs.unshift({
-      id: "a-" + Date.now(),
-      user_id: currentUserLabel(),
-      action,
-      inquiry_id: inquiryId || "",
-      ip: "browser-preview",
-      created_at: new Date().toISOString(),
-    });
-    writeStore(STORE_AUDIT, logs.slice(0, 250));
-  }
-
-  function seedInquiries() {
-    const existing = readStore(STORE_INQUIRIES, null);
-    if (existing) return;
-    writeStore(STORE_INQUIRIES, [
-      {
-        id: "iq-seed-1",
-        name: "王小旅",
-        phone: "0912345678",
-        line_id: "fuyun-test",
-        trip_type: "Multi-day Tour",
-        start_date: "2026-06-12T09:00",
-        pickup_location: "台北車站",
-        destination: "宜蘭太平山二日遊",
-        passenger_count: 38,
-        preferred_vehicle: ["43-seat Big Bus"],
-        special_requests: "需要協助安排午餐與住宿，車上希望有麥克風。",
-        status: "New",
-        created_at: "2026-05-25T10:00:00.000Z",
+  async function apiRequest(options = {}) {
+    const response = await fetch(API_URL, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        ...apiHeaders(),
+        ...(options.headers || {}),
       },
-    ]);
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false) {
+      throw new Error(data.message || "API request failed");
+    }
+    return data;
+  }
+
+  async function loadInquiries() {
+    if (loadingInquiries) return;
+    loadingInquiries = true;
+    try {
+      const data = await apiRequest({ method: "GET" });
+      inquiryCache = data.inquiries || [];
+      auditCache = data.audit || [];
+    } finally {
+      loadingInquiries = false;
+    }
   }
 
   function createField(labelText, input) {
@@ -128,6 +108,7 @@
 
   function ensureInquiryModal() {
     if ($("#fuyun-inquiry-modal")) return;
+
     const modal = document.createElement("section");
     modal.id = "fuyun-inquiry-modal";
     modal.className = "ft-modal hidden";
@@ -138,12 +119,12 @@
           <div>
             <p class="eyebrow">Custom Tour & Bus Rental</p>
             <h2>客製旅遊與包車詢價</h2>
-            <p class="muted">資料送出後將進入後台詢價管理；正式版會經由 /api/inquiry 寫入資料庫。</p>
+            <p class="muted">資料會送入正式後台詢價 API，管理者可在後台查看與編輯。</p>
           </div>
           <button class="ghost-button" type="button" data-inquiry-close>關閉</button>
         </div>
         <div class="ft-form-grid" id="fuyun-inquiry-fields"></div>
-        <p class="ft-security-note">安全預覽：前端驗證、欄位清理、Turnstile/reCAPTCHA token 預留、後台 PII 遮罩與操作紀錄。</p>
+        <p class="ft-security-note">正式流程已走 /api/inquiry；後續接上 MongoDB、Turnstile/reCAPTCHA 與 2FA 後，不需更換前台表單。</p>
         <p class="form-message" id="fuyun-inquiry-message"></p>
         <button class="primary-button full" type="submit">送出詢價</button>
       </form>
@@ -161,6 +142,7 @@
       createField("上車地點", input("pickup_location", "text", true)),
       createField("目的地 / 想走路線", input("destination", "text", true)),
     );
+
     const vehicleField = document.createElement("div");
     vehicleField.className = "ft-field full";
     vehicleField.innerHTML = "<span>偏好車型</span>";
@@ -196,16 +178,13 @@
       passenger_count: Number(data.get("passenger_count")),
       preferred_vehicle: data.getAll("preferred_vehicle").map(sanitize),
       special_requests: sanitize(data.get("special_requests")),
-      status: "New",
-      recaptcha_token: "preview-token",
-      created_at: new Date().toISOString(),
     };
   }
 
   function validateInquiry(payload) {
-    if (!payload.name || !payload.phone || !payload.start_date) return "請填寫姓名、電話、出發日期。";
+    if (!payload.name || !payload.phone || !payload.start_date) return "請填寫姓名、電話與出發日期。";
     if (!payload.pickup_location || !payload.destination) return "請填寫上車地點與目的地。";
-    if (!Number.isInteger(payload.passenger_count) || payload.passenger_count < 1) return "乘客人數需大於 0。";
+    if (!Number.isInteger(payload.passenger_count) || payload.passenger_count < 1) return "乘客人數必須大於 0。";
     if (!payload.preferred_vehicle.length) return "請至少選擇一種偏好車型。";
     return "";
   }
@@ -216,38 +195,40 @@
     const message = $("#fuyun-inquiry-message");
     const payload = formPayload(form);
     const error = validateInquiry(payload);
+
     if (error) {
       message.textContent = error;
       return;
     }
 
+    message.textContent = "送出中...";
+
     try {
-      await fetch("/api/inquiry", {
+      const data = await apiRequest({
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-    } catch {
-      // Preview fallback: static platform keeps the record in localStorage.
+      inquiryCache.unshift(data.inquiry);
+      message.textContent = "詢價已送出，我們會盡快聯繫。";
+      form.reset();
+      setTimeout(closeInquiryModal, 700);
+      refreshAdminPanel();
+    } catch (error) {
+      message.textContent = error.message || "送出失敗，請稍後再試。";
     }
-
-    const inquiries = readStore(STORE_INQUIRIES, []);
-    inquiries.unshift(payload);
-    writeStore(STORE_INQUIRIES, inquiries);
-    addAudit("CREATE_INQUIRY", payload.id);
-    message.textContent = "詢價已送出，我們會盡快聯繫。";
-    form.reset();
-    setTimeout(closeInquiryModal, 700);
-    enhanceAdmin();
   }
 
   function inquiryRows(inquiries) {
+    if (!inquiries.length) {
+      return `<tr><td colspan="6" class="muted">目前尚無詢價資料。</td></tr>`;
+    }
+
     return inquiries
       .map(
         (item) => `
           <tr>
             <td class="table-title">${sanitize(item.name)}</td>
-            <td>${maskPhone(item.phone)}</td>
+            <td>${sanitize(item.phone_masked || item.phone)}</td>
             <td>${sanitize(item.start_date || "").replace("T", " ")}</td>
             <td>${sanitize(item.pickup_location)} → ${sanitize(item.destination)}</td>
             <td>${sanitize(item.status)}</td>
@@ -258,27 +239,34 @@
       .join("");
   }
 
+  function auditItems(audit) {
+    if (!audit.length) return "<p class='muted'>目前沒有操作紀錄。</p>";
+    return audit
+      .slice(0, 8)
+      .map(
+        (log) =>
+          `<div class="notification-item"><strong>${sanitize(log.action)}</strong><p class="muted">${sanitize(log.created_at)} / ${sanitize(log.user_id)} / ${sanitize(log.ip)}</p></div>`,
+      )
+      .join("");
+  }
+
   function renderInquiryAdminPanel() {
-    const inquiries = readStore(STORE_INQUIRIES, []);
-    const audit = readStore(STORE_AUDIT, []);
     const panel = document.createElement("section");
     panel.className = "admin-panel ft-inquiry-admin";
     panel.id = "ft-inquiry-admin";
     panel.innerHTML = `
       <p class="eyebrow">Inquiry CRM</p>
       <h2>客製旅遊與包車詢價管理</h2>
-      <p class="muted">後台預覽已套用 PII 遮罩；點「查看 / 編輯」可編輯所有詢價欄位與狀態。</p>
+      <p class="muted">正式版已引用 /api/inquiry。列表電話採 PII 遮罩；點「查看 / 編輯」可查看完整資料並更新狀態。</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>姓名</th><th>電話</th><th>日期</th><th>路線</th><th>狀態</th><th>操作</th></tr></thead>
-          <tbody>${inquiryRows(inquiries)}</tbody>
+          <tbody id="ft-inquiry-rows"><tr><td colspan="6" class="muted">載入中...</td></tr></tbody>
         </table>
       </div>
       <details class="ft-audit">
-        <summary>Audit Trail（${audit.length}）</summary>
-        <div class="notification-list">
-          ${audit.slice(0, 8).map((log) => `<div class="notification-item"><strong>${log.action}</strong><p class="muted">${log.created_at} / ${log.user_id} / ${log.ip}</p></div>`).join("") || "<p class='muted'>尚無紀錄</p>"}
-        </div>
+        <summary id="ft-audit-title">Audit Trail</summary>
+        <div class="notification-list" id="ft-audit-list"></div>
       </details>
     `;
     panel.addEventListener("click", (event) => {
@@ -288,16 +276,39 @@
     return panel;
   }
 
+  async function refreshAdminPanel() {
+    const rows = $("#ft-inquiry-rows");
+    const auditTitle = $("#ft-audit-title");
+    const auditList = $("#ft-audit-list");
+
+    if (!rows) return;
+    rows.innerHTML = `<tr><td colspan="6" class="muted">載入中...</td></tr>`;
+
+    try {
+      await loadInquiries();
+      rows.innerHTML = inquiryRows(inquiryCache);
+      if (auditTitle) auditTitle.textContent = `Audit Trail（${auditCache.length}）`;
+      if (auditList) auditList.innerHTML = auditItems(auditCache);
+    } catch (error) {
+      rows.innerHTML = `<tr><td colspan="6" class="muted">${sanitize(error.message || "資料載入失敗。")}</td></tr>`;
+    }
+  }
+
   function enhanceAdmin() {
     const adminView = $("#admin-view.active");
-    if (!adminView || $("#ft-inquiry-admin", adminView)) return;
-    adminView.appendChild(renderInquiryAdminPanel());
+    if (!adminView) return;
+
+    if (!$("#ft-inquiry-admin", adminView)) {
+      adminView.appendChild(renderInquiryAdminPanel());
+    }
+
+    refreshAdminPanel();
   }
 
   function openInquiryEditor(id) {
-    const inquiries = readStore(STORE_INQUIRIES, []);
-    const item = inquiries.find((record) => record.id === id);
+    const item = inquiryCache.find((record) => record.id === id);
     if (!item) return;
+
     let modal = $("#ft-inquiry-editor");
     if (!modal) {
       modal = document.createElement("section");
@@ -305,18 +316,19 @@
       modal.className = "ft-modal";
       document.body.appendChild(modal);
     }
+
     modal.innerHTML = `
       <div class="ft-modal-backdrop" data-editor-close></div>
       <form class="ft-modal-card" id="ft-inquiry-edit-form">
         <div class="ft-modal-head">
           <div>
             <p class="eyebrow">Edit Inquiry</p>
-            <h2>詢價內容編輯</h2>
-            <p class="muted">管理者可編輯所有對話框欄位；列表預設遮罩，詳情才顯示完整資料。</p>
+            <h2>詢價明細編輯</h2>
+            <p class="muted">管理者可修改每個欄位，送出後會同步更新正式 API 資料。</p>
           </div>
           <button class="ghost-button" type="button" data-editor-close>關閉</button>
         </div>
-        <input type="hidden" name="id" value="${item.id}">
+        <input type="hidden" name="id" value="${sanitize(item.id)}">
         <div class="ft-form-grid">
           <label class="ft-field"><span>姓名</span><input name="name" required value="${sanitize(item.name)}"></label>
           <label class="ft-field"><span>電話</span><input name="phone" required value="${sanitize(item.phone)}"></label>
@@ -330,54 +342,53 @@
           <div class="ft-field full" id="ft-edit-vehicles"><span>偏好車型</span></div>
           <label class="ft-field full"><span>特殊需求</span><textarea name="special_requests">${sanitize(item.special_requests)}</textarea></label>
         </div>
-        <button class="primary-button full" type="submit">儲存修改</button>
+        <p class="form-message" id="ft-inquiry-edit-message"></p>
+        <button class="primary-button full" type="submit">儲存變更</button>
       </form>
     `;
-    const vehicleHolder = $("#ft-edit-vehicles", modal);
-    vehicleHolder.appendChild(vehicleCheckboxes(item.preferred_vehicle || []));
+
+    $("#ft-edit-vehicles", modal).appendChild(vehicleCheckboxes(item.preferred_vehicle || []));
     modal.classList.remove("hidden");
     $$("[data-editor-close]", modal).forEach((node) => node.addEventListener("click", () => modal.classList.add("hidden")));
     $("#ft-inquiry-edit-form", modal).addEventListener("submit", saveInquiryEdit);
-    addAudit("READ_INQUIRY", id);
   }
 
-  function saveInquiryEdit(event) {
+  async function saveInquiryEdit(event) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const id = data.get("id");
-    const inquiries = readStore(STORE_INQUIRIES, []);
-    const next = inquiries.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            name: sanitize(data.get("name")),
-            phone: sanitize(data.get("phone")),
-            line_id: sanitize(data.get("line_id")),
-            status: sanitize(data.get("status")),
-            trip_type: sanitize(data.get("trip_type")),
-            start_date: sanitize(data.get("start_date")),
-            passenger_count: Number(data.get("passenger_count")),
-            pickup_location: sanitize(data.get("pickup_location")),
-            destination: sanitize(data.get("destination")),
-            preferred_vehicle: data.getAll("preferred_vehicle").map(sanitize),
-            special_requests: sanitize(data.get("special_requests")),
-            updated_at: new Date().toISOString(),
-          }
-        : item,
-    );
-    writeStore(STORE_INQUIRIES, next);
-    addAudit("UPDATE_INQUIRY", id);
-    $("#ft-inquiry-editor").classList.add("hidden");
-    $("#ft-inquiry-admin")?.remove();
-    enhanceAdmin();
+    const form = event.currentTarget;
+    const message = $("#ft-inquiry-edit-message");
+    const data = new FormData(form);
+    const payload = {
+      id: sanitize(data.get("id")),
+      name: sanitize(data.get("name")),
+      phone: sanitize(data.get("phone")),
+      line_id: sanitize(data.get("line_id")),
+      status: sanitize(data.get("status")),
+      trip_type: sanitize(data.get("trip_type")),
+      start_date: sanitize(data.get("start_date")),
+      passenger_count: Number(data.get("passenger_count")),
+      pickup_location: sanitize(data.get("pickup_location")),
+      destination: sanitize(data.get("destination")),
+      preferred_vehicle: data.getAll("preferred_vehicle").map(sanitize),
+      special_requests: sanitize(data.get("special_requests")),
+    };
+
+    message.textContent = "儲存中...";
+
+    try {
+      await apiRequest({
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      $("#ft-inquiry-editor").classList.add("hidden");
+      await refreshAdminPanel();
+    } catch (error) {
+      message.textContent = error.message || "更新失敗，請稍後再試。";
+    }
   }
 
   function hookInquiryButtons() {
-    const candidates = [
-      ".top-inquiry",
-      ".entry-actions .primary-button",
-      "#contact-view .primary-button",
-    ];
+    const candidates = [".top-inquiry", ".entry-actions .primary-button", "#contact-view .primary-button"];
     candidates.forEach((selector) => {
       $$(selector).forEach((button) => {
         if (button.dataset.inquiryHooked === "1") return;
@@ -396,16 +407,16 @@
   }
 
   function boot() {
-    seedInquiries();
     ensureInquiryModal();
     hookInquiryButtons();
     enhanceAdmin();
-    window.addEventListener("hashchange", () => setTimeout(enhanceAdmin, 80));
+    window.addEventListener("hashchange", () => setTimeout(enhanceAdmin, 120));
     const observer = new MutationObserver(() => {
       hookInquiryButtons();
       enhanceAdmin();
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    window.FuyunInquiryOfficial = { refreshAdminPanel, openInquiryModal };
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
