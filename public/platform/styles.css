@@ -422,6 +422,101 @@ th { color: var(--muted); font-size: .86rem; }
   box-shadow: var(--shadow);
 }
 .push-consent p { margin-bottom: 0; color: var(--muted); }
+.ft-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+.ft-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .62);
+  backdrop-filter: blur(6px);
+}
+.ft-modal-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+  width: min(940px, 100%);
+  max-height: min(90vh, 980px);
+  overflow: auto;
+  border: 1px solid #e2d6bd;
+  border-radius: 8px;
+  padding: clamp(18px, 3vw, 28px);
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, .22);
+}
+.ft-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.ft-modal-head h2 {
+  margin-bottom: 8px;
+  font-size: clamp(1.55rem, 3vw, 2.2rem);
+}
+.ft-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.ft-field {
+  display: grid;
+  gap: 8px;
+  font-weight: 900;
+}
+.ft-field span {
+  color: #5f5648;
+  font-size: .92rem;
+}
+.ft-field.full { grid-column: 1 / -1; }
+.ft-checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ft-check {
+  display: inline-flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 14px;
+  background: #fffaf0;
+}
+.ft-check input { width: auto; min-height: auto; }
+.ft-security-note {
+  margin: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 800;
+}
+.ft-inquiry-admin {
+  display: grid;
+  gap: 14px;
+}
+.ft-audit {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffaf0;
+}
+.ft-audit summary {
+  cursor: pointer;
+  font-weight: 900;
+}
 
 @media (max-width: 960px) {
   .topbar, .page-heading { align-items: stretch; flex-direction: column; }
@@ -466,5 +561,11 @@ th { color: var(--muted); font-size: .86rem; }
   .bus-columns,
   .bus-seat-map {
     grid-template-columns: repeat(5, minmax(104px, 1fr));
+  }
+  .ft-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .ft-modal-head {
+    flex-direction: column;
   }
 }
