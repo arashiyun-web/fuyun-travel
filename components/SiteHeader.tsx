@@ -36,12 +36,20 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
           ))}
         </div>
 
-        <Link
-          href="/contact/inquiry"
-          className="rounded-md bg-[#2f2f2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#b89b5e]"
-        >
-          立即詢價
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/contact/inquiry"
+            className="rounded-md bg-[#2f2f2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#b89b5e]"
+          >
+            立即詢價
+          </Link>
+          <a
+            href="/platform/index.html?v=official-api-v1#login"
+            className="rounded-md border border-[#d8c9aa] bg-white/70 px-4 py-2 text-sm font-bold text-[#242424] transition hover:bg-white"
+          >
+            登入/註冊
+          </a>
+        </div>
       </nav>
     </header>
   );
