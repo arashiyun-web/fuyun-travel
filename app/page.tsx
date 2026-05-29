@@ -51,34 +51,41 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <section className="hero">
-        <h1>專業包車旅遊服務</h1>
-        <p className="lead">
-          浮雲旅遊提供台灣包車旅遊、企業接待、機場接送與客製化行程規劃，由專人協助確認車型、日期與報價。
-        </p>
-        <div className="cta-row">
-          <Link className="btn btn-primary" href="/contact/inquiry">立即詢價</Link>
-          <Link className="btn" href="/itineraries">查看行程</Link>
-          <LineButton>LINE 諮詢</LineButton>
+      <section className="hero hero-photo">
+        <div className="hero__overlay">
+          <p className="eyebrow">浮雲旅遊｜專業包車旅遊服務</p>
+          <h1>專業包車旅遊服務</h1>
+          <p className="lead">
+            浮雲旅遊提供台灣包車旅遊、企業接待、機場接送與客製化行程規劃，由專人協助確認車型、日期與報價。
+          </p>
+          <div className="cta-row">
+            <Link className="btn btn-primary" href="/contact/inquiry">立即詢價</Link>
+            <Link className="btn btn-glass" href="/itineraries">查看行程</Link>
+            <LineButton>LINE 諮詢</LineButton>
+          </div>
         </div>
       </section>
 
-      <section className="card-grid">
-        <Link className="card" href="/services">
-          <h3>服務</h3>
+      <section className="card-grid feature-grid" aria-label="浮雲旅遊服務入口">
+        <Link className="card feature-card" href="/services">
+          <span className="feature-card__label">服務</span>
+          <h3>包車與企業接待</h3>
           <p>包車旅遊、機場接送、企業接待與客製行程。</p>
         </Link>
-        <Link className="card" href="/fleet">
-          <h3>車型</h3>
-          <p>大型遊覽車、中巴、商務車，依人數與行李安排。</p>
+        <Link className="card feature-card" href="/fleet">
+          <span className="feature-card__label">車型</span>
+          <h3>大型車、中巴、商務車</h3>
+          <p>依照人數、行李量與路線安排合適車型。</p>
         </Link>
-        <Link className="card" href="/itineraries">
-          <h3>行程</h3>
-          <p>精選旅遊、報名選位與會員訂單查詢。</p>
+        <Link className="card feature-card" href="/itineraries">
+          <span className="feature-card__label">行程</span>
+          <h3>精選旅遊與報名選位</h3>
+          <p>查看精選行程、會員訂單與座位預訂流程。</p>
         </Link>
-        <Link className="card" href="/contact">
-          <h3>聯絡</h3>
-          <p>LINE、電話、Email 與表單詢價。</p>
+        <Link className="card feature-card" href="/contact">
+          <span className="feature-card__label">聯絡</span>
+          <h3>LINE、電話、Email</h3>
+          <p>由專人協助確認日期、車型、路線與報價。</p>
         </Link>
       </section>
 
