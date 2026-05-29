@@ -242,7 +242,7 @@ function go(route) {
 }
 
 function renderShell() {
-  $("#auth-chip").textContent = state.user ? `${state.user.name} / ${roles[state.user.role]}` : "訪客";
+  $("#auth-chip").textContent = state.user ? state.user.name : "訪客";
   $("#auth-action").textContent = state.user ? "登出" : "登入";
   renderNotificationDot();
   $$("[data-route]").forEach((button) => button.classList.toggle("active", button.dataset.route === `#${parseRoute().name}`));
@@ -408,7 +408,6 @@ function renderContact() {
   const actions = el("div", "action-row");
   [
     ["登入/註冊", () => go("#login"), "primary-button"],
-    ["功能預覽", () => go("#preview"), "secondary-button"],
     ["會員中心", () => go("#member"), "secondary-button"],
     ["管理後台", () => go("#admin"), "secondary-button"],
   ].forEach(([text, handler, className]) => {
@@ -418,8 +417,19 @@ function renderContact() {
     actions.appendChild(button);
   });
   main.appendChild(actions);
+
   const side = el("aside", "card");
-  side.append(el("h3", "", "浮雲旅遊"), el("p", "muted", "LINE、電話、表單詢價與 Facebook 社群入口。"));
+  side.append(
+    el("h3", "", "雲驛旅行社有限公司"),
+    el("p", "muted", "品保會員-甲種旅行社 / 註冊編號 882200"),
+    el("p", "", "電話：02-2685-1666"),
+    el("p", "", "Email：yunyi6866@gmail.com"),
+    el("p", "", "地址：新北市板橋區大觀路三段160巷20號6樓"),
+    el("p", "", "傳真：02-2685-1528"),
+    el("p", "", "聯絡人：蔡宛融"),
+    el("p", "muted", "統一編號：60675708 / 品保協會會員編號：北2760"),
+    el("p", "muted", "履約保證保險：旺旺友聯產物 15,000,000"),
+  );
   const fb = el("a", "secondary-button link-button", "Facebook");
   fb.href = "https://www.facebook.com/share/g/1NPbXN8THD/";
   fb.target = "_blank";
@@ -685,7 +695,7 @@ function renderCheckout(id) {
     el("p", "muted", tour.summary),
     el("div", "price", money(tour.price)),
     el("p", "stock", "剩餘 " + tour.remaining + " 席"),
-    el("p", "muted", canBook ? "付款成功後，座位會寫入訂單並同步扣除剩餘名額。" : "Admin / Editor 可由此確認座位系統與已預訂座位；顧客身分才可完成付款訂位。"),
+    el("p", "muted", canBook ? "付款成功後，座位會寫入訂單並同步扣除剩餘名額。" : "可由此確認座位系統與已預訂座位；會員身分才可完成付款訂位。"),
   );
   page.append(form, summary);
   views.checkout.replaceChildren(page);
@@ -785,27 +795,27 @@ function renderPreview() {
   const previewItems = [
     ["前台商城", "查看行程列表、搜尋與多條件即時篩選。", "打開前台", () => go("#home")],
     [
-      "顧客購買流程",
-      "用 customer 測試帳號進入會員中心，可下單、付款、查看訂單。",
-      "顧客預覽",
+      "會員購買流程",
+      "使用測試帳號進入會員中心，可下單、付款、查看訂單。",
+      "會員預覽",
       () => {
         const user = state.users.find((item) => item.role === "customer");
         login(user.username, user.password);
       },
     ],
     [
-      "Admin 後台",
-      "查看營收、訂單、會員管理、行程管理與系統級推播控制台。",
-      "Admin 預覽",
+      "後台管理",
+      "查看營收、訂單、會員管理、行程管理與推播控制台。",
+      "管理預覽",
       () => {
         const user = state.users.find((item) => item.username === "admin");
         login(user.username, user.password);
       },
     ],
     [
-      "Editor 後台",
-      "驗證一般員工只能新增/編輯行程，不能看金流與推播。",
-      "Editor 預覽",
+      "內容管理",
+      "驗證內容維護人員只能新增與編輯行程，不能看金流與推播。",
+      "內容預覽",
       () => {
         const user = state.users.find((item) => item.role === "editor");
         login(user.username, user.password);
@@ -825,7 +835,7 @@ function renderPreview() {
   previewItems.forEach(([title, text, action, handler]) => {
     const card = el("article", "card preview-card");
     card.append(el("h3", "", title), el("p", "muted", text));
-    const button = el("button", title.includes("Admin") ? "primary-button" : "secondary-button", action);
+    const button = el("button", title === "後台管理" ? "primary-button" : "secondary-button", action);
     button.type = "button";
     button.addEventListener("click", handler);
     card.appendChild(button);
@@ -1050,7 +1060,7 @@ function renderOrderAdmin() {
   const panel = el("section", "admin-panel");
   panel.append(el("p", "eyebrow", "Orders"), el("h2", "", currentPerm().orders ? "即時訂單與金流" : "訂單與金流"));
   if (!currentPerm().orders) {
-    panel.appendChild(el("div", "empty-state", "Editor 無法查看金流報表與所有訂單"));
+    panel.appendChild(el("div", "empty-state", "此帳號無法查看金流報表與所有訂單"));
     return panel;
   }
   const table = tableWrap(["訂單", "會員", "狀態", "座位", "金額"]);
@@ -1229,7 +1239,7 @@ function bind() {
   $("#login-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    if (!login(String(data.get("username")).trim(), data.get("password"))) $("#login-message").textContent = "帳號或密碼錯誤。";
+    if (!login(String(data.get("username")).trim(), data.get("password"))) $("#login-message").textContent = "登入失敗，請確認帳號資訊。";
   });
   $$("[data-demo-login]").forEach((button) => {
     button.addEventListener("click", () => {

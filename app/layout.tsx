@@ -1,53 +1,52 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fuyuntravel.com";
+import Footer from "@/components/Footer";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE.url),
   title: {
-    default: "浮雲旅遊｜專業包車旅遊服務",
-    template: "%s｜浮雲旅遊"
+    default: SITE.defaultTitle,
+    template: `%s｜${SITE.name}`,
   },
-  description:
-    "浮雲旅遊提供台灣包車、企業接待、機場接送與精選行程報名服務，結合專業車隊與客製化旅遊安排。",
-  keywords: [
-    "浮雲旅遊",
-    "台灣包車",
-    "包車旅遊",
-    "遊覽車",
-    "企業接待",
-    "機場接送",
-    "行程報名"
-  ],
+  description: SITE.defaultDescription,
+  keywords: ["浮雲旅遊", "包車旅遊", "台灣旅遊", "企業接待", "機場接送", "客製化行程"],
+  robots: { index: true, follow: true },
+  alternates: { canonical: SITE.url },
   openGraph: {
-    title: "浮雲旅遊｜專業包車旅遊服務",
-    description: "台灣包車、企業接待、機場接送與精選行程報名服務。",
-    url: siteUrl,
-    siteName: "浮雲旅遊",
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
+    url: SITE.url,
+    siteName: SITE.name,
     locale: "zh_TW",
-    type: "website"
+    type: "website",
+    images: [SITE.ogImage],
   },
-  robots: {
-    index: true,
-    follow: true
-  }
+  twitter: {
+    card: "summary_large_image",
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
+    images: [SITE.ogImage],
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2f2f2f"
+  themeColor: "#2f2f2f",
 };
 
 export default function RootLayout({
-  children
-}: Readonly<{
+  children,
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="zh-Hant-TW">
-      <body>{children}</body>
+    <html lang="zh-Hant">
+      <body>
+        <main className="page">{children}</main>
+        <Footer />
+      </body>
     </html>
   );
 }
