@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import LineButton from "@/components/LineButton";
 import { SITE, COMPANY } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -42,6 +41,22 @@ const jsonLd = {
   serviceType: ["台灣包車旅遊", "企業接待", "機場接送", "客製化行程規劃"],
 };
 
+const navItems = [
+  { href: "/services", label: "服務" },
+  { href: "/fleet", label: "車型" },
+  { href: "/itineraries", label: "行程" },
+  { href: "/contact", label: "聯絡" },
+];
+
+const featureItems = [
+  { href: "/services", title: "服務", text: "包車、接送、企業接待" },
+  { href: "/fleet", title: "車型", text: "大型車、中巴、商務車" },
+  { href: "/itineraries", title: "行程", text: "精選旅遊、報名選位" },
+  { href: "/contact", title: "聯絡", text: "LINE、電話、表單詢價" },
+];
+
+const facebookUrl = "https://www.facebook.com/share/g/1NPbXN8THD/";
+
 export default function HomePage() {
   return (
     <>
@@ -50,43 +65,63 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <section className="hero hero-photo">
-        <div className="hero__overlay">
-          <p className="eyebrow">浮雲旅遊｜專業包車旅遊服務</p>
-          <h1>專業包車旅遊服務</h1>
-          <p className="lead">
-            浮雲旅遊提供台灣包車旅遊、企業接待、機場接送與客製化行程規劃，由專人協助確認車型、日期與報價。
-          </p>
-          <div className="cta-row">
-            <Link className="btn btn-primary" href="/contact/inquiry">立即詢價</Link>
-            <Link className="btn btn-glass" href="/itineraries">查看行程</Link>
-            <LineButton>LINE 諮詢</LineButton>
-          </div>
-        </div>
-      </section>
+      <div className="home-page">
+        <header className="home-nav" aria-label="浮雲旅遊首頁導覽">
+          <Link className="home-brand" href="/">
+            <strong>浮雲旅遊</strong>
+            <span>專業包車旅遊服務</span>
+          </Link>
 
-      <section className="card-grid feature-grid" aria-label="浮雲旅遊服務入口">
-        <Link className="card feature-card" href="/services">
-          <span className="feature-card__label">服務</span>
-          <h3>包車與企業接待</h3>
-          <p>包車旅遊、機場接送、企業接待與客製行程。</p>
-        </Link>
-        <Link className="card feature-card" href="/fleet">
-          <span className="feature-card__label">車型</span>
-          <h3>大型車、中巴、商務車</h3>
-          <p>依照人數、行李量與路線安排合適車型。</p>
-        </Link>
-        <Link className="card feature-card" href="/itineraries">
-          <span className="feature-card__label">行程</span>
-          <h3>精選旅遊與報名選位</h3>
-          <p>查看精選行程、會員訂單與座位預訂流程。</p>
-        </Link>
-        <Link className="card feature-card" href="/contact">
-          <span className="feature-card__label">聯絡</span>
-          <h3>LINE、電話、Email</h3>
-          <p>由專人協助確認日期、車型、路線與報價。</p>
-        </Link>
-      </section>
+          <nav className="home-nav__links" aria-label="主要選單">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="home-nav__actions">
+            <Link className="home-nav__quote" href="/contact/inquiry">
+              立即詢價
+            </Link>
+            <a className="home-nav__login" href="/platform/index.html?v=official#login">
+              登入/註冊
+            </a>
+          </div>
+        </header>
+
+        <section className="home-hero" aria-label="專業包車旅遊服務">
+          <div className="home-hero__content">
+            <p className="home-eyebrow">浮雲旅遊｜專業包車旅遊服務</p>
+            <h1>專業包車旅遊服務</h1>
+            <div className="home-hero__actions">
+              <Link className="home-btn home-btn--gold" href="/contact/inquiry">
+                立即詢價
+              </Link>
+              <Link className="home-btn home-btn--glass" href="/itineraries">
+                查看行程
+              </Link>
+              <a
+                className="home-btn home-btn--glass"
+                href={facebookUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Facebook ↗
+              </a>
+            </div>
+          </div>
+
+          <div className="home-feature-grid" aria-label="浮雲旅遊服務入口">
+            {featureItems.map((item) => (
+              <Link className="home-feature-card" key={item.href} href={item.href}>
+                <h2>{item.title}</h2>
+                <p>{item.text}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
     </>
   );
 }
