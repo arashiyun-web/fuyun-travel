@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LineButton from "@/components/LineButton";
-import LegalInfo from "@/components/LegalInfo";
 import { COMPANY, pageMeta } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
@@ -48,8 +47,6 @@ export default function ContactPage() {
           <p>{COMPANY.agencyType}</p>
         </div>
       </section>
-
-      <LegalInfo />
     </>
   );
 }

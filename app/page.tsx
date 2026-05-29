@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import LegalInfo from "@/components/LegalInfo";
 import LineButton from "@/components/LineButton";
 import { SITE, COMPANY } from "@/lib/site";
 
@@ -88,8 +87,6 @@ export default function HomePage() {
           <p>由專人協助確認日期、車型、路線與報價。</p>
         </Link>
       </section>
-
-      <LegalInfo />
     </>
   );
 }
