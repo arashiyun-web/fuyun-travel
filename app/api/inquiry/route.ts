@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { SITE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -147,7 +148,7 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
   });
 
   const text = [
-    "浮雲旅遊新詢價",
+    `${SITE.name}新詢價`,
     "",
     `姓名：${inquiry.name}`,
     `電話：${inquiry.phone}`,
@@ -165,7 +166,7 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
   await transporter.sendMail({
     from,
     to,
-    subject: `浮雲旅遊新詢價：${inquiry.name}`,
+    subject: `${SITE.name}新詢價：${inquiry.name}`,
     text,
     replyTo: from,
   });

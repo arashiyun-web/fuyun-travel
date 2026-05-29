@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatMoney, type Tour } from "@/lib/tours";
+import { SITE } from "@/lib/site";
 
 type Seat = {
   id: string;
@@ -112,7 +113,7 @@ export default function SeatBooking({ tour }: { tour: Tour }) {
   return (
     <main className="min-h-screen bg-[#f7f3ea] pb-16 pt-16 text-[#242424]">
       <section className="relative overflow-hidden bg-[#2f2f2f]">
-        <img src="/hero-bus-sunny.png" alt="浮雲旅遊車輛" className="h-[360px] w-full object-cover opacity-75" />
+        <img src="/hero-bus-sunny.png" alt={`${SITE.name}車輛`} className="h-[360px] w-full object-cover opacity-75" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/65 to-transparent" />
         <div className="absolute left-1/2 top-12 w-full max-w-7xl -translate-x-1/2 px-4 sm:px-6 lg:px-8">

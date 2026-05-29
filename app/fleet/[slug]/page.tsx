@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import { findContentItem, fleetItems } from "@/lib/siteContent";
+import { SITE } from "@/lib/site";
 
 type FleetDetailPageProps = {
   params: {
@@ -35,7 +36,7 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
           返回車型分類
         </Link>
         <article className="mt-6 overflow-hidden rounded-md border border-[#d8ccb2] bg-white shadow-[0_18px_45px_rgba(48,39,24,0.12)]">
-          <img src="/hero-bus-sunny.png" alt="浮雲旅遊車輛" className="h-72 w-full object-cover" />
+          <img src="/hero-bus-sunny.png" alt={`${SITE.name}車輛`} className="h-72 w-full object-cover" />
           <div className="p-8">
             <Icon className="text-[#b89b5e]" size={42} />
             <p className="mt-6 text-sm font-bold tracking-[0.25em] text-[#b89b5e]">第三層｜車型內容</p>

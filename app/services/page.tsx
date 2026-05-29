@@ -1,44 +1,33 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
-import { serviceItems } from "@/lib/siteContent";
+import { pageMeta } from "@/lib/site";
 
-export const metadata = {
-  title: "服務項目"
-};
+export const metadata: Metadata = pageMeta({
+  title: "服務項目",
+  description: "企業包車接待、家庭好友小團、機場接送與客製包車旅遊，依集合點與時程彈性規劃。",
+  path: "/services",
+});
+
+const services = [
+  { href: "/services/business-charter", title: "企業包車接待", desc: "會議、活動、貴賓接待與員工旅遊，依集合點與時程規劃車輛調度。" },
+  { href: "/services/family-group", title: "家庭好友小團", desc: "適合家族旅遊、好友出遊與銀髮族慢遊，行程彈性、節奏更舒適。" },
+  { href: "/services/airport-transfer", title: "機場接送", desc: "往返機場、飯店與景點，協助安排多人行李與班機時間銜接。" },
+  { href: "/services/custom-tour", title: "客製包車旅遊", desc: "依天數、預算與偏好規劃台灣各地景點、餐食與住宿動線。" },
+];
 
 export default function ServicesPage() {
   return (
-    <main className="min-h-screen bg-[#f7f3ea] pb-16 pt-16 text-[#242424]">
-      <SiteHeader active="services" />
-      <section className="relative overflow-hidden bg-[#2f2f2f]">
-        <img src="/hero-bus-sunny.png" alt="浮雲旅遊車輛" className="h-[360px] w-full object-cover opacity-75" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/25 to-transparent" />
-        <div className="absolute left-1/2 top-16 w-full max-w-7xl -translate-x-1/2 px-4 sm:px-6 lg:px-8">
-          <p className="text-sm font-bold tracking-[0.25em] text-[#ffe600]">第二層｜服務分類</p>
-          <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight text-white sm:text-6xl">
-            選擇服務後，進入第三層看完整內容
-          </h1>
-        </div>
+    <>
+      <h1>服務項目</h1>
+      <p className="lead">選擇您需要的服務，查看完整方案。</p>
+      <section className="card-grid">
+        {services.map((service) => (
+          <Link className="card" href={service.href} key={service.href}>
+            <h3>{service.title}</h3>
+            <p>{service.desc}</p>
+          </Link>
+        ))}
       </section>
-
-      <section className="mx-auto mt-10 grid max-w-7xl gap-6 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-        {serviceItems.map((service) => {
-          const Icon = service.icon;
-
-          return (
-            <Link
-              key={service.slug}
-              href={`/services/${service.slug}`}
-              className="rounded-md border border-[#d8ccb2] bg-white p-6 shadow-[0_18px_45px_rgba(48,39,24,0.12)] transition hover:-translate-y-1"
-            >
-              <Icon className="text-[#b89b5e]" size={32} />
-              <h2 className="mt-5 text-2xl font-black">{service.title}</h2>
-              <p className="mt-4 leading-8 text-[#666]">{service.summary}</p>
-              <p className="mt-5 text-sm font-black text-[#b89b5e]">查看第三層內容</p>
-            </Link>
-          );
-        })}
-      </section>
-    </main>
+    </>
   );
 }

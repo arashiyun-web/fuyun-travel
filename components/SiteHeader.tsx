@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SITE } from "@/lib/site";
 
 type SiteHeaderProps = {
   active?: "home" | "services" | "fleet" | "itineraries" | "contact";
@@ -16,7 +17,7 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
     <header className="fixed inset-x-0 top-0 z-50 border-b border-black/5 bg-[#f7f3ea]/90 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="text-sm font-black tracking-wide text-[#2b2b2b]">
-          浮雲旅遊
+          {SITE.name}
           <span className="block text-xs font-medium tracking-[0.22em] text-[#b89b5e]">
             專業包車旅遊服務
           </span>
@@ -44,7 +45,7 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
             立即詢價
           </Link>
           <a
-            href="/platform/index.html?v=official-api-v1#login"
+            href="/platform/index.html?v=company-info-v1#login"
             className="rounded-md border border-[#d8c9aa] bg-white/70 px-4 py-2 text-sm font-bold text-[#242424] transition hover:bg-white"
           >
             登入/註冊

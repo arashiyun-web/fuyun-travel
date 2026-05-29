@@ -1,135 +1,161 @@
-﻿"use client";
+"use client";
 
-import { FormEvent, useState } from "react";
-import { Send } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { COMPANY } from "@/lib/site";
 
-type FormState = "idle" | "sending" | "success" | "error";
+const SERVICE_TYPES = [
+  "台灣包車旅遊",
+  "企業包車",
+  "商務接待",
+  "客製旅遊",
+  "小團高品質",
+  "企業交通車",
+  "機場接送",
+  "團體一日遊",
+  "多日旅遊行程",
+];
+
+// 台灣手機基本驗證：09 開頭，共 10 碼，允許中間有一個「-」
+const PHONE_RE = /^09\d{2}-?\d{3}-?\d{3}$/;
 
 export default function InquiryForm() {
-  const [state, setState] = useState<FormState>("idle");
-  const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setState("sending");
-    setMessage("");
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-
-    const response = await fetch("/api/inquiry", {
-      method: "POST",
-      body: JSON.stringify(Object.fromEntries(formData.entries())),
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (response.ok) {
-      setState("success");
-      setMessage("詢價已送出，我們會盡快與您聯繫。");
-      form.reset();
+    // 四、手機欄位基本驗證
+    if (!PHONE_RE.test(phone.trim())) {
+      setError("請輸入正確的手機號碼（例如 0912-345-678）。");
       return;
     }
 
-    setState("error");
-    setMessage("送出失敗，請改用 LINE 或電話聯繫。");
+    // 一、未勾選同意不得送出
+    if (!consent) {
+      setError("請先勾選並同意《隱私權政策》後再送出。");
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      const response = await fetch("/api/inquiry", {
+        method: "POST",
+        body: JSON.stringify({
+          ...Object.fromEntries(formData.entries()),
+          phone: phone.trim(),
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        setError("送出失敗，請稍後再試或改用 LINE、電話聯繫。");
+        return;
+      }
+
+      e.currentTarget.reset();
+      setPhone("");
+      setConsent(false);
+      setSubmitted(true);
+    } catch {
+      setError("暫時無法送出，請稍後再試或改用 LINE、電話聯繫。");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (submitted) {
+    // 送出成功訊息
+    return (
+      <div className="form-success" role="status">
+        我們已收到您的需求，將由專人與您聯繫。
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2 text-sm font-semibold text-[#333]">
-          姓名
-          <input
-            name="name"
-            required
-            className="h-12 rounded-md border border-[#d8ccb2] bg-white px-4 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-            placeholder="請輸入姓名"
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-[#333]">
-          電話
-          <input
-            name="phone"
-            required
-            inputMode="tel"
-            className="h-12 rounded-md border border-[#d8ccb2] bg-white px-4 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-            placeholder="請輸入手機或市話"
-          />
-        </label>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2 text-sm font-semibold text-[#333]">
-          出發日期
-          <input
-            name="date"
-            type="date"
-            className="h-12 rounded-md border border-[#d8ccb2] bg-white px-4 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-[#333]">
-          人數
-          <input
-            name="passengers"
-            inputMode="numeric"
-            className="h-12 rounded-md border border-[#d8ccb2] bg-white px-4 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-            placeholder="例：8人 / 20人 / 40人"
-          />
-        </label>
-      </div>
-
-      <label className="grid gap-2 text-sm font-semibold text-[#333]">
-        需求類型
-        <select
-          name="service"
-          className="h-12 rounded-md border border-[#d8ccb2] bg-white px-4 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-          defaultValue="台灣包車旅遊"
-        >
-          <option>台灣包車旅遊</option>
-          <option>企業包車</option>
-          <option>商務接待</option>
-          <option>客製旅遊</option>
-          <option>小團高品質</option>
-          <option>企業交通車</option>
-          <option>機場接送</option>
-          <option>團體一日遊</option>
-          <option>多日旅遊行程</option>
-        </select>
+    <form className="inquiry-form" onSubmit={handleSubmit} noValidate>
+      <label className="field">
+        <span>姓名</span>
+        <input type="text" name="name" autoComplete="name" required />
       </label>
 
-      <label className="grid gap-2 text-sm font-semibold text-[#333]">
-        行程與備註
-        <textarea
-          name="note"
-          rows={5}
-          className="rounded-md border border-[#d8ccb2] bg-white px-4 py-3 text-base font-normal outline-none transition focus:border-[#b89b5e] focus:ring-4 focus:ring-[#eadfca]"
-          placeholder="請留下出發地、目的地、用車時間、是否需要代排行程"
+      <label className="field">
+        <span>電話</span>
+        <input
+          type="tel"
+          name="phone"
+          inputMode="tel"
+          placeholder="0912-345-678"
+          value={phone}
+          onChange={(event) => setPhone(event.target.value)}
+          required
         />
       </label>
 
-      <button
-        type="submit"
-        disabled={state === "sending"}
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#c8ad72] px-5 font-bold text-[#242424] transition hover:bg-[#d6bd83] disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        <Send size={18} />
-        {state === "sending" ? "送出中" : "送出詢價"}
-      </button>
+      <label className="field">
+        <span>出發日期</span>
+        <input type="date" name="date" required />
+      </label>
 
-      {message ? (
-        <p
-          className={`rounded-md px-4 py-3 text-sm font-semibold ${
-            state === "success"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {message}
+      <label className="field">
+        <span>人數</span>
+        <input type="number" name="passengers" min={1} inputMode="numeric" required />
+      </label>
+
+      <label className="field">
+        <span>需求類型</span>
+        <select name="trip_type" defaultValue={SERVICE_TYPES[0]}>
+          {SERVICE_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        <span>行程與備註</span>
+        <textarea name="note" rows={4} />
+      </label>
+
+      {/* 三、表單旁簡短個資告知 */}
+      <p className="privacy-notice">
+        本表單僅為旅遊詢價與客服聯繫目的蒐集您的姓名、電話等資料， 詳見{" "}
+        <Link href="/privacy">《隱私權政策》</Link>。
+      </p>
+
+      {/* 一、送出前必勾同意 */}
+      <label className="consent">
+        <input
+          type="checkbox"
+          name="consent"
+          checked={consent}
+          onChange={(event) => setConsent(event.target.checked)}
+        />
+        <span>
+          我已閱讀並同意《隱私權政策》，並同意{COMPANY.companyName}為旅遊詢價與客服聯繫目的蒐集、處理及利用本人資料。
+        </span>
+      </label>
+
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
         </p>
-      ) : null}
+      )}
+
+      <button type="submit" className="btn btn-primary" disabled={!consent || sending}>
+        {sending ? "送出中" : "送出詢價"}
+      </button>
     </form>
   );
 }
-
