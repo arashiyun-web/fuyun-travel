@@ -10,12 +10,6 @@ export default function Footer() {
         <LegalInfo />
 
         <div className="site-footer__cta">
-          <a className="btn" href={`tel:${COMPANY.phone}`}>
-            電話：{COMPANY.phone}
-          </a>
-          <a className="btn" href={`mailto:${COMPANY.email}`}>
-            Email：{COMPANY.email}
-          </a>
           <LineButton>LINE 官方帳號諮詢</LineButton>
         </div>
 
