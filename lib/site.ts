@@ -9,7 +9,8 @@ export const SITE = {
   ogImage: "/hero-bus-sunny.png",
 } as const;
 
-export const LINE_URL: string = process.env.NEXT_PUBLIC_LINE_URL ?? "";
+export const LINE_URL: string =
+  process.env.NEXT_PUBLIC_LINE_URL ?? "https://line.me/R/ti/p/@954fyicw";
 
 export const COMPANY = {
   companyName: "雲驛旅行社有限公司",
