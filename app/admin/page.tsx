@@ -80,6 +80,11 @@ export default function AdminPage() {
     setSummary(initialSummary);
   }
 
+  function openPlatformAdmin() {
+    sessionStorage.setItem("travel-commerce-session-v1", "u-owner");
+    window.location.href = "/platform/index.html?v=official-owner-login-v5#admin";
+  }
+
   useEffect(() => {
     const saved = localStorage.getItem("admin_token") || "";
     if (saved) {
@@ -153,6 +158,19 @@ export default function AdminPage() {
           <div className="text-center py-12 text-xs text-slate-600 tracking-wide">請點擊左側單號，即可調出完整的營運編輯面板。</div>
         </div>
       </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider">platform operations</p>
+            <h2 className="text-base font-medium text-slate-200 mt-1">其他平台管理功能</h2>
+            <p className="text-xs text-slate-500 mt-2">行程管理、即時訂單、會員明細、系統級推播。</p>
+          </div>
+          <button type="button" onClick={openPlatformAdmin} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+            開啟平台管理後台
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -165,4 +183,3 @@ function Metric({ label, value, muted, highlight, success }: { label: string; va
     </div>
   );
 }
-
