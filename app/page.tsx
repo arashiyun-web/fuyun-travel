@@ -84,7 +84,7 @@ export default function HomePage() {
             <Link className="home-nav__quote" href="/contact/inquiry">
               立即詢價
             </Link>
-            <a className="home-nav__login" href="/platform/index.html?v=official-owner-login-v5#login">
+            <a className="home-nav__login" href="/platform/index.html?v=official-member-register-v1#login">
               登入/註冊
             </a>
           </div>

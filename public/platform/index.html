@@ -111,6 +111,13 @@
           <label>密碼 <input name="password" type="password" autocomplete="current-password" required /></label>
           <button class="primary-button" type="submit">登入</button>
           <p id="login-message" class="form-message"></p>
+          <div class="divider"></div>
+          <p class="eyebrow">New Member</p>
+          <h3>新會員註冊</h3>
+          <label>姓名 <input id="register-name" autocomplete="name" /></label>
+          <label>帳號 <input id="register-username" autocomplete="username" /></label>
+          <label>密碼 <input id="register-password" type="password" autocomplete="new-password" /></label>
+          <button id="register-button" class="secondary-button" type="button">註冊會員</button>
         </form>
       </section>
 
@@ -128,7 +135,7 @@
     <div id="notification-panel" class="notification-panel hidden"></div>
     <div id="toast-root" class="toast-root"></div>
 
-    <script src="./app.js?v=official-owner-login-v5"></script>
+    <script src="./app.js?v=official-member-register-v1"></script>
     <script src="./inquiry-module.js"></script>
   </body>
 </html>

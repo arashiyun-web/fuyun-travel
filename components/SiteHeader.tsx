@@ -45,7 +45,7 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
             立即詢價
           </Link>
           <a
-            href="/platform/index.html?v=official-owner-login-v5#login"
+            href="/platform/index.html?v=official-member-register-v1#login"
             className="rounded-md border border-[#d8c9aa] bg-white/70 px-4 py-2 text-sm font-bold text-[#242424] transition hover:bg-white"
           >
             登入/註冊
