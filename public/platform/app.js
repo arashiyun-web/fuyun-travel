@@ -241,6 +241,10 @@ function parseRoute() {
 }
 
 function go(route) {
+  if ((location.hash || "#home") === route) {
+    renderRoute();
+    return;
+  }
   location.hash = route;
 }
 
