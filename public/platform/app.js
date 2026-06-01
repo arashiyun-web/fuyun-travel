@@ -132,6 +132,7 @@ function ensureSystemUser(account) {
 }
 
 ensureSystemUser({ id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" });
+ensureSystemUser({ id: "u-owner", name: "最高權限管理員", username: "arashiyun6866", password: "y12345678", role: "admin" });
 ensureSystemUser({ id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" });
 ensureSystemUser({ id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" });
 save("users");
