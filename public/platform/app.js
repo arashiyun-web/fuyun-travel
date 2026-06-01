@@ -1214,8 +1214,20 @@ function toast(text) {
   setTimeout(() => node.remove(), 3200);
 }
 
+async function loginOwnerDashboard(username, password) {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success || !data.token) throw new Error(data.error || "登入失敗，請確認帳號資訊。");
+  localStorage.setItem("admin_token", data.token);
+  window.location.href = "/admin";
+}
+
 function login(username, password) {
-  if (username === OWNER_ACCOUNT.username && password === OWNER_ACCOUNT.password) {
+  if (username === OWNER_ACCOUNT.username && String(password).trim() === OWNER_ACCOUNT.password) {
     ensureSystemUser(OWNER_ACCOUNT);
     save("users");
     const owner = state.users.find((item) => item.username === OWNER_ACCOUNT.username) || OWNER_ACCOUNT;
@@ -1258,7 +1270,21 @@ function bind() {
   $("#login-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    if (!login(String(data.get("username")).trim(), data.get("password"))) $("#login-message").textContent = "登入失敗，請確認帳號資訊。";
+    const username = String(data.get("username")).trim();
+    const password = String(data.get("password")).trim();
+    const message = $("#login-message");
+    const submit = event.currentTarget.querySelector("button[type='submit']");
+    message.textContent = "";
+    if (username === OWNER_ACCOUNT.username) {
+      submit.disabled = true;
+      loginOwnerDashboard(username, password)
+        .catch((error) => {
+          message.textContent = error.message || "登入失敗，請確認帳號資訊。";
+          submit.disabled = false;
+        });
+      return;
+    }
+    if (!login(username, password)) message.textContent = "登入失敗，請確認帳號資訊。";
   });
   $$("[data-demo-login]").forEach((button) => {
     button.addEventListener("click", () => {
