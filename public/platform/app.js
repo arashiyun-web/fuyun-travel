@@ -1221,13 +1221,17 @@ function login(username, password) {
     const owner = state.users.find((item) => item.username === OWNER_ACCOUNT.username) || OWNER_ACCOUNT;
     setSession(owner);
     go("#admin");
+    renderRoute();
     return true;
   }
   const user = state.users.find((item) => item.username === username && item.password === password);
   if (!user) return false;
   setSession(user);
   if (user.role === "customer") go("#member");
-  else go("#admin");
+  else {
+    go("#admin");
+    renderRoute();
+  }
   return true;
 }
 
