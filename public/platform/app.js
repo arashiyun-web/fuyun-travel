@@ -10,6 +10,8 @@ const STORE = {
   session: "travel-commerce-session-v1",
 };
 
+const OWNER_ACCOUNT = { id: "u-owner", name: "最高權限管理員", username: "arashiyun6866", password: "y12345678", role: "admin" };
+
 // Demo VAPID public key. In production this comes from the backend and pairs
 // with the private VAPID key used by web-push on the server.
 const DEMO_VAPID_PUBLIC_KEY = "BEl6jNqXgkqv2fP9U_KQ8P_c9Gw6r4v2GzvKh3yM5LqJm-Push-Demo-Key-Replace-In-Prod";
@@ -132,7 +134,7 @@ function ensureSystemUser(account) {
 }
 
 ensureSystemUser({ id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" });
-ensureSystemUser({ id: "u-owner", name: "最高權限管理員", username: "arashiyun6866", password: "y12345678", role: "admin" });
+ensureSystemUser(OWNER_ACCOUNT);
 ensureSystemUser({ id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" });
 ensureSystemUser({ id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" });
 save("users");
@@ -1209,6 +1211,14 @@ function toast(text) {
 }
 
 function login(username, password) {
+  if (username === OWNER_ACCOUNT.username && password === OWNER_ACCOUNT.password) {
+    ensureSystemUser(OWNER_ACCOUNT);
+    save("users");
+    const owner = state.users.find((item) => item.username === OWNER_ACCOUNT.username) || OWNER_ACCOUNT;
+    setSession(owner);
+    go("#admin");
+    return true;
+  }
   const user = state.users.find((item) => item.username === username && item.password === password);
   if (!user) return false;
   setSession(user);
