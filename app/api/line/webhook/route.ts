@@ -169,25 +169,29 @@ async function handleText(userId: string, text: string) {
 }
 
 async function handleEvent(event: LineEvent) {
-  if (event.type !== "message" || event.message?.type !== "text" || !event.source?.userId) return;
-  const userId = event.source.userId;
-  const replyToken = event.replyToken || "";
-  const reply = await handleText(userId, event.message.text || "");
-
-  if (!replyToken) {
-    await pushLineText(userId, reply).catch((error) => {
-      console.error("LINE push fallback failed:", error);
-    });
-    return;
-  }
-
   try {
-    await replyLineText(replyToken, reply);
+    if (event.type !== "message" || event.message?.type !== "text" || !event.source?.userId) return;
+    const userId = event.source.userId;
+    const replyToken = event.replyToken || "";
+    const reply = await handleText(userId, event.message.text || "");
+
+    if (!replyToken) {
+      await pushLineText(userId, reply).catch((error) => {
+        console.error("LINE push fallback failed:", error);
+      });
+      return;
+    }
+
+    try {
+      await replyLineText(replyToken, reply);
+    } catch (error) {
+      console.error("LINE reply failed, fallback to push:", error);
+      await pushLineText(userId, reply).catch((pushError) => {
+        console.error("LINE push fallback failed:", pushError);
+      });
+    }
   } catch (error) {
-    console.error("LINE reply failed, fallback to push:", error);
-    await pushLineText(userId, reply).catch((pushError) => {
-      console.error("LINE push fallback failed:", pushError);
-    });
+    console.error("LINE event handling failed:", error);
   }
 }
 
