@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { pushLineText, replyLineText } from "@/lib/lineApi";
+import { replyLineText } from "@/lib/lineApi";
 import {
   buildQuoteDraftText,
   buildQuoteOptions,
@@ -169,26 +169,9 @@ async function handleText(userId: string, text: string) {
 }
 
 async function handleEvent(event: LineEvent) {
-  if (event.type !== "message" || event.message?.type !== "text" || !event.source?.userId) return;
-  const userId = event.source.userId;
-  const replyToken = event.replyToken || "";
-  const reply = await handleText(userId, event.message.text || "");
-
-  if (!replyToken) {
-    await pushLineText(userId, reply).catch((error) => {
-      console.error("LINE push fallback failed:", error);
-    });
-    return;
-  }
-
-  try {
-    await replyLineText(replyToken, reply);
-  } catch (error) {
-    console.error("LINE reply failed, fallback to push:", error);
-    await pushLineText(userId, reply).catch((pushError) => {
-      console.error("LINE push fallback failed:", pushError);
-    });
-  }
+  if (event.type !== "message" || event.message?.type !== "text" || !event.replyToken || !event.source?.userId) return;
+  const reply = await handleText(event.source.userId, event.message.text || "");
+  await replyLineText(event.replyToken, reply);
 }
 
 export async function GET() {
