@@ -49,6 +49,15 @@ function estimate(base: number, passengerCount = 0) {
   return `NT$ ${Number(base + groupFactor).toLocaleString("zh-TW")} 起`;
 }
 
+function priceComponents(base: number, passengerCount = 0) {
+  const groupFactor = passengerCount > 40 ? 3500 : passengerCount > 20 ? 2500 : passengerCount > 8 ? 1500 : 0;
+  return [
+    `基礎車資：NT$ ${base.toLocaleString("zh-TW")}`,
+    `人數級距加成：NT$ ${groupFactor.toLocaleString("zh-TW")}`,
+    "日期、路線、車輛調度與實際需求：需由真人客服最後確認",
+  ];
+}
+
 export function buildQuoteOptions(draft: QuoteDraft): QuoteOption[] {
   const passengers = draft.passengerCount || 0;
   return [
@@ -62,6 +71,7 @@ export function buildQuoteOptions(draft: QuoteDraft): QuoteOption[] {
 export function buildQuoteDraftText(draft: QuoteDraft) {
   const options = buildQuoteOptions(draft);
   const recommended = recommendedVehicle(draft.passengerCount || 0);
+  const passengers = draft.passengerCount || 0;
   return [
     "浮雲輕鬆遊正式報價草稿",
     "",
@@ -74,6 +84,9 @@ export function buildQuoteDraftText(draft: QuoteDraft) {
     "AI 估價方案：",
     ...options.map((item) => `- ${item.vehicle}：${item.estimate}（${item.note}）`),
     "",
+    "價格成份說明：",
+    ...priceComponents(6500, passengers).map((line) => `- ${line}`),
+    "",
     `建議車型：${recommended}`,
     "",
     "以上為 AI 初步估價，正式價格仍需依日期、路線、車輛調度與實際需求由真人客服確認。",
@@ -82,10 +95,14 @@ export function buildQuoteDraftText(draft: QuoteDraft) {
 
 export function publicQuoteSummary(draft: QuoteDraft) {
   const options = buildQuoteOptions(draft);
+  const passengers = draft.passengerCount || 0;
   return [
     "已收到您的包車詢價，以下為 AI 初步估價：",
     "",
     ...options.map((item) => `${item.vehicle}：${item.estimate}`),
+    "",
+    "價格成份說明：",
+    ...priceComponents(6500, passengers).map((line) => `- ${line}`),
     "",
     `建議車型：${recommendedVehicle(draft.passengerCount || 0)}`,
     "真人客服會再確認路線與車輛後提供正式報價。",
