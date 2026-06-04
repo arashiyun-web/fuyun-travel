@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CharterQuote {
+  id                 String    @id @default(cuid())
+  lineUserId         String    @map("line_user_id")
+  lineName           String?   @map("line_name")
+  tripDate           String?   @map("trip_date")
+  passengerCount     Int?      @map("passenger_count")
+  pickup             String?
+  destination        String?
+  remark             String?
+  recommendedVehicle String?   @map("recommended_vehicle")
+  quoteOptions       Json?     @map("quote_options")
+  quoteDraftText     String?   @map("quote_draft_text")
+  quoteStatus        String    @default("DRAFT") @map("quote_status")
+  sentAt             DateTime? @map("sent_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@map("charter_quotes")
+}
+
+model LineSession {
+  userId    String   @id @map("user_id")
+  state     String
+  draftJson Json?    @map("draft_json")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("line_sessions")
+}
