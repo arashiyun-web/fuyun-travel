@@ -112,13 +112,47 @@ async function continueQuote(userId: string, text: string) {
   return nextQuoteQuestion(nextState);
 }
 
+async function latestQuoteSummary(userId: string) {
+  const quote = await prisma.charterQuote.findFirst({
+    where: { lineUserId: userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!quote) {
+    return "目前沒有上一筆包車估價，請先輸入「包車」開始詢價。";
+  }
+
+  const options = Array.isArray(quote.quoteOptions) ? (quote.quoteOptions as { vehicle?: string; estimate?: string }[]) : [];
+  if (options.length === 0) {
+    return publicQuoteSummary({
+      tripDate: quote.tripDate ?? undefined,
+      passengerCount: quote.passengerCount ?? undefined,
+      pickup: quote.pickup ?? undefined,
+      destination: quote.destination ?? undefined,
+      remark: quote.remark ?? undefined,
+    });
+  }
+
+  return [
+    "以下為上一筆包車初步估價：",
+    "",
+    ...options.map((item) => `${item.vehicle || "車型"}：${item.estimate || "待確認"}`),
+    "",
+    `建議車型：${quote.recommendedVehicle || recommendedVehicle(quote.passengerCount || 0)}`,
+    "真人客服會再確認路線與車輛後提供正式報價。",
+  ].join("\n");
+}
+
 async function handleText(userId: string, text: string) {
   const message = normalize(text);
+
+  if (["選單", "menu", "功能"].includes(message)) return MENU;
+  if (message === "價格" || message === "報價") return latestQuoteSummary(userId);
+  if (message.includes("包車") || message === "1") return startQuote(userId);
+
   const inProgress = await continueQuote(userId, text);
   if (inProgress) return inProgress;
 
-  if (["選單", "menu", "功能"].includes(message)) return MENU;
-  if (message.includes("包車") || message === "1") return startQuote(userId);
   if (message.includes("國旅") || message.includes("國內") || message === "2") {
     return "國內旅遊可協助規劃一日遊、多日遊與客製化行程。請提供出發日期、出發地、目的地、人數與預計天數，客服會協助安排。";
   }
