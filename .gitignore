@@ -16,3 +16,5 @@ backend/.venv/
 __pycache__/
 .pytest_cache/
 *.pyc
+backend/chroma_db/
+chroma_db/
