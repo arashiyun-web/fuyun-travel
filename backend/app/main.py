@@ -31,6 +31,7 @@ from app.rag_service import rag_service
 from app.storage import quote_store
 
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
+LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
 app = FastAPI(title="Fuyun Travel LINE RAG Bot")
 
@@ -97,7 +98,7 @@ def _general_reply(text: str, analysis: dict[str, Any]) -> str:
     return MENU
 
 
-async def _reply_to_line(reply_token: str, text: str, access_token: str) -> None:
+async def _reply_to_line(reply_token: str, user_id: str, text: str, access_token: str) -> None:
     async with httpx.AsyncClient(timeout=15) as client:
         response = await client.post(
             LINE_REPLY_URL,
@@ -105,6 +106,20 @@ async def _reply_to_line(reply_token: str, text: str, access_token: str) -> None
             json={"replyToken": reply_token, "messages": [{"type": "text", "text": text[:4500]}]},
         )
     if response.status_code >= 400:
+        error_text = response.text[:500]
+        print(f"LINE reply API failed: {response.status_code} {error_text}", flush=True)
+        if user_id:
+            async with httpx.AsyncClient(timeout=15) as client:
+                push_response = await client.post(
+                    LINE_PUSH_URL,
+                    headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+                    json={"to": user_id, "messages": [{"type": "text", "text": text[:4500]}]},
+                )
+            if push_response.status_code < 400:
+                return
+            push_error = push_response.text[:500]
+            print(f"LINE push API failed: {push_response.status_code} {push_error}", flush=True)
+            raise HTTPException(status_code=500, detail=f"LINE reply/push API failed: {response.status_code}/{push_response.status_code}")
         raise HTTPException(status_code=500, detail=f"LINE reply API failed: {response.status_code}")
 
 
@@ -239,7 +254,7 @@ async def handle_event(event: dict[str, Any], access_token: str):
     if not reply_token or not user_id:
         return
     reply = await handle_text(user_id, event.get("message", {}).get("text", ""))
-    await _reply_to_line(reply_token, reply, access_token)
+    await _reply_to_line(reply_token, user_id, reply, access_token)
 
 
 @app.post("/line/webhook")

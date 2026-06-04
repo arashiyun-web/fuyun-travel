@@ -45,8 +45,8 @@ def make_body(text: str) -> bytes:
 def test_webhook_valid_signature_starts_quote_flow(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
-        calls.append({"reply_token": reply_token, "text": text, "access_token": access_token})
+    async def fake_reply(reply_token, user_id, text, access_token):
+        calls.append({"reply_token": reply_token, "user_id": user_id, "text": text, "access_token": access_token})
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
     body = make_body("包車")
@@ -69,7 +69,7 @@ def test_webhook_invalid_signature_returns_403():
 def test_quote_flow_writes_charter_quotes(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
+    async def fake_reply(reply_token, user_id, text, access_token):
         calls.append(text)
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
@@ -97,7 +97,7 @@ def test_quote_flow_writes_charter_quotes(monkeypatch):
 def test_price_returns_last_quote_summary(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
+    async def fake_reply(reply_token, user_id, text, access_token):
         calls.append(text)
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
@@ -118,7 +118,7 @@ def test_price_returns_last_quote_summary(monkeypatch):
 def test_one_day_round_taiwan_block(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
+    async def fake_reply(reply_token, user_id, text, access_token):
         calls.append(text)
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
@@ -133,7 +133,7 @@ def test_one_day_round_taiwan_block(monkeypatch):
 def test_45_seat_airport_big_luggage_warning(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
+    async def fake_reply(reply_token, user_id, text, access_token):
         calls.append(text)
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
@@ -148,8 +148,8 @@ def test_45_seat_airport_big_luggage_warning(monkeypatch):
 def test_api_line_webhook_alias_valid_signature(monkeypatch):
     calls = []
 
-    async def fake_reply(reply_token, text, access_token):
-        calls.append({"reply_token": reply_token, "text": text, "access_token": access_token})
+    async def fake_reply(reply_token, user_id, text, access_token):
+        calls.append({"reply_token": reply_token, "user_id": user_id, "text": text, "access_token": access_token})
 
     monkeypatch.setattr("app.main._reply_to_line", fake_reply)
     body = make_body("包車")
