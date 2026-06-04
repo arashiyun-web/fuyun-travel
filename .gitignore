@@ -12,3 +12,7 @@ pnpm-debug.log*
 
 .tools
 .env*
+backend/.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
