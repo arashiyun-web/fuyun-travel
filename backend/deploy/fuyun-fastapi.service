@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/home/arashiyun/fuyun-travel/backend
 EnvironmentFile=/home/arashiyun/fuyun-travel/backend/.env
+EnvironmentFile=-/home/arashiyun/fuyun-travel/.env.local
 ExecStart=/home/arashiyun/fuyun-travel/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=3

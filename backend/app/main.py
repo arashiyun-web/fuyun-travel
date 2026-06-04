@@ -11,11 +11,37 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app import quote_engine
+from app.quote_flow import (
+    ASK_DATE,
+    ASK_DESTINATION,
+    ASK_PASSENGER,
+    ASK_PICKUP,
+    ASK_REMARK,
+    build_quote_draft_text,
+    build_quote_options,
+    clean_text,
+    determine_next_state,
+    next_quote_question,
+    parse_passenger_count,
+    parse_quote_seed,
+    parse_trip_date,
+    recommended_vehicle,
+)
 from app.rag_service import rag_service
+from app.storage import quote_store
 
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 
 app = FastAPI(title="Fuyun Travel LINE RAG Bot")
+
+MENU = "\n".join([
+    "浮雲輕鬆遊 AI 客服選單：",
+    "1. 包車詢價（輸入：包車）",
+    "2. 國內旅遊（輸入：國旅）",
+    "3. 校外教學（輸入：校外教學）",
+    "4. 機場接送（輸入：機場接送）",
+    "5. 客服人員（輸入：客服）",
+])
 
 
 def _required_env() -> tuple[str, str]:
@@ -34,32 +60,41 @@ def _verify_signature(body: bytes, signature: str | None, channel_secret: str) -
     return hmac.compare_digest(expected, signature)
 
 
-def build_customer_reply(message: str, analysis: dict[str, Any], context: str) -> str:
-    lines: list[str] = []
+def _clean_draft(draft: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "trip_date": clean_text(draft.get("trip_date"), 32) or None,
+        "passenger_count": draft.get("passenger_count"),
+        "pickup": clean_text(draft.get("pickup"), 120) or None,
+        "destination": clean_text(draft.get("destination"), 120) or None,
+        "remark": clean_text(draft.get("remark"), 120) or None,
+    }
 
+
+def _latest_quote_summary(user_id: str) -> str:
+    quote = quote_store.latest_quote(user_id)
+    if not quote:
+        return "目前沒有上一筆包車估價，請先輸入「包車」開始詢價。"
+    options = quote.get("quote_options") or build_quote_options(quote)
+    return "\n".join([
+        "以下為上一筆包車初步估價：",
+        "",
+        *[f"{item.get('vehicle', '車型')}：{item.get('estimate', '待確認')}" for item in options],
+        "",
+        f"建議車型：{quote.get('recommended_vehicle') or recommended_vehicle(int(quote.get('passenger_count') or 0))}",
+        "真人客服會再確認路線與車輛後提供正式報價。",
+    ])
+
+
+def _general_reply(text: str, analysis: dict[str, Any]) -> str:
     if analysis.get("is_one_day_round_taiwan"):
-        lines.append("一日環島風險過高，行車時間、休息與安全都不合理，浮雲旅遊不建議也不承接一日環島行程。")
-    elif analysis.get("asks_legal"):
-        lines.append("浮雲旅遊是交通部觀光署甲種旅行社，註冊編號 882200，品保協會會員北2760，履約保證保險 1500 萬元")
-    elif analysis.get("intent") == "quote":
-        lines.append("已收到您的詢價需求。以下先提供初步行情方向，正式價格需由客服依日期、路線、車型與車輛調度確認。")
-    else:
-        lines.append("您好，這裡是浮雲旅遊客服。請提供需求，我們會協助確認行程與車輛安排。")
-
+        return "一日環島風險過高，行車時間、休息與安全都不合理，浮雲旅遊不建議也不承接一日環島行程。"
+    if analysis.get("asks_legal"):
+        return "浮雲旅遊是交通部觀光署甲種旅行社，註冊編號 882200，品保協會會員北2760，履約保證保險 1500 萬元"
     if analysis.get("needs_luggage_warning"):
-        lines.append("44-45座大巴遇到大行李、機場、多日或環島行程時，行李艙容量有限；若每人一件大行李，可能需要減少座位、改派行李車或調整車型。")
-
-    missing_fields = analysis.get("missing_fields") or []
-    if missing_fields:
-        lines.append("目前資訊還不完整，因此只能提供初步行情，不能當作正式報價。")
-        lines.append("請補充：" + "、".join(missing_fields) + "。")
-
-    lines.append("工時計算不包含空車回送，實際費用仍以客服確認後的正式報價為準。")
-    if context:
-        lines.append("\n參考規則：")
-        lines.append(context)
-    lines.append("\n請留下：日期、人數、行李件數、路線。")
-    return "\n".join(lines)
+        return "44-45座大巴遇到大行李、機場、多日或環島行程時，行李艙容量有限；若每人一件大行李，可能需要減少座位、改派行李車或調整車型。\n\n請留下：日期、人數、行李件數、路線。"
+    if analysis.get("intent") == "quote":
+        return "請輸入「包車」開始正式詢價流程。"
+    return MENU
 
 
 async def _reply_to_line(reply_token: str, text: str, access_token: str) -> None:
@@ -78,6 +113,135 @@ async def health() -> dict[str, object]:
     return {"ok": True, "knowledge_documents": rag_service.document_count()}
 
 
+async def _start_quote(user_id: str, draft: dict[str, Any] | None = None) -> str:
+    clean_draft = _clean_draft(draft or {})
+    next_state = determine_next_state(clean_draft)
+    if next_state is None:
+        quote_store.create_quote({
+            "line_user_id": user_id,
+            "line_name": None,
+            "trip_date": clean_draft.get("trip_date"),
+            "passenger_count": clean_draft.get("passenger_count"),
+            "pickup": clean_draft.get("pickup"),
+            "destination": clean_draft.get("destination"),
+            "remark": clean_draft.get("remark") or "無",
+            "recommended_vehicle": recommended_vehicle(int(clean_draft.get("passenger_count") or 0)),
+            "quote_options": build_quote_options(clean_draft),
+            "quote_draft_text": build_quote_draft_text(clean_draft),
+            "quote_status": "DRAFT",
+            "sent_at": None,
+        })
+        quote_store.delete_session(user_id)
+        return "已收到詢價需求，客服將盡快確認。"
+
+    quote_store.upsert_session(user_id, next_state, clean_draft)
+    return next_quote_question(next_state)
+
+
+async def _continue_quote(user_id: str, text: str) -> str | None:
+    session = quote_store.get_session(user_id)
+    if not session:
+        return None
+
+    draft = dict(session.get("draft_json") or {})
+    state = session.get("state")
+    value = clean_text(text, 500)
+
+    if state == ASK_DATE:
+        parsed_date = parse_trip_date(value)
+        if not parsed_date:
+            return next_quote_question(ASK_DATE)
+        draft["trip_date"] = parsed_date
+    elif state == ASK_PASSENGER:
+        passenger_count = parse_passenger_count(value)
+        if passenger_count is None:
+            return "請輸入正確人數，例如：8"
+        draft["passenger_count"] = passenger_count
+    elif state == ASK_PICKUP:
+        draft["pickup"] = value
+    elif state == ASK_DESTINATION:
+        draft["destination"] = value
+    elif state == ASK_REMARK:
+        draft["remark"] = value or "無"
+        quote_store.create_quote({
+            "line_user_id": user_id,
+            "line_name": None,
+            "trip_date": draft.get("trip_date"),
+            "passenger_count": draft.get("passenger_count"),
+            "pickup": draft.get("pickup"),
+            "destination": draft.get("destination"),
+            "remark": draft.get("remark") or "無",
+            "recommended_vehicle": recommended_vehicle(int(draft.get("passenger_count") or 0)),
+            "quote_options": build_quote_options(draft),
+            "quote_draft_text": build_quote_draft_text(draft),
+            "quote_status": "DRAFT",
+            "sent_at": None,
+        })
+        quote_store.delete_session(user_id)
+        return "已收到詢價需求，客服將盡快確認。"
+    else:
+        quote_store.delete_session(user_id)
+        return None
+
+    next_state = determine_next_state(draft)
+    if next_state is None:
+        quote_store.create_quote({
+            "line_user_id": user_id,
+            "line_name": None,
+            "trip_date": draft.get("trip_date"),
+            "passenger_count": draft.get("passenger_count"),
+            "pickup": draft.get("pickup"),
+            "destination": draft.get("destination"),
+            "remark": draft.get("remark") or "無",
+            "recommended_vehicle": recommended_vehicle(int(draft.get("passenger_count") or 0)),
+            "quote_options": build_quote_options(draft),
+            "quote_draft_text": build_quote_draft_text(draft),
+            "quote_status": "DRAFT",
+            "sent_at": None,
+        })
+        quote_store.delete_session(user_id)
+        return "已收到詢價需求，客服將盡快確認。"
+
+    quote_store.upsert_session(user_id, next_state, draft)
+    return next_quote_question(next_state)
+
+
+async def handle_text(user_id: str, text: str) -> str:
+    message = clean_text(text, 120).lower()
+
+    if message in {"選單", "menu", "功能"}:
+        return MENU
+    if message in {"價格", "報價"}:
+        return _latest_quote_summary(user_id)
+    if "包車" in message or message == "1":
+        return await _start_quote(user_id)
+
+    in_progress = await _continue_quote(user_id, text)
+    if in_progress is not None:
+        return in_progress
+
+    analysis = quote_engine.analyze(text)
+    if analysis.get("is_one_day_round_taiwan") or analysis.get("asks_legal") or analysis.get("needs_luggage_warning"):
+        return _general_reply(text, analysis)
+
+    seed = parse_quote_seed(text)
+    if len(seed) >= 2 and ("trip_date" in seed or "passenger_count" in seed):
+        return await _start_quote(user_id, seed)
+
+    return _general_reply(text, analysis)
+
+
+async def handle_event(event: dict[str, Any], access_token: str):
+    if event.get("type") != "message" or event.get("message", {}).get("type") != "text":
+        return
+    reply_token = event.get("replyToken")
+    user_id = event.get("source", {}).get("userId")
+    if not reply_token or not user_id:
+        return
+    reply = await handle_text(user_id, event.get("message", {}).get("text", ""))
+    await _reply_to_line(reply_token, reply, access_token)
+
+
 @app.post("/line/webhook")
 async def line_webhook(request: Request) -> JSONResponse:
     channel_secret, access_token = _required_env()
@@ -88,19 +252,7 @@ async def line_webhook(request: Request) -> JSONResponse:
 
     payload = await request.json()
     for event in payload.get("events", []):
-        if event.get("type") != "message":
-            continue
-        message = event.get("message", {})
-        if message.get("type") != "text":
-            continue
-        reply_token = event.get("replyToken")
-        if not reply_token:
-            continue
-        text = message.get("text", "")
-        analysis = quote_engine.analyze(text)
-        context = rag_service.as_context(text, analysis)
-        reply = build_customer_reply(text, analysis, context)
-        await _reply_to_line(reply_token, reply, access_token)
+        await handle_event(event, access_token)
 
     return JSONResponse({"ok": True})
 
