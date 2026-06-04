@@ -92,3 +92,18 @@ def test_45_seat_airport_big_luggage_warning(monkeypatch):
     assert response.status_code == 200
     assert "行李艙容量有限" in calls[0]
     assert "每人一件大行李" in calls[0]
+
+
+def test_api_line_webhook_alias_valid_signature(monkeypatch):
+    calls = []
+
+    async def fake_reply(reply_token, text, access_token):
+        calls.append({"reply_token": reply_token, "text": text, "access_token": access_token})
+
+    monkeypatch.setattr("app.main._reply_to_line", fake_reply)
+    body = make_body("包車")
+    response = TestClient(app).post("/api/line/webhook", content=body, headers={"X-Line-Signature": sign(body)})
+
+    assert response.status_code == 200
+    assert calls
+    assert calls[0]["reply_token"] == "reply-token"

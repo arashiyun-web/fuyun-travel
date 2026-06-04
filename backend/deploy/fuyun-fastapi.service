@@ -1,0 +1,15 @@
+[Unit]
+Description=Fuyun Travel FastAPI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/arashiyun/fuyun-travel/backend
+EnvironmentFile=/home/arashiyun/fuyun-travel/backend/.env
+ExecStart=/home/arashiyun/fuyun-travel/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

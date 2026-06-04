@@ -21,6 +21,17 @@ class RagService:
                 merged.update(data)
         return merged
 
+
+    def document_count(self) -> int:
+        count = 0
+        for path in self.knowledge_dir.glob("*.y*ml"):
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if isinstance(data, list):
+                count += len(data)
+            elif isinstance(data, dict):
+                count += 1
+        return count
+
     def as_context(self, message: str, analysis: dict[str, Any] | None = None) -> str:
         analysis = analysis or {}
         rules: list[str] = []

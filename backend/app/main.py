@@ -74,8 +74,8 @@ async def _reply_to_line(reply_token: str, text: str, access_token: str) -> None
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, object]:
+    return {"ok": True, "knowledge_documents": rag_service.document_count()}
 
 
 @app.post("/line/webhook")
@@ -103,3 +103,8 @@ async def line_webhook(request: Request) -> JSONResponse:
         await _reply_to_line(reply_token, reply, access_token)
 
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/line/webhook")
+async def api_line_webhook(request: Request) -> JSONResponse:
+    return await line_webhook(request)
