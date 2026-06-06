@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMPANY, SITE, organizationJsonLd } from "@/lib/site";
-import { fleetItems, serviceItems } from "@/lib/siteContent";
-import { toursData } from "@/lib/tours";
-import { travelArticles } from "@/lib/travelContent";
 
 export const metadata: Metadata = {
   title: { absolute: SITE.defaultTitle },
@@ -30,16 +27,13 @@ const navItems = [
   { href: "/about", label: "關於" },
   { href: "/fleet", label: "車隊" },
   { href: "/travel", label: "旅遊" },
-  { href: "/featured-trips", label: "熱門" },
-  { href: "/ai-trip-planner", label: "AI規劃" },
-  { href: "/reviews", label: "評價" },
   { href: "/contact", label: "聯絡" },
 ];
 
 const featureItems = [
   { href: "/services/coach-charter", title: "遊覽車包車", text: "校外教學、企業旅遊、大型團體" },
   { href: "/services/airport-transfer", title: "機場接送", text: "航班接送、多點上下車、行李安排" },
-  { href: "/travel", title: "旅遊攻略", text: "賞花、美食、景點與包車建議" },
+  { href: "/travel", title: "旅遊攻略", text: "最新旅遊內容、熱門行程與包車建議" },
   { href: "/contact/inquiry", title: "立即報價", text: "日期、人數、路線快速評估" },
 ];
 
@@ -90,7 +84,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="home-feature-grid" aria-label="熱門服務">
+          <div className="home-feature-grid" aria-label="核心服務">
             {featureItems.map((item) => (
               <Link className="home-feature-card" key={item.href} href={item.href}>
                 <h2>{item.title}</h2>
@@ -100,82 +94,6 @@ export default function HomePage() {
           </div>
         </section>
       </div>
-
-      <section>
-        <h2>最新旅遊紀錄</h2>
-        <div className="card-grid">
-          {travelArticles.slice(0, 4).map((article) => (
-            <Link className="card" href={`/travel/${article.slug}`} key={article.slug}>
-              <p className="lead">{article.category}｜{article.location}</p>
-              <h3>{article.title}</h3>
-              <p>{article.description}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>AI 成交漏斗</h2>
-        <div className="card-grid">
-          {[
-            ["Facebook同步", "/featured-trips"],
-            ["AI內容工廠", "/travel"],
-            ["Money Page", "/service/price"],
-            ["AI行程規劃", "/ai-trip-planner"],
-            ["LINE客服", "/contact"],
-            ["立即報價", "/contact/inquiry"],
-          ].map(([title, href]) => (
-            <Link className="card" href={href} key={href}>
-              <h3>{title}</h3>
-              <p>串接搜尋、內容、詢價、LINE 與會員 CRM 的成交流程節點。</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>熱門景點與行程</h2>
-        <div className="card-grid">
-          {toursData.slice(0, 4).map((tour) => (
-            <Link className="card" href={`/itineraries/${tour.id}`} key={tour.id}>
-              <p className="lead">{tour.region}｜{tour.days} 日</p>
-              <h3>{tour.title}</h3>
-              <p>{tour.summary}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>熱門包車與校外教學</h2>
-        <div className="card-grid">
-          {[...serviceItems.slice(0, 4), ...fleetItems.slice(0, 2)].map((item) => (
-            <Link className="card" href={`${fleetItems.includes(item) ? "/fleet" : "/services"}/${item.slug}`} key={item.slug}>
-              <h3>{item.title}</h3>
-              <p>{item.summary}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>AI 成交漏斗</h2>
-        <div className="card-grid">
-          {[
-            ["Facebook同步", "/featured-trips"],
-            ["AI內容工廠", "/travel"],
-            ["Money Page", "/service/price"],
-            ["AI行程規劃", "/ai-trip-planner"],
-            ["LINE客服", "/contact"],
-            ["立即報價", "/contact/inquiry"],
-          ].map(([title, href]) => (
-            <Link className="card" href={href} key={href}>
-              <h3>{title}</h3>
-              <p>串接搜尋、內容、詢價、LINE 與會員 CRM 的成交流程節點。</p>
-            </Link>
-          ))}
-        </div>
-      </section>
     </>
   );
 }

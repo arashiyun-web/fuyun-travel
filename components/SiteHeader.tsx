@@ -10,8 +10,6 @@ const navItems = [
   { href: "/services", label: "服務項目", key: "services" },
   { href: "/fleet", label: "車隊介紹", key: "fleet" },
   { href: "/travel", label: "旅遊內容", key: "travel" },
-  { href: "/featured-trips", label: "熱門內容", key: "travel" },
-  { href: "/ai-trip-planner", label: "AI規劃", key: "travel" },
   { href: "/reviews", label: "旅客評價", key: "reviews" },
   { href: "/contact", label: "聯絡我們", key: "contact" },
 ] as const;
@@ -30,7 +28,7 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
         <div className="hidden items-center gap-6 text-sm font-semibold text-[#3d3d3d] md:flex">
           {navItems.map((item) => (
             <Link
-              key={`${item.href}-${item.label}`}
+              key={item.key}
               href={item.href}
               className={`transition hover:text-[#b89b5e] ${
                 active === item.key ? "text-[#b89b5e]" : ""

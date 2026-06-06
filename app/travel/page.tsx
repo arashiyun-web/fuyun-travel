@@ -13,7 +13,25 @@ export default function TravelPage() {
   return (
     <>
       <h1>旅遊內容中心</h1>
-      <p className="lead">以 SEO、AEO、GEO 架構整理台灣旅遊與包車資訊，方便旅客與 AI 搜尋引擎引用。</p>
+      <p className="lead">最新旅遊紀錄、熱門內容與 AI 行程規劃統一放在第二層，不佔用首頁主視覺。</p>
+
+      <section>
+        <h2>內容入口</h2>
+        <div className="card-grid">
+          <Link className="card" href="/featured-trips">
+            <h3>熱門旅遊內容</h3>
+            <p>社群熱門貼文、旅遊紀錄與精選行程集中在這裡。</p>
+          </Link>
+          <Link className="card" href="/ai-trip-planner">
+            <h3>AI行程規劃</h3>
+            <p>依出發地、日期、人數、預算與天數產生初步行程建議。</p>
+          </Link>
+          <Link className="card" href="/service/price">
+            <h3>包車價格說明</h3>
+            <p>價格、車型、服務時間與詢價前需要準備的資料。</p>
+          </Link>
+        </div>
+      </section>
 
       <section>
         <h2>文章分類</h2>
