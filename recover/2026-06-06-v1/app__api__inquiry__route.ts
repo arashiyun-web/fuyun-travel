@@ -52,16 +52,16 @@ const store: Store =
     inquiries: [
       {
         id: "iq-seed-1",
-        name: "測試旅客",
+        name: "王小旅",
         phone: "0912345678",
         line_id: "fuyun-test",
-        trip_type: "包車旅遊",
-        start_date: "2026-06-12",
-        pickup_location: "板橋車站",
-        destination: "阿里山",
+        trip_type: "Multi-day Tour",
+        start_date: "2026-06-12T09:00",
+        pickup_location: "台北車站",
+        destination: "宜蘭太平山二日遊",
         passenger_count: 38,
-        preferred_vehicle: ["Scania K400"],
-        special_requests: "需要安排長輩友善休息點與午餐建議。",
+        preferred_vehicle: ["43-seat Big Bus"],
+        special_requests: "需要協助安排午餐餐廳，並確認大型行李放置空間。",
         status: "New",
         created_at: "2026-05-25T10:00:00.000Z",
       },
@@ -148,25 +148,25 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
   });
 
   const text = [
-    `${SITE.name} 新詢價`,
+    `${SITE.name}新詢價`,
     "",
     `姓名：${inquiry.name}`,
     `電話：${inquiry.phone}`,
     `LINE：${inquiry.line_id || "未填"}`,
-    `服務：${inquiry.trip_type}`,
-    `日期：${inquiry.start_date}`,
+    `行程類型：${inquiry.trip_type}`,
+    `出發時間：${inquiry.start_date}`,
     `人數：${inquiry.passenger_count}`,
-    `車型：${inquiry.preferred_vehicle.join("、") || "未指定"}`,
+    `車型：${inquiry.preferred_vehicle.join("、") || "未選"}`,
     `路線：${inquiry.pickup_location} → ${inquiry.destination}`,
     "",
-    "備註：",
+    "特殊需求：",
     inquiry.special_requests || "未填",
   ].join("\n");
 
   await transporter.sendMail({
     from,
     to,
-    subject: `${SITE.name} 新詢價：${inquiry.name}`,
+    subject: `${SITE.name}新詢價：${inquiry.name}`,
     text,
     replyTo: from,
   });
@@ -184,7 +184,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!checkRateLimit(request)) {
-    return NextResponse.json({ success: false, message: "送出太頻繁，請稍後再試。" }, { status: 429 });
+    return NextResponse.json({ success: false, message: "請稍後再送出詢價。" }, { status: 429 });
   }
 
   try {
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
     }
 
     if (!Number.isFinite(inquiry.passenger_count) || inquiry.passenger_count < 1) {
-      return NextResponse.json({ success: false, message: "請填寫正確人數。" }, { status: 400 });
+      return NextResponse.json({ success: false, message: "請填寫正確旅客人數。" }, { status: 400 });
     }
 
     store.inquiries.unshift(inquiry);
@@ -232,7 +232,7 @@ export async function POST(request: Request) {
       inquiry: publicInquiry(inquiry, true),
     });
   } catch {
-    return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 500 });
+    return NextResponse.json({ success: false, message: "資料送出失敗。" }, { status: 500 });
   }
 }
 
@@ -252,16 +252,14 @@ export async function PATCH(request: Request) {
       ...current,
       name: clean(body.name, 120) || current.name,
       phone: clean(body.phone, 80) || current.phone,
-      line_id: clean(body.line_id, 120) || current.line_id,
+      line_id: clean(body.line_id, 120),
       trip_type: clean(body.trip_type, 80) || current.trip_type,
       start_date: clean(body.start_date, 80) || current.start_date,
       pickup_location: clean(body.pickup_location, 160) || current.pickup_location,
       destination: clean(body.destination, 240) || current.destination,
       passenger_count: Number(body.passenger_count || current.passenger_count),
-      preferred_vehicle: cleanArray(body.preferred_vehicle).length
-        ? cleanArray(body.preferred_vehicle)
-        : current.preferred_vehicle,
-      special_requests: clean(body.special_requests, 1200) || current.special_requests,
+      preferred_vehicle: cleanArray(body.preferred_vehicle),
+      special_requests: clean(body.special_requests, 1200),
       status: STATUSES.includes(status) ? status : current.status,
       updated_at: new Date().toISOString(),
     };

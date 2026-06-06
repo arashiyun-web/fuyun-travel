@@ -2,18 +2,14 @@ import Link from "next/link";
 import { SITE } from "@/lib/site";
 
 type SiteHeaderProps = {
-  active?: "home" | "about" | "services" | "fleet" | "travel" | "reviews" | "contact";
+  active?: "home" | "services" | "fleet" | "itineraries" | "contact";
 };
 
 const navItems = [
-  { href: "/about", label: "關於我們", key: "about" },
-  { href: "/services", label: "服務項目", key: "services" },
-  { href: "/fleet", label: "車隊介紹", key: "fleet" },
-  { href: "/travel", label: "旅遊內容", key: "travel" },
-  { href: "/featured-trips", label: "熱門內容", key: "travel" },
-  { href: "/ai-trip-planner", label: "AI規劃", key: "travel" },
-  { href: "/reviews", label: "旅客評價", key: "reviews" },
-  { href: "/contact", label: "聯絡我們", key: "contact" },
+  { href: "/services", label: "服務", key: "services" },
+  { href: "/fleet", label: "車型", key: "fleet" },
+  { href: "/itineraries", label: "行程", key: "itineraries" },
+  { href: "/contact", label: "聯絡", key: "contact" }
 ] as const;
 
 export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
@@ -23,14 +19,14 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
         <Link href="/" className="text-sm font-black tracking-wide text-[#2b2b2b]">
           {SITE.name}
           <span className="block text-xs font-medium tracking-[0.22em] text-[#b89b5e]">
-            台灣包車旅遊
+            專業包車旅遊服務
           </span>
         </Link>
 
-        <div className="hidden items-center gap-6 text-sm font-semibold text-[#3d3d3d] md:flex">
+        <div className="hidden items-center gap-8 text-sm font-semibold text-[#3d3d3d] md:flex">
           {navItems.map((item) => (
             <Link
-              key={`${item.href}-${item.label}`}
+              key={item.key}
               href={item.href}
               className={`transition hover:text-[#b89b5e] ${
                 active === item.key ? "text-[#b89b5e]" : ""
@@ -46,13 +42,13 @@ export default function SiteHeader({ active = "home" }: SiteHeaderProps) {
             href="/contact/inquiry"
             className="rounded-md bg-[#2f2f2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#b89b5e]"
           >
-            立即報價
+            立即詢價
           </Link>
           <a
-            href="/platform/index.html?v=official-member-register-v1#login"
+            href="/platform/index.html?v=company-info-v1#login"
             className="rounded-md border border-[#d8c9aa] bg-white/70 px-4 py-2 text-sm font-bold text-[#242424] transition hover:bg-white"
           >
-            平台登入
+            登入/註冊
           </a>
         </div>
       </nav>

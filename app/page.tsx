@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE, COMPANY } from "@/lib/site";
+import { COMPANY, SITE, organizationJsonLd } from "@/lib/site";
+import { fleetItems, serviceItems } from "@/lib/siteContent";
+import { toursData } from "@/lib/tours";
+import { travelArticles } from "@/lib/travelContent";
 
 export const metadata: Metadata = {
   title: { absolute: SITE.defaultTitle },
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
     description: SITE.defaultDescription,
     url: SITE.url,
     siteName: SITE.name,
-    locale: "zh_TW",
+    locale: SITE.locale,
     type: "website",
     images: [SITE.ogImage],
   },
@@ -23,56 +26,35 @@ export const metadata: Metadata = {
   },
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "TravelAgency",
-  name: COMPANY.companyName,
-  alternateName: COMPANY.siteName,
-  url: SITE.url,
-  telephone: COMPANY.phone,
-  email: COMPANY.email,
-  faxNumber: COMPANY.fax,
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: COMPANY.address,
-    addressCountry: "TW",
-  },
-  areaServed: "Taiwan",
-  serviceType: ["台灣包車旅遊", "企業接待", "機場接送", "客製化行程規劃"],
-};
-
 const navItems = [
-  { href: "/services", label: "服務" },
-  { href: "/fleet", label: "車型" },
-  { href: "/itineraries", label: "行程" },
+  { href: "/about", label: "關於" },
+  { href: "/fleet", label: "車隊" },
+  { href: "/travel", label: "旅遊" },
+  { href: "/featured-trips", label: "熱門" },
+  { href: "/ai-trip-planner", label: "AI規劃" },
   { href: "/contact", label: "聯絡" },
 ];
 
 const featureItems = [
-  { href: "/services", title: "服務", text: "包車、接送、企業接待" },
-  { href: "/fleet", title: "車型", text: "大型車、中巴、商務車" },
-  { href: "/itineraries", title: "行程", text: "精選旅遊、報名選位" },
-  { href: "/contact", title: "聯絡", text: "LINE、電話、表單詢價" },
+  { href: "/services/coach-charter", title: "遊覽車包車", text: "校外教學、企業旅遊、大型團體" },
+  { href: "/services/airport-transfer", title: "機場接送", text: "航班接送、多點上下車、行李安排" },
+  { href: "/travel", title: "旅遊攻略", text: "賞花、美食、景點與包車建議" },
+  { href: "/contact/inquiry", title: "立即報價", text: "日期、人數、路線快速評估" },
 ];
-
-const facebookUrl = "https://www.facebook.com/share/g/1NPbXN8THD/";
 
 export default function HomePage() {
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} />
 
       <div className="home-page">
-        <header className="home-nav" aria-label="浮雲旅遊首頁導覽">
+        <header className="home-nav" aria-label="浮雲輕鬆遊網站導覽">
           <Link className="home-brand" href="/">
-            <strong>浮雲旅遊</strong>
-            <span>專業包車旅遊服務</span>
+            <strong>{SITE.name}</strong>
+            <span>台灣包車旅遊</span>
           </Link>
 
-          <nav className="home-nav__links" aria-label="主要選單">
+          <nav className="home-nav__links" aria-label="主要導覽">
             {navItems.map((item) => (
               <Link key={item.href} href={item.href}>
                 {item.label}
@@ -82,37 +64,32 @@ export default function HomePage() {
 
           <div className="home-nav__actions">
             <Link className="home-nav__quote" href="/contact/inquiry">
-              立即詢價
+              立即報價
             </Link>
             <a className="home-nav__login" href="/platform/index.html?v=official-member-register-v1#login">
-              登入/註冊
+              平台登入
             </a>
           </div>
         </header>
 
-        <section className="home-hero" aria-label="專業包車旅遊服務">
+        <section className="home-hero" aria-label="台灣包車旅遊服務">
           <div className="home-hero__content">
-            <p className="home-eyebrow">浮雲旅遊｜專業包車旅遊服務</p>
-            <h1>專業包車旅遊服務</h1>
+            <p className="home-eyebrow">{COMPANY.companyName}｜{COMPANY.fleetCompanyName}</p>
+            <h1>台灣包車旅遊</h1>
             <div className="home-hero__actions">
               <Link className="home-btn home-btn--gold" href="/contact/inquiry">
-                立即詢價
+                立即報價
               </Link>
-              <Link className="home-btn home-btn--glass" href="/itineraries">
-                查看行程
+              <Link className="home-btn home-btn--glass" href="/travel">
+                旅遊攻略
               </Link>
-              <a
-                className="home-btn home-btn--glass"
-                href={facebookUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Facebook ↗
+              <a className="home-btn home-btn--glass" href={COMPANY.facebookUrl} target="_blank" rel="noreferrer">
+                Facebook
               </a>
             </div>
           </div>
 
-          <div className="home-feature-grid" aria-label="浮雲旅遊服務入口">
+          <div className="home-feature-grid" aria-label="熱門服務">
             {featureItems.map((item) => (
               <Link className="home-feature-card" key={item.href} href={item.href}>
                 <h2>{item.title}</h2>
@@ -122,6 +99,63 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+
+      <section>
+        <h2>最新旅遊紀錄</h2>
+        <div className="card-grid">
+          {travelArticles.slice(0, 4).map((article) => (
+            <Link className="card" href={`/travel/${article.slug}`} key={article.slug}>
+              <p className="lead">{article.category}｜{article.location}</p>
+              <h3>{article.title}</h3>
+              <p>{article.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>熱門景點與行程</h2>
+        <div className="card-grid">
+          {toursData.slice(0, 4).map((tour) => (
+            <Link className="card" href={`/itineraries/${tour.id}`} key={tour.id}>
+              <p className="lead">{tour.region}｜{tour.days} 日</p>
+              <h3>{tour.title}</h3>
+              <p>{tour.summary}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>熱門包車與校外教學</h2>
+        <div className="card-grid">
+          {[...serviceItems.slice(0, 4), ...fleetItems.slice(0, 2)].map((item) => (
+            <Link className="card" href={`${fleetItems.includes(item) ? "/fleet" : "/services"}/${item.slug}`} key={item.slug}>
+              <h3>{item.title}</h3>
+              <p>{item.summary}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>AI 成交漏斗</h2>
+        <div className="card-grid">
+          {[
+            ["Facebook同步", "/featured-trips"],
+            ["AI內容工廠", "/travel"],
+            ["Money Page", "/service/price"],
+            ["AI行程規劃", "/ai-trip-planner"],
+            ["LINE客服", "/contact"],
+            ["立即報價", "/contact/inquiry"],
+          ].map(([title, href]) => (
+            <Link className="card" href={href} key={href}>
+              <h3>{title}</h3>
+              <p>串接搜尋、內容、詢價、LINE 與會員 CRM 的成交流程節點。</p>
+            </Link>
+          ))}
+        </div>
+      </section>
     </>
   );
 }

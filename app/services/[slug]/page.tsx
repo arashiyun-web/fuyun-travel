@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import { findContentItem, serviceItems } from "@/lib/siteContent";
+import { pageMeta } from "@/lib/site";
 
 type ServiceDetailPageProps = {
   params: {
@@ -15,7 +16,12 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: ServiceDetailPageProps) {
   const service = findContentItem(serviceItems, params.slug);
-  return { title: service ? service.title : "服務內容" };
+  if (!service) return pageMeta({ title: "服務項目", path: "/services" });
+  return pageMeta({
+    title: service.title,
+    description: service.summary,
+    path: `/services/${service.slug}`,
+  });
 }
 
 export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
@@ -32,11 +38,11 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
       <SiteHeader active="services" />
       <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <Link href="/services" className="text-sm font-bold text-[#b89b5e] hover:text-[#242424]">
-          返回服務分類
+          返回服務項目
         </Link>
         <article className="mt-6 rounded-md border border-[#d8ccb2] bg-white p-8 shadow-[0_18px_45px_rgba(48,39,24,0.12)]">
           <Icon className="text-[#b89b5e]" size={42} />
-          <p className="mt-6 text-sm font-bold tracking-[0.25em] text-[#b89b5e]">第三層｜服務內容</p>
+          <p className="mt-6 text-sm font-bold tracking-[0.25em] text-[#b89b5e]">SERVICE</p>
           <h1 className="mt-4 text-4xl font-black">{service.title}</h1>
           <p className="mt-5 text-lg font-bold leading-9 text-[#555]">{service.summary}</p>
           <div className="mt-8 rounded-md bg-[#fffaf0] p-6 ring-1 ring-[#d8ccb2]">
@@ -46,7 +52,7 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
             href="/contact/inquiry"
             className="mt-8 inline-flex rounded-md bg-[#2f2f2f] px-5 py-3 font-black text-white transition hover:bg-[#b89b5e] hover:text-[#242424]"
           >
-            針對此服務詢價
+            取得報價
           </Link>
         </article>
       </section>

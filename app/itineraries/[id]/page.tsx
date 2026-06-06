@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import SeatBooking from "@/components/SeatBooking";
 import SiteHeader from "@/components/SiteHeader";
 import { findTourById, toursData } from "@/lib/tours";
+import { pageMeta } from "@/lib/site";
 
 type TourDetailPageProps = {
   params: {
@@ -15,10 +16,12 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: TourDetailPageProps) {
   const tour = findTourById(params.id);
-
-  return {
-    title: tour ? `${tour.title}｜報名選位` : "行程報名選位"
-  };
+  if (!tour) return pageMeta({ title: "精選行程", path: "/itineraries" });
+  return pageMeta({
+    title: tour.title,
+    description: tour.summary,
+    path: `/itineraries/${tour.id}`,
+  });
 }
 
 export default function TourDetailPage({ params }: TourDetailPageProps) {
@@ -30,7 +33,7 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
 
   return (
     <>
-      <SiteHeader active="itineraries" />
+      <SiteHeader active="travel" />
       <SeatBooking tour={tour} />
     </>
   );

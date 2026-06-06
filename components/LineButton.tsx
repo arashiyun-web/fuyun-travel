@@ -16,7 +16,7 @@ export default function LineButton({
         aria-disabled="true"
         title="尚未設定 NEXT_PUBLIC_LINE_URL"
       >
-        LINE 官方帳號待設定
+        LINE 客服準備中
       </span>
     );
   }

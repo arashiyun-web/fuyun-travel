@@ -10,15 +10,15 @@ export default function Footer() {
         <LegalInfo />
 
         <div className="site-footer__cta">
-          <LineButton>LINE 客服諮詢</LineButton>
+          <LineButton>LINE 官方帳號諮詢</LineButton>
         </div>
 
-        <nav className="site-footer__links" aria-label="網站政策">
+        <nav className="site-footer__links" aria-label="網站連結">
           <Link href="/privacy">隱私權政策</Link>
         </nav>
 
         <small className="site-footer__copy">
-          © {new Date().getFullYear()} {COMPANY.companyName}｜{COMPANY.siteName}｜All rights reserved.
+          © {new Date().getFullYear()} {COMPANY.companyName}（{COMPANY.siteName}）All rights reserved.
         </small>
       </div>
     </footer>
