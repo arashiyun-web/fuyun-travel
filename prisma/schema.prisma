@@ -34,3 +34,106 @@ model LineSession {
 
   @@map("line_sessions")
 }
+
+model Article {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  content     String
+  excerpt     String?
+  category    String
+  tags        String[]
+  location    String?
+  seoJson     Json?     @map("seo_json")
+  schemaJson  Json?     @map("schema_json")
+  fbPostId    String?   @unique @map("fb_post_id")
+  status      String    @default("draft")
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("articles")
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  fleetId   String?  @map("fleet_id")
+  brand     String
+  model     String
+  slug      String   @unique
+  seatCount Int?     @map("seat_count")
+  features  String[]
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("vehicles")
+}
+
+model Inquiry {
+  id               String    @id @default(cuid())
+  agencyId         String?   @map("agency_id")
+  customerName     String    @map("customer_name")
+  phone            String
+  lineId           String?   @map("line_id")
+  email            String?
+  tripType         String    @map("trip_type")
+  startDate        DateTime? @map("start_date")
+  pickupLocation   String?   @map("pickup_location")
+  destination      String?
+  passengerCount   Int       @map("passenger_count")
+  preferredVehicle String[]  @map("preferred_vehicle")
+  specialRequests  String?   @map("special_requests")
+  source           String?
+  status           String    @default("New")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("inquiries")
+}
+
+model LineUser {
+  id                String   @id @default(cuid())
+  lineUid           String   @unique @map("line_uid")
+  name              String?
+  phone             String?
+  email             String?
+  memberLevel       String?  @map("member_level")
+  tags              String[]
+  inquiryHistory    Json?    @map("inquiry_history")
+  quoteHistory      Json?    @map("quote_history")
+  orderHistory      Json?    @map("order_history")
+  tripHistory       Json?    @map("trip_history")
+  couponHistory     Json?    @map("coupon_history")
+  repurchaseHistory Json?    @map("repurchase_history")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("line_users")
+}
+
+model FbImportLog {
+  id         String   @id @default(cuid())
+  fbPostId   String   @unique @map("fb_post_id")
+  source     String
+  title      String
+  status     String
+  payload    Json
+  importedAt DateTime @default(now()) @map("imported_at")
+
+  @@map("fb_import_logs")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  type      String
+  name      String
+  contact   String?
+  region    String?
+  tags      String[]
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("suppliers")
+}

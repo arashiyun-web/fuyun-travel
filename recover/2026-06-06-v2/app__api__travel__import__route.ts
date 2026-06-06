@@ -1,8 +1,4 @@
 import { NextResponse } from "next/server";
-import { envConfig } from "@/lib/config/company";
-import { generateFaq } from "@/lib/seo/generateFaq";
-import { generateGeo } from "@/lib/seo/generateGeo";
-import { generateSlug } from "@/lib/seo/generateSlug";
 import { travelCategories, type TravelCategory } from "@/lib/travelContent";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +7,8 @@ type ImportedTravelPost = {
   id: string;
   title: string;
   content: string;
-  excerpt: string;
   images: string[];
   publishDate: string;
-  slug: string;
-  category: TravelCategory;
-  fbPostId: string;
   tags: string[];
   location: string;
   seo: {
@@ -26,7 +18,6 @@ type ImportedTravelPost = {
     outline: string[];
     faq: Array<{ question: string; answer: string }>;
     schemaTypes: string[];
-    geo: ReturnType<typeof generateGeo>;
   };
 };
 
@@ -63,10 +54,18 @@ function buildSeo(title: string, content: string, tags: string[], location: stri
     title: seoTitle,
     description,
     h1: title,
-    outline: ["行程亮點", "適合族群", "推薦景點", "推薦車型", "FAQ"],
-    faq: generateFaq(title, category),
+    outline: ["行程亮點", "適合族群", "推薦車型", "包車安排建議", "FAQ"],
+    faq: [
+      {
+        question: `${title} 適合包車旅遊嗎？`,
+        answer: "適合。可依人數選擇九人座、中巴或遊覽車，並依停靠點調整行程節奏。",
+      },
+      {
+        question: "詢價時需要提供哪些資料？",
+        answer: "建議提供日期、人數、上車地點、目的地、停靠點、行李與特殊需求。",
+      },
+    ],
     schemaTypes: ["Article", "FAQPage", "BreadcrumbList", "TouristAttraction", "LocalBusiness"],
-    geo: generateGeo(title),
   };
 }
 
@@ -74,26 +73,17 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     source: "小羽旅遊趣 / Facebook Graph API ready",
-    auth: envConfig.travelImportApiKey ? "x-api-key required" : "development mode; TRAVEL_IMPORT_API_KEY not configured",
-    flow: ["Facebook", "Graph API", "n8n", "GX10 AI", "SEO改寫", "網站發布", "Google收錄", "LINE推播", "詢價", "成交"],
+    flow: ["Facebook", "Graph API", "n8n", "GX10 AI", "SEO文章生成", "網站發布", "Google Index", "LINE推播", "詢價", "成交"],
     imports,
   });
 }
 
 export async function POST(request: Request) {
   try {
-    if (envConfig.travelImportApiKey) {
-      const apiKey = request.headers.get("x-api-key");
-      if (apiKey !== envConfig.travelImportApiKey) {
-        return NextResponse.json({ success: false, message: "Invalid x-api-key." }, { status: 401 });
-      }
-    }
-
     const body = await request.json();
     const title = clean(body.title, 180);
     const content = clean(body.content, 5000);
     const tags = cleanArray(body.tags);
-    const category = clean(body.category, 80);
     const location = clean(body.location, 120);
 
     if (!title || !content) {
@@ -103,28 +93,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const allTags = category ? Array.from(new Set([category, ...tags])) : tags;
-    const fbPostId = clean(body.fbPostId, 120);
-    const slug = generateSlug(fbPostId || title);
-    const existing = imports.find((item) => item.fbPostId && item.fbPostId === fbPostId);
-
-    if (existing) {
-      return NextResponse.json({ success: true, duplicated: true, post: existing });
-    }
-
     const post: ImportedTravelPost = {
       id: clean(body.id, 80) || `fb-${Date.now()}`,
       title,
       content,
-      excerpt: clean(body.excerpt, 300) || clean(content, 140),
       images: cleanArray(body.images),
       publishDate: clean(body.publishDate, 40) || new Date().toISOString(),
-      slug,
-      category: inferCategory(allTags),
-      fbPostId,
-      tags: allTags,
+      tags,
       location,
-      seo: buildSeo(title, content, allTags, location),
+      seo: buildSeo(title, content, tags, location),
     };
 
     imports.unshift(post);
@@ -134,12 +111,6 @@ export async function POST(request: Request) {
       success: true,
       message: "Travel post imported and SEO/AEO/GEO draft generated.",
       post,
-      sideEffects: {
-        sitemap: "Next.js sitemap route will include persisted articles when database storage is connected.",
-        rss: "RSS route is ready; imported in-memory drafts are available through this API.",
-        indexNow: envConfig.indexNowKey ? "IndexNow key configured" : "IndexNow disabled until INDEXNOW_KEY is set.",
-        linePush: "Reserved for LINE Messaging API after credentials are configured.",
-      },
     });
   } catch {
     return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 500 });

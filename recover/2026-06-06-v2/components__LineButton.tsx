@@ -14,9 +14,9 @@ export default function LineButton({
         className={`btn btn-line btn-disabled ${className}`}
         role="button"
         aria-disabled="true"
-        title="請設定 NEXT_PUBLIC_LINE_OA_URL"
+        title="尚未設定 NEXT_PUBLIC_LINE_URL"
       >
-        請設定LINE官方帳號
+        LINE 客服準備中
       </span>
     );
   }

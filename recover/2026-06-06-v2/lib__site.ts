@@ -1,39 +1,43 @@
 import type { Metadata } from "next";
-import { companyConfig, getLineOaUrl } from "@/lib/config/company";
 
 export const SITE = {
-  url: companyConfig.siteUrl,
-  name: companyConfig.brandName,
-  defaultTitle: `${companyConfig.brandName}｜台灣包車旅遊與遊覽車服務`,
+  url: "https://fuyuntravel.com",
+  name: "浮雲輕鬆遊",
+  defaultTitle: "浮雲輕鬆遊｜台灣包車旅遊與遊覽車服務",
   defaultDescription:
     "浮雲輕鬆遊提供遊覽車包車、中巴包車、九人座包車、機場接送、校外教學、企業旅遊與客製化台灣行程規劃。",
-  ogImage: companyConfig.ogImage,
+  ogImage: "/hero-bus-sunny.png",
   locale: "zh_TW",
 } as const;
 
-export const LINE_URL: string = getLineOaUrl();
+export const LINE_URL: string = process.env.NEXT_PUBLIC_LINE_URL ?? "";
 
 export const COMPANY = {
-  companyName: companyConfig.travelAgencyName,
-  fleetCompanyName: companyConfig.transportCompanyName,
+  companyName: "雲驛旅行社有限公司",
+  fleetCompanyName: "雲陞通運有限公司",
   siteName: SITE.name,
   url: SITE.url,
-  agencyType: companyConfig.agencyType,
-  registrationNo: companyConfig.agencyRegistrationNo,
-  taxId: companyConfig.taxId,
-  address: companyConfig.address,
-  representative: companyConfig.founder,
-  phone: companyConfig.phone,
-  fax: companyConfig.fax,
-  email: companyConfig.email,
-  contactPerson: companyConfig.contactPerson,
-  business: companyConfig.services.join("、"),
-  memberVerify: `品保會員 ${companyConfig.qualityAssuranceNo}`,
-  performanceBond: `${companyConfig.performanceBondProvider}履約保證保險 ${companyConfig.performanceBondAmount}`,
+  agencyType: "旅行社與車隊包車服務",
+  registrationNo: "品保會員 北2760",
+  taxId: "60675708",
+  address: "新北市板橋區大觀路三段160巷20號6樓",
+  representative: "雲惠民",
+  phone: "02-2685-1666",
+  fax: "02-2685-1528",
+  email: "yunyi6866@gmail.com",
+  contactPerson: "浮雲客服",
+  business:
+    "遊覽車包車、中巴包車、九人座包車、機場接送、校外教學、企業旅遊、國內旅遊與客製化行程",
+  memberVerify: "品保會員 北2760",
+  performanceBond: "旺旺友聯產險履約保證保險 1,500 萬元",
   liabilityInsurance: "依法投保車輛與旅客相關保險",
-  facebookSource: companyConfig.facebookSource,
-  facebookUrl: companyConfig.facebookUrl,
-  geo: companyConfig.geo,
+  facebookSource: "小羽旅遊趣",
+  facebookUrl: "https://www.facebook.com/share/g/1NPbXN8THD/",
+  geo: {
+    latitude: 25.0065,
+    longitude: 121.448,
+    region: "TW-NWT",
+  },
 } as const;
 
 export function absoluteUrl(path = "/") {
@@ -59,13 +63,10 @@ export function pageMeta(args: {
     alternates: {
       canonical: url,
       languages: {
-        "zh-Hant": absoluteUrl(`/zh-tw${path === "/" ? "" : path}`),
+        "zh-Hant": absoluteUrl(`/zh${path === "/" ? "" : path}`),
         en: absoluteUrl(`/en${path === "/" ? "" : path}`),
         ja: absoluteUrl(`/ja${path === "/" ? "" : path}`),
         ko: absoluteUrl(`/ko${path === "/" ? "" : path}`),
-        ms: absoluteUrl(`/ms${path === "/" ? "" : path}`),
-        vi: absoluteUrl(`/vi${path === "/" ? "" : path}`),
-        th: absoluteUrl(`/th${path === "/" ? "" : path}`),
       },
     },
     openGraph: {

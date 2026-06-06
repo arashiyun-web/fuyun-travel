@@ -30,8 +30,6 @@ const navItems = [
   { href: "/about", label: "關於" },
   { href: "/fleet", label: "車隊" },
   { href: "/travel", label: "旅遊" },
-  { href: "/featured-trips", label: "熱門" },
-  { href: "/ai-trip-planner", label: "AI規劃" },
   { href: "/reviews", label: "評價" },
   { href: "/contact", label: "聯絡" },
 ];
@@ -67,7 +65,7 @@ export default function HomePage() {
             <Link className="home-nav__quote" href="/contact/inquiry">
               立即報價
             </Link>
-            <a className="home-nav__login" href="/platform/index.html?v=official-member-register-v1#login">
+            <a className="home-nav__login" href="/platform/index.html?v=ai-platform-v1#login">
               平台登入
             </a>
           </div>
@@ -115,25 +113,6 @@ export default function HomePage() {
       </section>
 
       <section>
-        <h2>AI 成交漏斗</h2>
-        <div className="card-grid">
-          {[
-            ["Facebook同步", "/featured-trips"],
-            ["AI內容工廠", "/travel"],
-            ["Money Page", "/service/price"],
-            ["AI行程規劃", "/ai-trip-planner"],
-            ["LINE客服", "/contact"],
-            ["立即報價", "/contact/inquiry"],
-          ].map(([title, href]) => (
-            <Link className="card" href={href} key={href}>
-              <h3>{title}</h3>
-              <p>串接搜尋、內容、詢價、LINE 與會員 CRM 的成交流程節點。</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
         <h2>熱門景點與行程</h2>
         <div className="card-grid">
           {toursData.slice(0, 4).map((tour) => (
@@ -153,25 +132,6 @@ export default function HomePage() {
             <Link className="card" href={`${fleetItems.includes(item) ? "/fleet" : "/services"}/${item.slug}`} key={item.slug}>
               <h3>{item.title}</h3>
               <p>{item.summary}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>AI 成交漏斗</h2>
-        <div className="card-grid">
-          {[
-            ["Facebook同步", "/featured-trips"],
-            ["AI內容工廠", "/travel"],
-            ["Money Page", "/service/price"],
-            ["AI行程規劃", "/ai-trip-planner"],
-            ["LINE客服", "/contact"],
-            ["立即報價", "/contact/inquiry"],
-          ].map(([title, href]) => (
-            <Link className="card" href={href} key={href}>
-              <h3>{title}</h3>
-              <p>串接搜尋、內容、詢價、LINE 與會員 CRM 的成交流程節點。</p>
             </Link>
           ))}
         </div>

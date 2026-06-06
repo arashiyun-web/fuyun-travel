@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import { findContentItem, fleetItems } from "@/lib/siteContent";
 import { SITE, pageMeta } from "@/lib/site";
+import { generateFaq } from "@/lib/seo/generateFaq";
+import { faqSchema, vehicleSchema } from "@/lib/seo/generateSchema";
 
 type FleetDetailPageProps = {
   params: {
@@ -32,9 +34,20 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
   }
 
   const Icon = vehicle.icon;
+  const faq = generateFaq(vehicle.title, "車隊介紹");
+  const jsonLd = [
+    vehicleSchema({
+      name: vehicle.title,
+      description: vehicle.summary,
+      path: `/fleet/${vehicle.slug}`,
+      seats: vehicle.slug.includes("scania") || vehicle.slug === "man" ? "43" : undefined,
+    }),
+    faqSchema(faq),
+  ];
 
   return (
     <main className="min-h-screen bg-[#f7f3ea] pb-16 pt-16 text-[#242424]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader active="fleet" />
       <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <Link href="/fleet" className="text-sm font-bold text-[#b89b5e] hover:text-[#242424]">
@@ -49,6 +62,14 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
             <p className="mt-5 text-lg font-bold leading-9 text-[#555]">{vehicle.summary}</p>
             <div className="mt-8 rounded-md bg-[#fffaf0] p-6 ring-1 ring-[#d8ccb2]">
               <p className="leading-9 text-[#4b463d]">{vehicle.detail}</p>
+            </div>
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {faq.slice(0, 4).map((item) => (
+                <div className="rounded-md bg-[#fffaf0] p-5 ring-1 ring-[#d8ccb2]" key={item.question}>
+                  <h2 className="text-lg font-black">{item.question}</h2>
+                  <p className="mt-2 leading-7 text-[#4b463d]">{item.answer}</p>
+                </div>
+              ))}
             </div>
             <Link
               href="/contact/inquiry"

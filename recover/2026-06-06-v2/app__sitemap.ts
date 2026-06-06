@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
-import { absoluteUrl } from "@/lib/site";
+import { SITE, absoluteUrl } from "@/lib/site";
 import { fleetItems, serviceItems } from "@/lib/siteContent";
-import { locationPages, moneyPages } from "@/lib/growthPages";
 import { toursData } from "@/lib/tours";
 import { travelArticles } from "@/lib/travelContent";
 
@@ -13,19 +12,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/fleet",
     "/travel",
     "/reviews",
-    "/featured-trips",
-    "/ai-trip-planner",
     "/contact",
     "/contact/inquiry",
     "/privacy",
     "/zh",
-    "/zh-tw",
     "/en",
     "/ja",
     "/ko",
-    "/ms",
-    "/vi",
-    "/th",
   ];
 
   const dynamicPaths = [
@@ -33,14 +26,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...fleetItems.map((item) => `/fleet/${item.slug}`),
     ...travelArticles.map((article) => `/travel/${article.slug}`),
     ...toursData.map((tour) => `/itineraries/${tour.id}`),
-    ...locationPages.map((page) => `/charter-bus/${page.slug}`),
-    ...moneyPages.map((page) => `/service/${page.slug}`),
   ];
 
   return [...staticPaths, ...dynamicPaths].map((path) => ({
     url: absoluteUrl(path),
     lastModified: new Date(),
-    changeFrequency: path === "/" ? "daily" : "weekly",
-    priority: path === "/" ? 1 : path.includes("/service/") || path.includes("/charter-bus/") ? 0.85 : 0.7,
+    changeFrequency: path === SITE.url ? "daily" : "weekly",
+    priority: path === "/" ? 1 : 0.7,
   }));
 }
