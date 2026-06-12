@@ -16,7 +16,7 @@ export default function LineButton({
         aria-disabled="true"
         title="請設定 NEXT_PUBLIC_LINE_OA_URL"
       >
-        請設定LINE官方帳號
+        加入LINE立即詢價
       </span>
     );
   }
