@@ -26,6 +26,28 @@ model CharterQuote {
   @@map("charter_quotes")
 }
 
+model AiConversation {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now()) @map("created_at")
+  sessionId      String?  @map("session_id")
+  source         String
+  userId         String?  @map("user_id")
+  query          String
+  intent         String
+  reply          String
+  route          String?
+  peopleCount    Int?     @map("people_count")
+  luggageCount   Int?     @map("luggage_count")
+  estimatedPrice Int?     @map("estimated_price")
+  status         String   @default("answered")
+
+  @@index([createdAt])
+  @@index([source])
+  @@index([intent])
+  @@index([route])
+  @@map("ai_conversations")
+}
+
 model LineSession {
   userId    String   @id @map("user_id")
   state     String
@@ -85,6 +107,14 @@ model Inquiry {
   preferredVehicle String[]  @map("preferred_vehicle")
   specialRequests  String?   @map("special_requests")
   source           String?
+  sourcePage       String?   @map("source_page")
+  referer          String?
+  utmSource        String?   @map("utm_source")
+  utmMedium        String?   @map("utm_medium")
+  utmCampaign      String?   @map("utm_campaign")
+  utmTerm          String?   @map("utm_term")
+  utmContent       String?   @map("utm_content")
+  keyword          String?
   status           String    @default("New")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -136,4 +166,20 @@ model Supplier {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("suppliers")
+}
+
+model ContentDraft {
+  id            String   @id @default(cuid())
+  tripTitle     String   @map("trip_title")
+  inputJson     Json     @map("input_json")
+  outputJson    Json     @map("output_json")
+  imageUrls     String[] @map("image_urls")
+  coverImageUrl String?  @map("cover_image_url")
+  status        String   @default("draft")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("content_drafts")
 }
