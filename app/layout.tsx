@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
+import { Suspense } from "react";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import "./globals.css";
 import FloatingContactBar from "@/components/FloatingContactBar";
 import Footer from "@/components/Footer";
@@ -50,12 +53,32 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
   return (
     <html lang="zh-Hant">
       <body>
-        <main className="page">{children}</main>
-        <Footer />
-        <FloatingContactBar />
+        {gaId ? (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                window.gtag = gtag;
+                gtag('js', new Date());
+                gtag('config', '${gaId}');
+              `}
+            </Script>
+          </>
+        ) : null}
+        <Suspense fallback={null}>
+          <AnalyticsProvider>
+            <main className="page">{children}</main>
+            <Footer />
+            <FloatingContactBar />
+          </AnalyticsProvider>
+        </Suspense>
       </body>
     </html>
   );

@@ -1,12 +1,19 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { LINE_URL } from "@/lib/site";
+import { trackEvent } from "@/lib/analytics";
+
+type LineSource = "home" | "pricing" | "charter" | "school" | "airport" | "article";
 
 export default function LineButton({
   children = "LINE 諮詢",
   className = "",
+  source = "pricing",
 }: {
   children?: ReactNode;
   className?: string;
+  source?: LineSource;
 }) {
   if (!LINE_URL) {
     return (
@@ -27,6 +34,7 @@ export default function LineButton({
       href={LINE_URL}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackEvent("line_click", { source })}
     >
       {children}
     </a>

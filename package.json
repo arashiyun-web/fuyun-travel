@@ -7,13 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "line:create-rich-menu": "node scripts/create-line-rich-menu.mjs"
+    "line:create-rich-menu": "node scripts/create-line-rich-menu.mjs",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
     "lucide-react": "^0.468.0",
     "next": "^14.2.18",
     "nodemailer": "^6.9.16",
+    "posthog-js": "^1.386.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

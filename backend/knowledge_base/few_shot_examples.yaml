@@ -1,0 +1,56 @@
+- id: example_1
+  category: line_reply
+  user: "範例問題 1"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_2
+  category: line_reply
+  user: "範例問題 2"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_3
+  category: line_reply
+  user: "範例問題 3"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_4
+  category: line_reply
+  user: "範例問題 4"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_5
+  category: line_reply
+  user: "範例問題 5"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_6
+  category: line_reply
+  user: "範例問題 6"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_7
+  category: line_reply
+  user: "範例問題 7"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_8
+  category: line_reply
+  user: "範例問題 8"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_9
+  category: line_reply
+  user: "範例問題 9"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_10
+  category: line_reply
+  user: "範例問題 10"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_11
+  category: line_reply
+  user: "範例問題 11"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_12
+  category: line_reply
+  user: "範例問題 12"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_13
+  category: line_reply
+  user: "範例問題 13"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"
+- id: example_14
+  category: line_reply
+  user: "範例問題 14"
+  assistant: "以繁體中文、初步行情、追問缺漏資料、不得正式報價為原則。"

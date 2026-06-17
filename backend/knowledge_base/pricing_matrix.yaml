@@ -1,0 +1,11 @@
+pricing_matrix:
+  bus_44_45:
+    taipei_city_short: "11000~12500元"
+    taipei_to_taoyuan_hsinchu: "12500~15000元"
+    taipei_to_taichung_changhua_lukang_round_trip: "16000~22000元"
+    taipei_to_south_long: "24000~35000元"
+    mountain_addon: "日月潭、清境、山區另加價"
+    driver_tip: "司機小費 NT$1,000~2,000/天"
+    driver_meal: "司機誤餐費 NT$250/餐"
+    work_hours: "工時計算不含空車回送"
+    quote_policy: "缺日期、出發地、目的地、行李件數、單程或來回時不得正式報價，只能列出缺少欄位。"

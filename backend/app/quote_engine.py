@@ -9,6 +9,9 @@ def _has_any(text: str, keywords: list[str]) -> bool:
 
 
 def _passenger_count(text: str) -> int | None:
+    labeled = re.search(r"人數\s*[:：]\s*(\d{1,3})", text)
+    if labeled:
+        return int(labeled.group(1))
     match = re.search(r"(\d{1,3})\s*(人|位)", text)
     return int(match.group(1)) if match else None
 
@@ -24,7 +27,8 @@ def analyze(message: str) -> dict[str, Any]:
     has_big_luggage = _has_any(text, ["大行李", "行李箱", "大件行李", "每人一個大行李", "每人一件大行李"])
     asks_legal = _has_any(text, ["合法", "旅行社", "甲種", "履約", "品保", "註冊"])
     mentions_44_45_bus = bool(re.search(r"(44|45)\s*座", text)) or _has_any(text, ["大巴", "大型巴士", "遊覽車"])
-    needs_luggage_warning = mentions_44_45_bus and (has_big_luggage or is_airport or is_multi_day or is_round_taiwan)
+    large_group = passenger_count is not None and passenger_count >= 32
+    needs_luggage_warning = (mentions_44_45_bus or large_group) and (has_big_luggage or is_airport or is_multi_day or is_round_taiwan)
 
     missing_fields: list[str] = []
     if not re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}/\d{1,2}|\d{1,2}月\d{1,2}日", text):
@@ -33,7 +37,7 @@ def analyze(message: str) -> dict[str, Any]:
         missing_fields.append("人數")
     if not _has_any(text, ["行李", "背包", "行李箱"]):
         missing_fields.append("行李件數")
-    if not _has_any(text, ["到", "→", "->", "接送", "出發", "目的地", "路線", "板橋", "宜蘭", "台北", "桃園"]):
+    if not _has_any(text, ["到", "→", "->", "⇄", "接送", "出發", "目的地", "路線", "板橋", "宜蘭", "台北", "桃園", "樹林", "鹿港"]):
         missing_fields.append("路線")
 
     return {
@@ -46,7 +50,8 @@ def analyze(message: str) -> dict[str, Any]:
         "has_big_luggage": has_big_luggage,
         "mentions_44_45_bus": mentions_44_45_bus,
         "needs_luggage_warning": needs_luggage_warning,
+        "large_group": large_group,
         "asks_legal": asks_legal,
         "missing_fields": missing_fields,
-        "intent": "quote" if _has_any(normalized, ["包車", "報價", "詢價", "接送", "機場", "遊覽車"]) else "customer_service",
+        "intent": "quote" if _has_any(normalized, ["包車", "報價", "詢價", "訂車", "立即報價", "接送", "機場", "遊覽車"]) else "customer_service",
     }

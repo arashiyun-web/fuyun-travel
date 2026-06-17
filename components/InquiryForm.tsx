@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { COMPANY } from "@/lib/site";
+import { getAttribution, trackEvent } from "@/lib/analytics";
 
 const SERVICE_TYPES = [
   "遊覽車包車",
@@ -42,11 +43,20 @@ export default function InquiryForm() {
 
     try {
       const formData = new FormData(e.currentTarget);
+      const attribution = getAttribution();
       const response = await fetch("/api/inquiry", {
         method: "POST",
         body: JSON.stringify({
           ...Object.fromEntries(formData.entries()),
           phone: phone.trim(),
+          source_page: attribution.sourcePage,
+          referer: attribution.referer,
+          utm_source: attribution.utmSource,
+          utm_medium: attribution.utmMedium,
+          utm_campaign: attribution.utmCampaign,
+          utm_term: attribution.utmTerm,
+          utm_content: attribution.utmContent,
+          keyword: attribution.keyword,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -57,6 +67,13 @@ export default function InquiryForm() {
         setError("詢價送出失敗，請稍後再試，或改用 LINE / 電話聯絡。");
         return;
       }
+
+      trackEvent("quote_submitted", {
+        source_page: attribution.sourcePage,
+        utm_source: attribution.utmSource,
+        utm_campaign: attribution.utmCampaign,
+        keyword: attribution.keyword,
+      });
 
       e.currentTarget.reset();
       setPhone("");

@@ -27,6 +27,7 @@ const navItems = [
   { href: "/about", label: "關於" },
   { href: "/fleet", label: "車隊" },
   { href: "/travel", label: "旅遊" },
+  { href: "/ai-test", label: "AI旅遊顧問（測試版）" },
   { href: "/contact", label: "聯絡" },
 ];
 

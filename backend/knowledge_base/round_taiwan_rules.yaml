@@ -1,0 +1,5 @@
+round_taiwan_rules:
+  blocked_keywords: ["一天環島", "一日環島", "單日環島"]
+  distance: "環島約950-1000公里"
+  legal_limits: ["每日駕車10小時", "每日總工時12小時"]
+  alternatives: ["二日環島", "三日環島", "四日深度環島"]

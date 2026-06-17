@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { prisma } from "@/lib/prisma";
 import { SITE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,14 @@ type InquiryRecord = {
   status: InquiryStatus;
   created_at: string;
   updated_at?: string;
+  source_page?: string;
+  referer?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  keyword?: string;
 };
 
 type AuditRecord = {
@@ -33,7 +42,6 @@ type AuditRecord = {
 };
 
 type Store = {
-  inquiries: InquiryRecord[];
   audit: AuditRecord[];
   rate: Map<string, { count: number; resetAt: number }>;
 };
@@ -49,23 +57,6 @@ const globalStore = globalThis as typeof globalThis & {
 const store: Store =
   globalStore.__fuyunInquiryStore ||
   (globalStore.__fuyunInquiryStore = {
-    inquiries: [
-      {
-        id: "iq-seed-1",
-        name: "測試旅客",
-        phone: "0912345678",
-        line_id: "fuyun-test",
-        trip_type: "包車旅遊",
-        start_date: "2026-06-12",
-        pickup_location: "板橋車站",
-        destination: "阿里山",
-        passenger_count: 38,
-        preferred_vehicle: ["Scania K400"],
-        special_requests: "需要安排長輩友善休息點與午餐建議。",
-        status: "New",
-        created_at: "2026-05-25T10:00:00.000Z",
-      },
-    ],
     audit: [],
     rate: new Map(),
   });
@@ -130,6 +121,62 @@ function publicInquiry(item: InquiryRecord, reveal = false) {
   };
 }
 
+function toPublicRecord(item: {
+  id: string;
+  customerName: string;
+  phone: string;
+  lineId: string | null;
+  tripType: string;
+  startDate: Date | null;
+  pickupLocation: string | null;
+  destination: string | null;
+  passengerCount: number;
+  preferredVehicle: string[];
+  specialRequests: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sourcePage: string | null;
+  referer: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  keyword: string | null;
+}): InquiryRecord {
+  return {
+    id: item.id,
+    name: item.customerName,
+    phone: item.phone,
+    line_id: item.lineId || "",
+    trip_type: item.tripType,
+    start_date: item.startDate ? item.startDate.toISOString().slice(0, 10) : "",
+    pickup_location: item.pickupLocation || "",
+    destination: item.destination || "",
+    passenger_count: item.passengerCount,
+    preferred_vehicle: item.preferredVehicle,
+    special_requests: item.specialRequests || "",
+    status: item.status as InquiryStatus,
+    created_at: item.createdAt.toISOString(),
+    updated_at: item.updatedAt.toISOString(),
+    source_page: item.sourcePage || "",
+    referer: item.referer || "",
+    utm_source: item.utmSource || "",
+    utm_medium: item.utmMedium || "",
+    utm_campaign: item.utmCampaign || "",
+    utm_term: item.utmTerm || "",
+    utm_content: item.utmContent || "",
+    keyword: item.keyword || "",
+  };
+}
+
+function parseDate(value: string) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 async function sendNotificationEmail(inquiry: InquiryRecord) {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
@@ -158,6 +205,9 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
     `人數：${inquiry.passenger_count}`,
     `車型：${inquiry.preferred_vehicle.join("、") || "未指定"}`,
     `路線：${inquiry.pickup_location} → ${inquiry.destination}`,
+    `來源頁：${inquiry.source_page || "未記錄"}`,
+    `UTM：${inquiry.utm_source || ""} ${inquiry.utm_medium || ""} ${inquiry.utm_campaign || ""}`.trim(),
+    `關鍵字：${inquiry.keyword || "未記錄"}`,
     "",
     "備註：",
     inquiry.special_requests || "未填",
@@ -174,11 +224,13 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
 
 export async function GET(request: Request) {
   addAudit(request, "READ_INQUIRIES", "");
+  const inquiries = await prisma.inquiry.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
+
   return NextResponse.json({
     success: true,
-    inquiries: store.inquiries.map((item) => publicInquiry(item, true)),
+    inquiries: inquiries.map((item) => publicInquiry(toPublicRecord(item), true)),
     audit: store.audit,
-    source: process.env.MONGODB_URI ? "mongodb-ready" : "server-store",
+    source: "postgresql",
   });
 }
 
@@ -203,6 +255,14 @@ export async function POST(request: Request) {
       special_requests: clean(body.special_requests || body.note, 1200),
       status: "New",
       created_at: new Date().toISOString(),
+      source_page: clean(body.source_page, 240),
+      referer: clean(body.referer, 400),
+      utm_source: clean(body.utm_source, 120),
+      utm_medium: clean(body.utm_medium, 120),
+      utm_campaign: clean(body.utm_campaign, 160),
+      utm_term: clean(body.utm_term, 160),
+      utm_content: clean(body.utm_content, 160),
+      keyword: clean(body.keyword, 160),
     };
 
     if (!inquiry.name || !inquiry.phone || !inquiry.start_date) {
@@ -216,20 +276,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "請填寫正確人數。" }, { status: 400 });
     }
 
-    store.inquiries.unshift(inquiry);
-    store.inquiries = store.inquiries.slice(0, 500);
-    addAudit(request, "CREATE_INQUIRY", inquiry.id);
+    const created = await prisma.inquiry.create({
+      data: {
+        id: inquiry.id,
+        customerName: inquiry.name,
+        phone: inquiry.phone,
+        lineId: inquiry.line_id || null,
+        tripType: inquiry.trip_type,
+        startDate: parseDate(inquiry.start_date),
+        pickupLocation: inquiry.pickup_location || null,
+        destination: inquiry.destination || null,
+        passengerCount: inquiry.passenger_count,
+        preferredVehicle: inquiry.preferred_vehicle,
+        specialRequests: inquiry.special_requests || null,
+        source: inquiry.utm_source || inquiry.source_page || null,
+        sourcePage: inquiry.source_page || null,
+        referer: inquiry.referer || null,
+        utmSource: inquiry.utm_source || null,
+        utmMedium: inquiry.utm_medium || null,
+        utmCampaign: inquiry.utm_campaign || null,
+        utmTerm: inquiry.utm_term || null,
+        utmContent: inquiry.utm_content || null,
+        keyword: inquiry.keyword || null,
+        status: "New",
+      },
+    });
+
+    addAudit(request, "CREATE_INQUIRY", created.id);
 
     try {
-      await sendNotificationEmail(inquiry);
+      await sendNotificationEmail(toPublicRecord(created));
     } catch {
-      addAudit(request, "EMAIL_FAILED", inquiry.id);
+      addAudit(request, "EMAIL_FAILED", created.id);
     }
 
     return NextResponse.json({
       success: true,
       message: "Inquiry received",
-      inquiry: publicInquiry(inquiry, true),
+      inquiry: publicInquiry(toPublicRecord(created), true),
     });
   } catch {
     return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 500 });
@@ -240,39 +324,35 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const id = clean(body.id, 80);
-    const index = store.inquiries.findIndex((item) => item.id === id);
+    const status = clean(body.status, 40) as InquiryStatus;
 
-    if (index < 0) {
+    const current = await prisma.inquiry.findUnique({ where: { id } });
+    if (!current) {
       return NextResponse.json({ success: false, message: "找不到詢價資料。" }, { status: 404 });
     }
 
-    const current = store.inquiries[index];
-    const status = clean(body.status, 40) as InquiryStatus;
-    const next: InquiryRecord = {
-      ...current,
-      name: clean(body.name, 120) || current.name,
-      phone: clean(body.phone, 80) || current.phone,
-      line_id: clean(body.line_id, 120) || current.line_id,
-      trip_type: clean(body.trip_type, 80) || current.trip_type,
-      start_date: clean(body.start_date, 80) || current.start_date,
-      pickup_location: clean(body.pickup_location, 160) || current.pickup_location,
-      destination: clean(body.destination, 240) || current.destination,
-      passenger_count: Number(body.passenger_count || current.passenger_count),
-      preferred_vehicle: cleanArray(body.preferred_vehicle).length
-        ? cleanArray(body.preferred_vehicle)
-        : current.preferred_vehicle,
-      special_requests: clean(body.special_requests, 1200) || current.special_requests,
-      status: STATUSES.includes(status) ? status : current.status,
-      updated_at: new Date().toISOString(),
-    };
+    const updated = await prisma.inquiry.update({
+      where: { id },
+      data: {
+        customerName: clean(body.name, 120) || current.customerName,
+        phone: clean(body.phone, 80) || current.phone,
+        lineId: clean(body.line_id, 120) || current.lineId,
+        tripType: clean(body.trip_type, 80) || current.tripType,
+        startDate: parseDate(clean(body.start_date, 80)) || current.startDate,
+        pickupLocation: clean(body.pickup_location, 160) || current.pickupLocation,
+        destination: clean(body.destination, 240) || current.destination,
+        passengerCount: Number(body.passenger_count || current.passengerCount),
+        preferredVehicle: cleanArray(body.preferred_vehicle).length ? cleanArray(body.preferred_vehicle) : current.preferredVehicle,
+        specialRequests: clean(body.special_requests, 1200) || current.specialRequests,
+        status: STATUSES.includes(status) ? status : (current.status as InquiryStatus),
+      },
+    });
 
-    store.inquiries[index] = next;
     addAudit(request, "UPDATE_INQUIRY", id);
 
     return NextResponse.json({
       success: true,
-      inquiry: publicInquiry(next, true),
-      audit: store.audit,
+      inquiry: publicInquiry(toPublicRecord(updated), true),
     });
   } catch {
     return NextResponse.json({ success: false, message: "更新失敗。" }, { status: 500 });

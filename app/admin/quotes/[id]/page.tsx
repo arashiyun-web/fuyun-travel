@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
 
 type Quote = {
   id: string;
@@ -55,6 +56,7 @@ export default function QuoteEditPage({ params, searchParams }: { params: { id: 
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.error || "送出失敗");
     setQuote(data.quote);
+    trackEvent("quote_sent", { quote_id: params.id });
     setMessage("已送出正式報價給 LINE 使用者。");
   }
 

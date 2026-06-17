@@ -1,9 +1,26 @@
+"use client";
+
 import { MessageCircle, Phone, Send, Smartphone } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { COMPANY, LINE_URL } from "@/lib/site";
+import { trackEvent } from "@/lib/analytics";
+
+type LineSource = "home" | "pricing" | "charter" | "school" | "airport" | "article";
+
+function lineSourceFromPath(pathname: string): LineSource {
+  if (pathname === "/") return "home";
+  if (pathname.includes("school")) return "school";
+  if (pathname.includes("airport")) return "airport";
+  if (pathname.startsWith("/charter-bus") || pathname.includes("coach-charter")) return "charter";
+  if (pathname.startsWith("/travel")) return "article";
+  return "pricing";
+}
 
 export default function FloatingContactBar() {
+  const pathname = usePathname();
   const lineHref = LINE_URL || "/contact";
+  const lineSource = lineSourceFromPath(pathname);
 
   return (
     <aside className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 md:inset-x-auto md:right-5 md:top-1/2 md:block md:-translate-y-1/2 md:px-0">
@@ -12,6 +29,7 @@ export default function FloatingContactBar() {
           href={lineHref}
           target={LINE_URL ? "_blank" : undefined}
           rel={LINE_URL ? "noopener noreferrer" : undefined}
+          onClick={() => trackEvent("line_click", { source: lineSource })}
           className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#066d2b] text-white hover:bg-[#0a8d39]"
           aria-label="LINE AI客服"
           title="LINE AI客服"
