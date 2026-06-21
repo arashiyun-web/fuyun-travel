@@ -3,9 +3,12 @@ import { absoluteUrl } from "@/lib/site";
 import { fleetItems, serviceItems } from "@/lib/siteContent";
 import { locationPages, moneyPages } from "@/lib/growthPages";
 import { toursData } from "@/lib/tours";
-import { travelArticles } from "@/lib/travelContent";
+import { listPublishedTravelArticles } from "@/lib/dynamicTravelArticles";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const dynamic = "force-dynamic";
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const articles = await listPublishedTravelArticles();
   const staticPaths = [
     "/",
     "/about",
@@ -31,7 +34,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const dynamicPaths = [
     ...serviceItems.map((item) => `/services/${item.slug}`),
     ...fleetItems.map((item) => `/fleet/${item.slug}`),
-    ...travelArticles.map((article) => `/travel/${article.slug}`),
+    ...articles.map((article) => `/travel/${article.slug}`),
     ...toursData.map((tour) => `/itineraries/${tour.id}`),
     ...locationPages.map((page) => `/charter-bus/${page.slug}`),
     ...moneyPages.map((page) => `/service/${page.slug}`),

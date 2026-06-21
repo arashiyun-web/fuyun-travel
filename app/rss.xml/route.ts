@@ -1,5 +1,7 @@
 import { SITE, absoluteUrl } from "@/lib/site";
-import { travelArticles } from "@/lib/travelContent";
+import { listPublishedTravelArticles } from "@/lib/dynamicTravelArticles";
+
+export const dynamic = "force-dynamic";
 
 function escapeXml(value: string) {
   return value
@@ -11,6 +13,7 @@ function escapeXml(value: string) {
 }
 
 export async function GET() {
+  const travelArticles = await listPublishedTravelArticles();
   const items = travelArticles
     .map(
       (article) => `

@@ -4,6 +4,7 @@ import { generateFaq } from "@/lib/seo/generateFaq";
 import { generateGeo } from "@/lib/seo/generateGeo";
 import { generateSlug } from "@/lib/seo/generateSlug";
 import { travelCategories, type TravelCategory } from "@/lib/travelContent";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -71,12 +72,13 @@ function buildSeo(title: string, content: string, tags: string[], location: stri
 }
 
 export async function GET() {
+  const persisted = await prisma.article.findMany({ orderBy: { createdAt: "desc" }, take: 50 }).catch(() => []);
   return NextResponse.json({
     success: true,
     source: "小羽旅遊趣 / Facebook Graph API ready",
     auth: envConfig.travelImportApiKey ? "x-api-key required" : "development mode; TRAVEL_IMPORT_API_KEY not configured",
     flow: ["Facebook", "Graph API", "n8n", "GX10 AI", "SEO改寫", "網站發布", "Google收錄", "LINE推播", "詢價", "成交"],
-    imports,
+    imports: persisted.length ? persisted : imports,
   });
 }
 
@@ -106,12 +108,6 @@ export async function POST(request: Request) {
     const allTags = category ? Array.from(new Set([category, ...tags])) : tags;
     const fbPostId = clean(body.fbPostId, 120);
     const slug = generateSlug(fbPostId || title);
-    const existing = imports.find((item) => item.fbPostId && item.fbPostId === fbPostId);
-
-    if (existing) {
-      return NextResponse.json({ success: true, duplicated: true, post: existing });
-    }
-
     const post: ImportedTravelPost = {
       id: clean(body.id, 80) || `fb-${Date.now()}`,
       title,
@@ -129,19 +125,35 @@ export async function POST(request: Request) {
 
     imports.unshift(post);
     imports.splice(50);
+    const requestedStatus = clean(body.status, 20);
+    const status = requestedStatus === "published" ? "published" : "draft";
+    const persisted = await prisma.article.upsert({
+      where: { slug },
+      create: {
+        slug, title, content, excerpt: post.excerpt, category: post.category, tags: allTags, location,
+        seoJson: post.seo, fbPostId: fbPostId || null, status,
+        publishedAt: status === "published" ? new Date(post.publishDate) : null,
+      },
+      update: {
+        title, content, excerpt: post.excerpt, category: post.category, tags: allTags, location,
+        seoJson: post.seo, status,
+        publishedAt: status === "published" ? new Date(post.publishDate) : null,
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      message: "Travel post imported and SEO/AEO/GEO draft generated.",
-      post,
+      message: status === "published" ? "Travel post published." : "Travel post draft saved.",
+      post: { ...post, status: persisted.status },
       sideEffects: {
-        sitemap: "Next.js sitemap route will include persisted articles when database storage is connected.",
-        rss: "RSS route is ready; imported in-memory drafts are available through this API.",
+        sitemap: "Published articles are included from the Article table.",
+        rss: "Published articles are included in RSS.",
         indexNow: envConfig.indexNowKey ? "IndexNow key configured" : "IndexNow disabled until INDEXNOW_KEY is set.",
         linePush: "Reserved for LINE Messaging API after credentials are configured.",
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("Travel import failed", error);
     return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 500 });
   }
 }

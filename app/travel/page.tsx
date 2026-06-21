@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMeta } from "@/lib/site";
-import { keywordSeeds, travelArticles, travelCategories } from "@/lib/travelContent";
+import { keywordSeeds, travelCategories } from "@/lib/travelContent";
+import { listPublishedTravelArticles } from "@/lib/dynamicTravelArticles";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = pageMeta({
   title: "旅遊內容中心",
@@ -9,7 +12,8 @@ export const metadata: Metadata = pageMeta({
   path: "/travel",
 });
 
-export default function TravelPage() {
+export default async function TravelPage() {
+  const articles = await listPublishedTravelArticles();
   return (
     <>
       <h1>旅遊內容中心</h1>
@@ -48,7 +52,7 @@ export default function TravelPage() {
       <section>
         <h2>最新旅遊紀錄</h2>
         <div className="card-grid">
-          {travelArticles.map((article) => (
+          {articles.map((article) => (
             <article className="card" key={article.slug}>
               <p className="lead">{article.category}｜{article.publishDate}</p>
               <h3>{article.title}</h3>

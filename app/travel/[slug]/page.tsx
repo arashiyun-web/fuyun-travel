@@ -5,9 +5,11 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbJsonLd,
   buildFaqJsonLd,
-  findTravelArticle,
   travelArticles,
 } from "@/lib/travelContent";
+import { findPublishedTravelArticle } from "@/lib/dynamicTravelArticles";
+
+export const dynamic = "force-dynamic";
 
 type TravelDetailPageProps = {
   params: {
@@ -19,8 +21,8 @@ export function generateStaticParams() {
   return travelArticles.map((article) => ({ slug: article.slug }));
 }
 
-export function generateMetadata({ params }: TravelDetailPageProps) {
-  const article = findTravelArticle(params.slug);
+export async function generateMetadata({ params }: TravelDetailPageProps) {
+  const article = await findPublishedTravelArticle(params.slug);
   if (!article) return pageMeta({ title: "旅遊內容中心", path: "/travel" });
   return pageMeta({
     title: article.title,
@@ -31,8 +33,8 @@ export function generateMetadata({ params }: TravelDetailPageProps) {
   });
 }
 
-export default function TravelDetailPage({ params }: TravelDetailPageProps) {
-  const article = findTravelArticle(params.slug);
+export default async function TravelDetailPage({ params }: TravelDetailPageProps) {
+  const article = await findPublishedTravelArticle(params.slug);
 
   if (!article) {
     notFound();
