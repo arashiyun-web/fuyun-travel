@@ -67,26 +67,28 @@ export default function FloatingContactBarV2() {
         </div>
       </aside>
 
-      {/* Mobile bottom CTA bar (B) — replaces original mobile bar */}
-      <div className="mobile-cta-bar-v2" aria-label="快速聯絡">
-        <a
-          href={lineHref}
-          target={LINE_URL ? "_blank" : undefined}
-          rel={LINE_URL ? "noopener noreferrer" : undefined}
-          onClick={() => trackEvent("line_click", { source: lineSource })}
-          className="mobile-cta-bar-v2__line"
-          aria-label="LINE立即報價"
-        >
-          LINE立即報價
-        </a>
-        <Link
-          href="/contact/inquiry"
-          className="mobile-cta-bar-v2__inquiry"
-          aria-label="立即詢價"
-        >
-          立即詢價
-        </Link>
-      </div>
+      {/* Mobile bottom CTA bar (B) — not rendered on inquiry page */}
+      {pathname !== "/contact/inquiry" && (
+        <div className="mobile-cta-bar-v2" aria-label="快速聯絡">
+          <a
+            href={lineHref}
+            target={LINE_URL ? "_blank" : undefined}
+            rel={LINE_URL ? "noopener noreferrer" : undefined}
+            onClick={() => trackEvent("line_click", { source: lineSource })}
+            className="mobile-cta-bar-v2__line"
+            aria-label="LINE立即報價"
+          >
+            LINE立即報價
+          </a>
+          <Link
+            href="/contact/inquiry"
+            className="mobile-cta-bar-v2__inquiry"
+            aria-label="立即詢價"
+          >
+            立即詢價
+          </Link>
+        </div>
+      )}
     </>
   );
 }
