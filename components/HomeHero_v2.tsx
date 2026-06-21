@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { COMPANY, LINE_URL } from "@/lib/site";
+import { trackCtaClick } from "@/lib/analytics";
 
 const featureItems = [
   { href: "/services/coach-charter", title: "遊覽車包車", text: "校外教學、企業旅遊、大型團體" },
@@ -38,10 +41,15 @@ export default function HomeHeroV2() {
             href={lineHref}
             target={LINE_URL ? "_blank" : undefined}
             rel={LINE_URL ? "noopener noreferrer" : undefined}
+            onClick={() => trackCtaClick({ cta_location: "hero_line" })}
           >
             LINE立即報價
           </a>
-          <Link className="home-btn home-btn--gold" href="/contact/inquiry">
+          <Link
+            className="home-btn home-btn--gold"
+            href="/contact/inquiry?utm_content=hero"
+            onClick={() => trackCtaClick({ cta_location: "hero_inquiry" })}
+          >
             立即詢價
           </Link>
         </div>

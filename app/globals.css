@@ -662,3 +662,77 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
     text-decoration: none;
   }
 }
+
+/* D. Summer Urgency Banner */
+.summer-banner-v2 {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 48px 10px 20px;
+  background: #1c1a0e;
+  border-bottom: 1px solid rgba(209, 184, 117, .35);
+}
+
+.summer-banner-v2__text {
+  color: #f0e8cc;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.summer-banner-v2__line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #066d2b;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.summer-banner-v2__line:hover {
+  background: #0a8d39;
+  text-decoration: none;
+}
+
+.summer-banner-v2__close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(240, 232, 204, .55);
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  padding: 6px;
+}
+
+.summer-banner-v2__close:hover {
+  color: #f0e8cc;
+}
+
+@media (max-width: 640px) {
+  .summer-banner-v2 {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 36px 10px 14px;
+  }
+
+  .summer-banner-v2__text {
+    font-size: 13px;
+    flex: 1 1 100%;
+  }
+
+  .summer-banner-v2__line {
+    flex: 1;
+  }
+}

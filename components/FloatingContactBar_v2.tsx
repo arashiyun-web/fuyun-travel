@@ -4,7 +4,7 @@ import { MessageCircle, Phone, Send, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { COMPANY, LINE_URL } from "@/lib/site";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackCtaClick } from "@/lib/analytics";
 
 type LineSource = "home" | "pricing" | "charter" | "school" | "airport" | "article";
 
@@ -31,7 +31,10 @@ export default function FloatingContactBarV2() {
             href={lineHref}
             target={LINE_URL ? "_blank" : undefined}
             rel={LINE_URL ? "noopener noreferrer" : undefined}
-            onClick={() => trackEvent("line_click", { source: lineSource })}
+            onClick={() => {
+              trackEvent("line_click", { source: lineSource });
+              trackCtaClick({ cta_location: "sidebar_line" });
+            }}
             className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#066d2b] text-white hover:bg-[#0a8d39]"
             aria-label="LINE AI客服"
             title="LINE AI客服"
@@ -39,7 +42,8 @@ export default function FloatingContactBarV2() {
             <MessageCircle size={20} />
           </a>
           <Link
-            href="/contact/inquiry"
+            href="/contact/inquiry?utm_content=floating_bar"
+            onClick={() => trackCtaClick({ cta_location: "sidebar_inquiry" })}
             className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#2f6fed] text-white hover:bg-[#1f58c7]"
             aria-label="立即報價"
             title="立即報價"
@@ -73,14 +77,18 @@ export default function FloatingContactBarV2() {
           href={lineHref}
           target={LINE_URL ? "_blank" : undefined}
           rel={LINE_URL ? "noopener noreferrer" : undefined}
-          onClick={() => trackEvent("line_click", { source: lineSource })}
+          onClick={() => {
+            trackEvent("line_click", { source: lineSource });
+            trackCtaClick({ cta_location: "mobile_bar_line" });
+          }}
           className="mobile-cta-bar-v2__line"
           aria-label="LINE立即報價"
         >
           LINE立即報價
         </a>
         <Link
-          href="/contact/inquiry"
+          href="/contact/inquiry?utm_content=floating_bar"
+          onClick={() => trackCtaClick({ cta_location: "mobile_bar_inquiry" })}
           className="mobile-cta-bar-v2__inquiry"
           aria-label="立即詢價"
         >

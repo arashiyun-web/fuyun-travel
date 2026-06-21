@@ -13,6 +13,7 @@ export type AnalyticsPayload = Record<string, string | number | boolean | null |
 declare global {
   interface Window {
     gtag?: (command: "event", eventName: string, params?: AnalyticsPayload) => void;
+    fbq?: (command: string, eventName: string, params?: Record<string, unknown>) => void;
   }
 }
 
@@ -30,6 +31,12 @@ async function sendPostHogEvent(eventName: AnalyticsEventName, payload: Analytic
 export function trackEvent(eventName: AnalyticsEventName, payload: AnalyticsPayload = {}) {
   sendGa4Event(eventName, payload);
   void sendPostHogEvent(eventName, payload);
+}
+
+export function trackCtaClick(params: { cta_location: string } & AnalyticsPayload) {
+  if (typeof window !== "undefined" && typeof window.fbq === "function") {
+    window.fbq("trackCustom", "CTAClick", params);
+  }
 }
 
 export function getAttribution() {
