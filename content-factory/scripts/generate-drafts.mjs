@@ -5,10 +5,15 @@ import path from "node:path";
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const factoryDirectory = path.resolve(scriptDirectory, "..");
 const topicsPath = path.join(factoryDirectory, "data", "summer-campaign-topics.json");
+const seoCandidatesPath = path.join(factoryDirectory, "data", "seo-page-candidates.json");
+const todayPriorityPath = path.join(factoryDirectory, "data", "today-priority.json");
 const templatesDirectory = path.join(factoryDirectory, "templates");
 const outputDirectory = path.join(factoryDirectory, "output");
 
 const CTA = "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。";
+const SITE_URL = "https://fuyuntravel.com";
+const LINE_CTA_URL = "https://line.me/R/ti/p/@954fyicw";
+const UTM_CAMPAIGN = "summer_2026";
 const TRUST_POINTS = [
   "合法旅行社",
   "自有遊覽車車隊",
@@ -17,10 +22,38 @@ const TRUST_POINTS = [
   "家庭旅遊、企業旅遊、校外教學、機場接送皆可安排"
 ];
 const draftTypes = [
-  { template: "seo-article-template.md", output: "seo.md", titlePrefix: "" },
-  { template: "facebook-post-template.md", output: "facebook.md", titlePrefix: "暑假出遊提案｜" },
-  { template: "google-business-post-template.md", output: "google-business.md", titlePrefix: "暑假服務推薦｜" },
-  { template: "line-push-template.md", output: "line-push.md", titlePrefix: "暑假輕鬆遊｜" }
+  {
+    channel: "seo",
+    template: "seo-article-template.md",
+    output: "seo.md",
+    titlePrefix: "",
+    utmSource: "seo",
+    utmMedium: "search"
+  },
+  {
+    channel: "facebook",
+    template: "facebook-post-template.md",
+    output: "facebook.md",
+    titlePrefix: "暑假出遊提案｜",
+    utmSource: "facebook",
+    utmMedium: "social"
+  },
+  {
+    channel: "google-business",
+    template: "google-business-post-template.md",
+    output: "google-business.md",
+    titlePrefix: "暑假服務推薦｜",
+    utmSource: "google_business",
+    utmMedium: "organic"
+  },
+  {
+    channel: "line-push",
+    template: "line-push-template.md",
+    output: "line-push.md",
+    titlePrefix: "暑假輕鬆遊｜",
+    utmSource: "line",
+    utmMedium: "push"
+  }
 ];
 
 function toBulletList(items) {
@@ -78,8 +111,33 @@ function renderTemplate(template, topic, titlePrefix) {
   );
 }
 
+function buildLandingUrl(slug, draftType, topicId) {
+  const url = new URL(slug, SITE_URL);
+  url.searchParams.set("utm_source", draftType.utmSource);
+  url.searchParams.set("utm_medium", draftType.utmMedium);
+  url.searchParams.set("utm_campaign", UTM_CAMPAIGN);
+  url.searchParams.set("utm_content", topicId);
+  return url.toString();
+}
+
+function getPriority(topicId, highPriorityIds, hasSeoCandidate) {
+  if (highPriorityIds.has(topicId)) return "high";
+  return hasSeoCandidate ? "medium" : "low";
+}
+
+function getSuggestedPublishDate(priority, index) {
+  const startDate = new Date("2026-06-22T00:00:00.000Z");
+  const interval = priority === "high" ? 1 : priority === "medium" ? 2 : 3;
+  startDate.setUTCDate(startDate.getUTCDate() + index * interval);
+  return startDate.toISOString().slice(0, 10);
+}
+
 async function main() {
-  const topics = JSON.parse(await readFile(topicsPath, "utf8"));
+  const [topics, seoCandidates, todayPriority] = await Promise.all([
+    readFile(topicsPath, "utf8").then(JSON.parse),
+    readFile(seoCandidatesPath, "utf8").then(JSON.parse),
+    readFile(todayPriorityPath, "utf8").then(JSON.parse)
+  ]);
   const templates = new Map(
     await Promise.all(
       draftTypes.map(async ({ template }) => [
@@ -88,14 +146,24 @@ async function main() {
       ])
     )
   );
+  const seoSlugByKeyword = new Map(
+    seoCandidates.map((candidate) => [candidate.primaryKeyword, candidate.slug])
+  );
+  const highPriorityIds = new Set(todayPriority.map(({ id }) => id));
+  const publishQueue = [];
 
   await mkdir(outputDirectory, { recursive: true });
 
-  for (const topic of topics) {
+  for (const [topicIndex, topic] of topics.entries()) {
     const topicDirectory = path.join(outputDirectory, topic.id);
+    const candidateSlug = seoSlugByKeyword.get(topic.keyword);
+    const slug = candidateSlug ?? "/contact/inquiry";
+    const priority = getPriority(topic.id, highPriorityIds, Boolean(candidateSlug));
+    const metadata = [];
     await mkdir(topicDirectory, { recursive: true });
 
     for (const draftType of draftTypes) {
+      const title = `${draftType.titlePrefix}${topic.suggested_title}`;
       const content = renderTemplate(
         templates.get(draftType.template),
         topic,
@@ -106,20 +174,42 @@ async function main() {
         `${content.trim()}\n`,
         "utf8"
       );
-    }
 
-    const metadata = {
-      topicId: topic.id,
-      keyword: topic.keyword,
-      category: topic.category,
-      targetArea: topic.target_area,
-      searchIntent: topic.search_intent,
-      suggestedTitle: topic.suggested_title,
-      cta: topic.cta || CTA,
-      status: "draft",
-      requiresHumanApproval: true,
-      generatedFiles: draftTypes.map(({ output }) => output)
-    };
+      const landingUrl = buildLandingUrl(slug, draftType, topic.id);
+      metadata.push({
+        topicId: topic.id,
+        keyword: topic.keyword,
+        category: topic.category,
+        targetArea: topic.target_area,
+        channel: draftType.channel,
+        status: "draft",
+        reviewer: null,
+        approvedAt: null,
+        publishedAt: null,
+        utmSource: draftType.utmSource,
+        utmMedium: draftType.utmMedium,
+        utmCampaign: UTM_CAMPAIGN,
+        utmContent: topic.id,
+        landingUrl,
+        lineCtaUrl: LINE_CTA_URL,
+        notes: "AI 草稿，須經人工審核後才可發布。"
+      });
+
+      publishQueue.push({
+        id: `${topic.id}-${draftType.channel}`,
+        topicId: topic.id,
+        channel: draftType.channel,
+        title,
+        filePath: `content-factory/output/${topic.id}/${draftType.output}`,
+        status: "draft",
+        priority,
+        suggestedPublishDate: getSuggestedPublishDate(priority, topicIndex),
+        reviewer: null,
+        approved: false,
+        published: false,
+        landingUrl
+      });
+    }
 
     await writeFile(
       path.join(topicDirectory, "metadata.json"),
@@ -128,7 +218,15 @@ async function main() {
     );
   }
 
-  console.log(`已產生 ${topics.length} 組暑假內容草稿：${outputDirectory}`);
+  await writeFile(
+    path.join(outputDirectory, "publish-queue.json"),
+    `${JSON.stringify(publishQueue, null, 2)}\n`,
+    "utf8"
+  );
+
+  console.log(
+    `已產生 ${topics.length} 組、${publishQueue.length} 篇暑假內容草稿與發布清單：${outputDirectory}`
+  );
 }
 
 main().catch((error) => {

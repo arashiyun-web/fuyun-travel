@@ -1,0 +1,10 @@
+[
+  { "id": "taipei-charter", "keyword": "台北包車", "priority": "high" },
+  { "id": "new-taipei-charter", "keyword": "新北包車", "priority": "high" },
+  { "id": "banqiao-charter", "keyword": "板橋包車", "priority": "high" },
+  { "id": "bus-rental", "keyword": "遊覽車出租", "priority": "high" },
+  { "id": "school-trip-bus", "keyword": "校外教學遊覽車", "priority": "high" },
+  { "id": "corporate-employee-travel", "keyword": "企業員工旅遊", "priority": "high" },
+  { "id": "taoyuan-airport-transfer", "keyword": "桃園機場接送", "priority": "high" },
+  { "id": "dongyanshan-day-trip", "keyword": "東眼山一日遊", "priority": "high" }
+]

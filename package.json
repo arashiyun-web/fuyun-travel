@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "content:generate": "node content-factory/scripts/generate-drafts.mjs",
+    "content:review": "node content-factory/scripts/generate-review-list.mjs",
     "content:check": "node content-factory/scripts/check-output.mjs",
     "line:create-rich-menu": "node scripts/create-line-rich-menu.mjs",
     "postinstall": "prisma generate"
