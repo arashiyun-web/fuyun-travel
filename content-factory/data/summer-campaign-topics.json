@@ -1,0 +1,152 @@
+[
+  {
+    "id": "taipei-charter",
+    "keyword": "台北包車",
+    "category": "包車旅遊",
+    "target_area": "台北市",
+    "search_intent": "尋找台北出發的包車旅遊與接送服務",
+    "suggested_title": "台北包車推薦｜暑假家庭旅遊與團體接送輕鬆安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "new-taipei-charter",
+    "keyword": "新北包車",
+    "category": "包車旅遊",
+    "target_area": "新北市",
+    "search_intent": "尋找新北各區可到府接送的包車服務",
+    "suggested_title": "新北包車推薦｜暑假出遊、多人接送一次安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "banqiao-charter",
+    "keyword": "板橋包車",
+    "category": "包車旅遊",
+    "target_area": "新北市板橋區",
+    "search_intent": "尋找板橋出發的包車與團體接送服務",
+    "suggested_title": "板橋包車推薦｜暑假家庭與團體旅遊專人協助",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "bus-rental",
+    "keyword": "遊覽車出租",
+    "category": "遊覽車出租",
+    "target_area": "雙北及北台灣",
+    "search_intent": "比較合法遊覽車出租與團體用車方案",
+    "suggested_title": "遊覽車出租推薦｜暑假團體旅遊安全舒適出發",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "43-seat-tour-bus",
+    "keyword": "43人座遊覽車",
+    "category": "遊覽車出租",
+    "target_area": "雙北及北台灣",
+    "search_intent": "尋找適合大型團體的43人座遊覽車",
+    "suggested_title": "43人座遊覽車出租｜大型團體暑假出遊用車指南",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "school-trip-bus",
+    "keyword": "校外教學遊覽車",
+    "category": "校外教學",
+    "target_area": "雙北及北台灣",
+    "search_intent": "尋找學校校外教學的遊覽車與行程協助",
+    "suggested_title": "校外教學遊覽車｜學校團體交通與行程安心安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "corporate-employee-travel",
+    "keyword": "企業員工旅遊",
+    "category": "企業旅遊",
+    "target_area": "雙北及北台灣",
+    "search_intent": "規劃企業員工旅遊的交通與行程",
+    "suggested_title": "企業員工旅遊規劃｜暑假團體行程與遊覽車一次安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "taoyuan-airport-transfer",
+    "keyword": "桃園機場接送",
+    "category": "機場接送",
+    "target_area": "桃園機場及雙北地區",
+    "search_intent": "預約往返桃園機場的多人接送服務",
+    "suggested_title": "桃園機場接送｜家庭與團體行李用車輕鬆安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "dongyanshan-day-trip",
+    "keyword": "東眼山一日遊",
+    "category": "一日遊",
+    "target_area": "桃園市復興區",
+    "search_intent": "規劃東眼山暑假一日遊與包車交通",
+    "suggested_title": "東眼山一日遊｜暑假森林步道包車行程建議",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "jiaobanshan-day-trip",
+    "keyword": "角板山一日遊",
+    "category": "一日遊",
+    "target_area": "桃園市復興區",
+    "search_intent": "規劃角板山景點一日遊與團體交通",
+    "suggested_title": "角板山一日遊｜暑假親子包車行程輕鬆玩",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "window-on-world-charter",
+    "keyword": "小人國包車",
+    "category": "樂園包車",
+    "target_area": "桃園市龍潭區",
+    "search_intent": "預約小人國親子旅遊包車接送",
+    "suggested_title": "小人國包車｜暑假親子樂園接送省心安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "leofoo-village-charter",
+    "keyword": "六福村包車",
+    "category": "樂園包車",
+    "target_area": "新竹縣關西鎮",
+    "search_intent": "預約六福村家庭或團體包車接送",
+    "suggested_title": "六福村包車｜暑假家庭與團體接送便利出發",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "yilan-charter",
+    "keyword": "宜蘭包車",
+    "category": "包車旅遊",
+    "target_area": "宜蘭縣",
+    "search_intent": "規劃宜蘭景點包車一日遊或多日遊",
+    "suggested_title": "宜蘭包車推薦｜暑假親子景點與團體行程安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "jiufen-charter",
+    "keyword": "九份包車",
+    "category": "包車旅遊",
+    "target_area": "新北市瑞芳區",
+    "search_intent": "預約九份山城包車與周邊景點行程",
+    "suggested_title": "九份包車｜暑假山城一日遊與接送行程建議",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  },
+  {
+    "id": "pingxi-charter",
+    "keyword": "平溪包車",
+    "category": "包車旅遊",
+    "target_area": "新北市平溪區",
+    "search_intent": "預約平溪線景點包車一日遊",
+    "suggested_title": "平溪包車｜十分、菁桐暑假一日遊輕鬆安排",
+    "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+    "status": "draft"
+  }
+]

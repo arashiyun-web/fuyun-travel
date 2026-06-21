@@ -1,0 +1,17 @@
+{
+  "topicId": "jiaobanshan-day-trip",
+  "keyword": "角板山一日遊",
+  "category": "一日遊",
+  "targetArea": "桃園市復興區",
+  "searchIntent": "規劃角板山景點一日遊與團體交通",
+  "suggestedTitle": "角板山一日遊｜暑假親子包車行程輕鬆玩",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

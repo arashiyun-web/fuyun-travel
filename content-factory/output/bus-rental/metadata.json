@@ -1,0 +1,17 @@
+{
+  "topicId": "bus-rental",
+  "keyword": "遊覽車出租",
+  "category": "遊覽車出租",
+  "targetArea": "雙北及北台灣",
+  "searchIntent": "比較合法遊覽車出租與團體用車方案",
+  "suggestedTitle": "遊覽車出租推薦｜暑假團體旅遊安全舒適出發",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

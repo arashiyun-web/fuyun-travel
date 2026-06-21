@@ -1,0 +1,17 @@
+{
+  "topicId": "banqiao-charter",
+  "keyword": "板橋包車",
+  "category": "包車旅遊",
+  "targetArea": "新北市板橋區",
+  "searchIntent": "尋找板橋出發的包車與團體接送服務",
+  "suggestedTitle": "板橋包車推薦｜暑假家庭與團體旅遊專人協助",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

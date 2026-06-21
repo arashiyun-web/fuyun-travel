@@ -1,0 +1,17 @@
+{
+  "topicId": "leofoo-village-charter",
+  "keyword": "六福村包車",
+  "category": "樂園包車",
+  "targetArea": "新竹縣關西鎮",
+  "searchIntent": "預約六福村家庭或團體包車接送",
+  "suggestedTitle": "六福村包車｜暑假家庭與團體接送便利出發",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

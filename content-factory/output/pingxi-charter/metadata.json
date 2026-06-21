@@ -1,0 +1,17 @@
+{
+  "topicId": "pingxi-charter",
+  "keyword": "平溪包車",
+  "category": "包車旅遊",
+  "targetArea": "新北市平溪區",
+  "searchIntent": "預約平溪線景點包車一日遊",
+  "suggestedTitle": "平溪包車｜十分、菁桐暑假一日遊輕鬆安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

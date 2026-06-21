@@ -1,0 +1,101 @@
+[
+  {
+    "slug": "/charter/taipei",
+    "title": "台北包車推薦｜家庭旅遊與團體接送",
+    "metaDescription": "雲陞通運 × 浮雲輕鬆遊提供台北包車、家庭旅遊與團體接送服務，專人依日期、人數及行程需求協助安排。",
+    "primaryKeyword": "台北包車",
+    "secondaryKeywords": ["台北包車推薦", "台北旅遊包車", "台北團體接送"],
+    "conversionGoal": "取得台北包車詢價資料",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/charter/new-taipei",
+    "title": "新北包車推薦｜多區到府接送與旅遊安排",
+    "metaDescription": "新北包車涵蓋板橋、新莊、土城、樹林、三峽、中和、永和，家庭及團體行程皆可由專人協助安排。",
+    "primaryKeyword": "新北包車",
+    "secondaryKeywords": ["新北旅遊包車", "新北包車推薦", "新北團體接送"],
+    "conversionGoal": "取得新北包車詢價資料",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/charter/banqiao",
+    "title": "板橋包車推薦｜家庭與團體旅遊專車",
+    "metaDescription": "板橋出發包車旅遊、機場接送及團體用車，雲陞通運 × 浮雲輕鬆遊依人數與目的地提供合適方案。",
+    "primaryKeyword": "板橋包車",
+    "secondaryKeywords": ["板橋旅遊包車", "板橋機場接送", "板橋團體用車"],
+    "conversionGoal": "取得板橋地區詢價資料",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/bus-rental",
+    "title": "遊覽車出租｜合法車隊與團體用車安排",
+    "metaDescription": "自有遊覽車車隊提供企業旅遊、校外教學及團體活動用車，專人協助確認日期、人數、路線與乘車需求。",
+    "primaryKeyword": "遊覽車出租",
+    "secondaryKeywords": ["遊覽車租賃", "43人座遊覽車", "團體遊覽車"],
+    "conversionGoal": "取得遊覽車出租詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/school-trip-bus",
+    "title": "校外教學遊覽車｜學校團體交通安排",
+    "metaDescription": "合法旅行社與自有遊覽車車隊，協助學校規劃校外教學交通、集合點與行程動線，提供專人服務。",
+    "primaryKeyword": "校外教學遊覽車",
+    "secondaryKeywords": ["學校遊覽車", "校外教學包車", "學生團體用車"],
+    "conversionGoal": "取得學校或教育單位詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/corporate-travel",
+    "title": "企業員工旅遊｜行程規劃與遊覽車服務",
+    "metaDescription": "企業員工旅遊、部門活動與團體接送可一次安排，依預算、人數及目的地提供行程與車輛建議。",
+    "primaryKeyword": "企業員工旅遊",
+    "secondaryKeywords": ["企業旅遊規劃", "員工旅遊遊覽車", "公司團體旅遊"],
+    "conversionGoal": "取得企業團體旅遊詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/airport-transfer",
+    "title": "桃園機場接送｜家庭與團體用車安排",
+    "metaDescription": "提供雙北往返桃園機場接送服務，依乘客人數、行李數量與班機時間安排合適車輛及接送方案。",
+    "primaryKeyword": "桃園機場接送",
+    "secondaryKeywords": ["機場團體接送", "雙北機場接送", "多人機場接送"],
+    "conversionGoal": "取得機場接送預約資料",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/day-trip/dongyanshan",
+    "title": "東眼山一日遊｜森林步道包車行程",
+    "metaDescription": "規劃東眼山國家森林遊樂區一日遊，提供家庭及團體包車、集合點與順遊景點安排建議。",
+    "primaryKeyword": "東眼山一日遊",
+    "secondaryKeywords": ["東眼山包車", "東眼山親子旅遊", "桃園復興一日遊"],
+    "conversionGoal": "取得東眼山一日遊詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/day-trip/jiaobanshan",
+    "title": "角板山一日遊｜桃園復興包車行程",
+    "metaDescription": "角板山一日遊可搭配桃園復興周邊景點，由專人依家庭或團體需求安排包車路線及停留時間。",
+    "primaryKeyword": "角板山一日遊",
+    "secondaryKeywords": ["角板山包車", "桃園復興包車", "角板山親子旅遊"],
+    "conversionGoal": "取得角板山一日遊詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/day-trip/jiufen",
+    "title": "九份包車一日遊｜山城與東北角行程",
+    "metaDescription": "九份包車可搭配金瓜石、十分或東北角景點，依人數與出發地安排合適車輛及一日遊動線。",
+    "primaryKeyword": "九份包車",
+    "secondaryKeywords": ["九份一日遊", "九份十分包車", "東北角包車"],
+    "conversionGoal": "取得九份包車詢價",
+    "draftStatus": "draft"
+  },
+  {
+    "slug": "/day-trip/yilan",
+    "title": "宜蘭包車一日遊｜親子與團體行程",
+    "metaDescription": "宜蘭包車旅遊可依親子、家庭或團體需求安排景點、用餐與接送動線，專人協助規劃合適方案。",
+    "primaryKeyword": "宜蘭包車",
+    "secondaryKeywords": ["宜蘭一日遊包車", "宜蘭親子包車", "宜蘭團體旅遊"],
+    "conversionGoal": "取得宜蘭包車詢價",
+    "draftStatus": "draft"
+  }
+]

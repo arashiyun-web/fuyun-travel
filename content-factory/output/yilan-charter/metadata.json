@@ -1,0 +1,17 @@
+{
+  "topicId": "yilan-charter",
+  "keyword": "宜蘭包車",
+  "category": "包車旅遊",
+  "targetArea": "宜蘭縣",
+  "searchIntent": "規劃宜蘭景點包車一日遊或多日遊",
+  "suggestedTitle": "宜蘭包車推薦｜暑假親子景點與團體行程安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

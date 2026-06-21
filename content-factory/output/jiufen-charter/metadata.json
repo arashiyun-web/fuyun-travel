@@ -1,0 +1,17 @@
+{
+  "topicId": "jiufen-charter",
+  "keyword": "九份包車",
+  "category": "包車旅遊",
+  "targetArea": "新北市瑞芳區",
+  "searchIntent": "預約九份山城包車與周邊景點行程",
+  "suggestedTitle": "九份包車｜暑假山城一日遊與接送行程建議",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

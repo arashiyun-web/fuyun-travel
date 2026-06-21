@@ -1,0 +1,17 @@
+{
+  "topicId": "corporate-employee-travel",
+  "keyword": "企業員工旅遊",
+  "category": "企業旅遊",
+  "targetArea": "雙北及北台灣",
+  "searchIntent": "規劃企業員工旅遊的交通與行程",
+  "suggestedTitle": "企業員工旅遊規劃｜暑假團體行程與遊覽車一次安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

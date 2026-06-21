@@ -1,0 +1,17 @@
+{
+  "topicId": "43-seat-tour-bus",
+  "keyword": "43人座遊覽車",
+  "category": "遊覽車出租",
+  "targetArea": "雙北及北台灣",
+  "searchIntent": "尋找適合大型團體的43人座遊覽車",
+  "suggestedTitle": "43人座遊覽車出租｜大型團體暑假出遊用車指南",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

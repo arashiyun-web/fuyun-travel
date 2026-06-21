@@ -1,0 +1,17 @@
+{
+  "topicId": "new-taipei-charter",
+  "keyword": "新北包車",
+  "category": "包車旅遊",
+  "targetArea": "新北市",
+  "searchIntent": "尋找新北各區可到府接送的包車服務",
+  "suggestedTitle": "新北包車推薦｜暑假出遊、多人接送一次安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

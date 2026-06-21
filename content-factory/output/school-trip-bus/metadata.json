@@ -1,0 +1,17 @@
+{
+  "topicId": "school-trip-bus",
+  "keyword": "校外教學遊覽車",
+  "category": "校外教學",
+  "targetArea": "雙北及北台灣",
+  "searchIntent": "尋找學校校外教學的遊覽車與行程協助",
+  "suggestedTitle": "校外教學遊覽車｜學校團體交通與行程安心安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "topicId": "window-on-world-charter",
+  "keyword": "小人國包車",
+  "category": "樂園包車",
+  "targetArea": "桃園市龍潭區",
+  "searchIntent": "預約小人國親子旅遊包車接送",
+  "suggestedTitle": "小人國包車｜暑假親子樂園接送省心安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}

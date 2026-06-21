@@ -1,0 +1,17 @@
+{
+  "topicId": "taipei-charter",
+  "keyword": "台北包車",
+  "category": "包車旅遊",
+  "targetArea": "台北市",
+  "searchIntent": "尋找台北出發的包車旅遊與接送服務",
+  "suggestedTitle": "台北包車推薦｜暑假家庭旅遊與團體接送輕鬆安排",
+  "cta": "請提供日期、人數、出發地、目的地，我們會儘速回覆優惠方案。",
+  "status": "draft",
+  "requiresHumanApproval": true,
+  "generatedFiles": [
+    "seo.md",
+    "facebook.md",
+    "google-business.md",
+    "line-push.md"
+  ]
+}
