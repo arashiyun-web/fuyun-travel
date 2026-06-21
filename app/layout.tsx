@@ -3,7 +3,8 @@ import Script from "next/script";
 import { Suspense } from "react";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import "./globals.css";
-import FloatingContactBar from "@/components/FloatingContactBar";
+import FloatingContactBarV2 from "@/components/FloatingContactBar_v2";
+import FloatingLineButton from "@/components/FloatingLineButton";
 import Footer from "@/components/Footer";
 import { SITE } from "@/lib/site";
 
@@ -76,7 +77,8 @@ export default function RootLayout({
           <AnalyticsProvider>
             <main className="page">{children}</main>
             <Footer />
-            <FloatingContactBar />
+            <FloatingContactBarV2 />
+            <FloatingLineButton />
           </AnalyticsProvider>
         </Suspense>
       </body>

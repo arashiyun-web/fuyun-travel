@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import InquiryFormV2 from "@/components/InquiryForm_v2";
+import InquiryForm from "@/components/InquiryForm";
 import { pageMeta } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
@@ -17,7 +17,7 @@ export default function InquiryPage() {
       </p>
       <h1>立即報價</h1>
       <p className="lead">請留下基本需求，客服會依日期、人數、車型與路線協助評估。</p>
-      <InquiryFormV2 />
+      <InquiryForm />
     </>
   );
 }
