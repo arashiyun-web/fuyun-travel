@@ -85,6 +85,10 @@ export default function AdminPage() {
     window.location.href = "/platform/index.html?v=official-owner-login-v5#admin";
   }
 
+  function openSocialDistribute() {
+    window.location.href = "/admin/distribute";
+  }
+
   useEffect(() => {
     const saved = localStorage.getItem("admin_token") || "";
     if (saved) {
@@ -166,9 +170,14 @@ export default function AdminPage() {
             <h2 className="text-base font-medium text-slate-200 mt-1">其他平台管理功能</h2>
             <p className="text-xs text-slate-500 mt-2">行程管理、即時訂單、會員明細、系統級推播。</p>
           </div>
-          <button type="button" onClick={openPlatformAdmin} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
-            開啟平台管理後台
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button type="button" onClick={openSocialDistribute} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              社群分發作業
+            </button>
+            <button type="button" onClick={openPlatformAdmin} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              開啟平台管理後台
+            </button>
+          </div>
         </div>
       </div>
     </div>

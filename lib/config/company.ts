@@ -50,3 +50,10 @@ export const envConfig = {
 export function getLineOaUrl() {
   return envConfig.lineOaUrl || envConfig.legacyLineUrl;
 }
+
+export const COMPANY = {
+  brand: companyConfig.brandName,
+  legalName: `${companyConfig.travelAgencyName}｜${companyConfig.transportCompanyName}`,
+  phone: companyConfig.phone,
+  line: "@fuyuntravel",
+};
