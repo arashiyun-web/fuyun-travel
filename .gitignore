@@ -8,6 +8,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.tsbuildinfo
 .DS_Store
 
 .tools
@@ -19,3 +20,15 @@ __pycache__/
 backend/chroma_db/
 chroma_db/
 tsconfig.tsbuildinfo
+
+# TWA build artifacts (built separately, not committed)
+twa-project/
+create-twa.mjs
+*.keystore
+*.jks
+
+# APK files (hosted separately, not in git)
+public/apk/
+
+# Static manifest copy (generated from app/manifest.ts)
+public/manifest.webmanifest
