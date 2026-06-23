@@ -776,7 +776,7 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   transform: scale(1.02);
   background-image:
     linear-gradient(180deg, rgba(12, 14, 12, .08) 18%, rgba(12, 14, 12, .9) 100%),
-    url("https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=86");
+    url("/hero-bus-sunny.png");
   background-position: center;
   background-size: cover;
 }
@@ -1228,7 +1228,7 @@ a.travel-explore-card:hover .travel-explore-card__image {
   .travel-explore-hero__image {
     background-image:
       linear-gradient(180deg, rgba(12, 14, 12, .08) 18%, rgba(12, 14, 12, .9) 100%),
-      url("https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80");
+      url("/hero-bus-sunny.png");
   }
 
   .travel-explore-section,
@@ -1647,7 +1647,7 @@ a.travel-explore-card:hover .travel-explore-card__image {
   padding: clamp(28px, 4vw, 56px);
   background-image:
     linear-gradient(180deg, rgba(12, 14, 12, .18) 16%, rgba(12, 14, 12, .82) 100%),
-    url("https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=86");
+    url("/images/hero/travel-destination-collage.jpg");
   background-position: center;
   background-size: cover;
 }
