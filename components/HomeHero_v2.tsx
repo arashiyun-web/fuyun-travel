@@ -8,7 +8,7 @@ const featureItems = [
   { href: "/services/coach-charter", title: "遊覽車包車", text: "校外教學、企業旅遊、大型團體" },
   { href: "/services/airport-transfer", title: "機場接送", text: "航班接送、多點上下車、行李安排" },
   { href: "/travel", title: "旅遊攻略", text: "最新旅遊內容、熱門行程與包車建議" },
-  { href: "/contact/inquiry", title: "立即報價", text: "日期、人數、路線快速評估" },
+  { href: "/contact/inquiry?utm_content=hero", title: "立即詢價", text: "日期、人數、路線快速評估" },
 ];
 
 const trustBadges = [
@@ -45,13 +45,6 @@ export default function HomeHeroV2() {
           >
             LINE立即報價
           </a>
-          <Link
-            className="home-btn home-btn--gold"
-            href="/contact/inquiry?utm_content=hero"
-            onClick={() => trackCtaClick({ cta_location: "hero_inquiry" })}
-          >
-            立即詢價
-          </Link>
         </div>
       </div>
 

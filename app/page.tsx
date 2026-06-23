@@ -29,7 +29,6 @@ const navItems = [
   { href: "/fleet", label: "車隊" },
   { href: "/travel", label: "旅遊" },
   { href: "/ai-test", label: "AI旅遊顧問（測試版）" },
-  { href: "/contact", label: "聯絡" },
 ];
 
 export default function HomePage() {
@@ -39,7 +38,7 @@ export default function HomePage() {
 
       <div className="home-page">
         <header className="home-nav" aria-label="浮雲輕鬆遊網站導覽">
-          <Link className="home-brand" href="/">
+          <Link className="home-brand home-brand--xl" href="/">
             <strong>{SITE.name}</strong>
             <span>台灣包車旅遊</span>
           </Link>
@@ -53,9 +52,6 @@ export default function HomePage() {
           </nav>
 
           <div className="home-nav__actions">
-            <Link className="home-nav__quote" href="/contact/inquiry">
-              立即報價
-            </Link>
             <a className="home-nav__login" href="/platform/index.html?v=official-member-register-v1#login">
               平台登入
             </a>
