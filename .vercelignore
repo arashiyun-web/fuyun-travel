@@ -1,0 +1,11 @@
+node_modules
+backend
+twa-project
+.next
+.vercel
+.pytest_cache
+tsconfig.tsbuildinfo
+app/page_v2.tsx
+components/HomeHero_v2_backup.tsx
+components/HomeHero_v2_backup2.tsx
+create-twa.mjs
