@@ -12,6 +12,7 @@ export const metadata: Metadata = explorePageMeta({
   title: "旅遊探索中心",
   description: "探索台灣熱門景點、包車路線與校外教學靈感，從圖片快速找到下一趟旅程。",
   path: "/travel",
+  image: "/images/hero/travel-destination-collage.jpg",
 });
 
 // The exploration center favors visual discovery while deeper SEO content remains one level below.
