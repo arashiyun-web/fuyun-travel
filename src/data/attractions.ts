@@ -1,4 +1,5 @@
 import type { KnowledgeFaq, KnowledgeLink } from "@/src/data/knowledge";
+import { getAttractionImage } from "@/lib/attractionImages";
 
 export type AttractionEntry = {
   slug: string;
@@ -19,8 +20,6 @@ export type AttractionEntry = {
   legacySlugs?: string[];
 };
 
-const image = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1400&q=82`;
 
 // Curated local records are the canonical source for attraction pages and future AI retrieval.
 export const attractionEntries: AttractionEntry[] = [
@@ -50,7 +49,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "九份老街建議停留多久？", answer: "一般建議二至三小時；若安排喝茶或夜景可再增加時間。" },
       { question: "九份適合長輩嗎？", answer: "可以，但階梯較多，應降低步行量並選擇方便的上下車點。" },
     ],
-    coverImage: image("photo-1495567720989-cebdbdd97913"),
+    coverImage: getAttractionImage("jiufen"),
     updatedAt: "2026-06-23",
   },
   {
@@ -76,7 +75,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "野柳下雨天可以參觀嗎？", answer: "需依風雨與園區公告判斷，濱海步道濕滑時應調整行程。" },
       { question: "野柳和九份能排同一天嗎？", answer: "可以，建議預留完整一日並控制各站停留時間。" },
     ],
-    coverImage: image("photo-1497436072909-f5e4be1713c0"),
+    coverImage: getAttractionImage("yehliu"),
     updatedAt: "2026-06-23",
   },
   {
@@ -99,7 +98,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "淡水適合安排半天嗎？", answer: "適合，老街、河岸與漁人碼頭可依停留時間彈性取捨。" },
       { question: "淡水什麼時候最適合看夕陽？", answer: "日落時間依季節不同，建議出發前確認當日日落與天候。" },
     ],
-    coverImage: image("photo-1500530855697-b586d89ba3ee"),
+    coverImage: getAttractionImage("tamsui"),
     updatedAt: "2026-06-23",
   },
   {
@@ -122,7 +121,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "日月潭一天夠嗎？", answer: "可走訪主要區域，但建議聚焦二至三個核心景點。" },
       { question: "日月潭適合與清境一起排嗎？", answer: "適合安排二至三天，避免同日往返造成車程過長。" },
     ],
-    coverImage: image("photo-1501785888041-af3ef285b470"),
+    coverImage: getAttractionImage("sunMoonLake"),
     updatedAt: "2026-06-23",
   },
   {
@@ -142,7 +141,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "阿里山適合一日來回嗎？", answer: "從北部出發不建議，二日以上較能兼顧安全與體驗。" },
       { question: "阿里山一定看得到日出嗎？", answer: "無法保證，應依天候調整並準備替代行程。" },
     ],
-    coverImage: image("photo-1464822759023-fed622ff2c3b"),
+    coverImage: getAttractionImage("alishan"),
     updatedAt: "2026-06-23",
   },
   {
@@ -163,7 +162,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "清境適合帶長輩嗎？", answer: "可以，但需降低坡道步行量並注意高山溫差。" },
       { question: "清境與日月潭如何安排？", answer: "建議三天兩夜各住一晚，減少山路往返。" },
     ],
-    coverImage: image("photo-1500534623283-312aade485b7"),
+    coverImage: getAttractionImage("cingjing"),
     updatedAt: "2026-06-23",
   },
   {
@@ -183,7 +182,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "墾丁適合從台北當天來回嗎？", answer: "不適合，建議安排多日並在南部住宿。" },
       { question: "墾丁包車有什麼優勢？", answer: "景點分散，包車可減少轉乘並依天候調整海岸停靠。" },
     ],
-    coverImage: image("photo-1507525428034-b723cf961d3e"),
+    coverImage: getAttractionImage("kenting"),
     updatedAt: "2026-06-23",
   },
   {
@@ -203,7 +202,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "太魯閣目前可以安排嗎？", answer: "開放狀態可能變動，出發前必須以主管機關最新公告為準。" },
       { question: "台北到花蓮適合包車嗎？", answer: "多人或攜帶行李時可評估，並需依道路與行程時間安排。" },
     ],
-    coverImage: image("photo-1469474968028-56623f02e42e"),
+    coverImage: getAttractionImage("taroko"),
     updatedAt: "2026-06-23",
   },
   {
@@ -226,7 +225,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "六福村校外教學要安排多久？", answer: "通常安排完整一日，並預留點名、集合與散場時間。" },
       { question: "大型團體需要注意什麼？", answer: "需先建立分車名單、帶隊窗口及清楚的集合規則。" },
     ],
-    coverImage: image("photo-1513883049090-d0b7439799bf"),
+    coverImage: getAttractionImage("liufuVillage"),
     updatedAt: "2026-06-23",
   },
   {
@@ -246,7 +245,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "飛牛牧場適合哪個年齡層？", answer: "幼兒園與國小最常見，也適合親子自然體驗。" },
       { question: "校外教學需要提前預約嗎？", answer: "大型團體與體驗課程通常需提前確認園方安排。" },
     ],
-    coverImage: image("photo-1500595046743-cd271d694d30"),
+    coverImage: getAttractionImage("flyingCowRanch"),
     updatedAt: "2026-06-23",
   },
   {
@@ -269,7 +268,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "故宮適合校外教學嗎？", answer: "適合，建議依年齡設定導覽主題並控制參觀時間。" },
       { question: "故宮可以和淡水排同一天嗎？", answer: "可以，建議上午故宮、下午淡水並預留市區交通時間。" },
     ],
-    coverImage: image("photo-1564399579883-451a5d44ec08"),
+    coverImage: getAttractionImage("nationalPalaceMuseum"),
     updatedAt: "2026-06-23",
   },
   {
@@ -289,7 +288,7 @@ export const attractionEntries: AttractionEntry[] = [
       { question: "六福莊和六福村可以一起安排嗎？", answer: "可以，適合二天一夜親子行程，並需提前確認住宿與入園安排。" },
       { question: "大型遊覽車可以接送嗎？", answer: "可依團體人數評估，需先確認上下車、停車與行李需求。" },
     ],
-    coverImage: image("photo-1540573133985-87b6da6d54a9"),
+    coverImage: getAttractionImage("liufuVillage"),
     updatedAt: "2026-06-23",
   },
 ];

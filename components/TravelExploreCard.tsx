@@ -20,27 +20,29 @@ export default function TravelExploreCard({
   priority = false,
 }: TravelExploreCardProps) {
   // Unsplash width parameters provide responsive candidates without adding image infrastructure.
-  const responsiveSource = (width: number) => image.replace(/([?&])w=\d+/, `$1w=${width}`);
-  const imageAlt = meta ? `${title}，${meta}` : title;
+  const responsiveSource = (width: number) => image.replace(/([?&])w=\d+/, '$1w=' + width);
+  const imageAlt = meta ? title + '，' + meta : title;
 
   const content = (
     <>
-      {/* Native images allow the existing app to use curated remote imagery without changing global image config. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        className="travel-explore-card__image"
-        src={image}
-        srcSet={`${responsiveSource(480)} 480w, ${responsiveSource(800)} 800w, ${responsiveSource(1200)} 1200w`}
-        sizes="(max-width: 680px) calc(100vw - 32px), (max-width: 980px) 50vw, 33vw"
-        alt={imageAlt}
-        width={720}
-        height={480}
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : "auto"}
-      />
-      <span className="travel-explore-card__shade" aria-hidden="true" />
-      <span className="travel-explore-card__content">
+      <span className="travel-explore-card__media">
+        {/* Native images allow the existing app to use curated remote imagery without changing global image config. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="travel-explore-card__image"
+          src={image}
+          srcSet={responsiveSource(480) + ' 480w, ' + responsiveSource(800) + ' 800w, ' + responsiveSource(1200) + ' 1200w'}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1400px) 33vw, 25vw"
+          alt={imageAlt}
+          width={720}
+          height={540}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+        />
+        <span className="travel-explore-card__shade" aria-hidden="true" />
         {meta ? <span className="travel-explore-card__meta">{meta}</span> : null}
+      </span>
+      <span className="travel-explore-card__content">
         <strong>{title}</strong>
         <span>{description}</span>
       </span>
@@ -71,16 +73,16 @@ export function ExploreDetailPage({
   jsonLd,
 }: ExploreDetailPageProps) {
   const responsiveSource = (width: number) =>
-    item.coverImage.replace(/([?&])w=\d+/, `$1w=${width}`);
-  const facts = item.kind === "route"
+    item.coverImage.replace(/([?&])w=\d+/, '$1w=' + width);
+  const facts = item.kind === 'route'
     ? [
-        { label: "出發地", value: item.origin },
-        { label: "目的地", value: item.destination },
+        { label: '出發地', value: item.origin },
+        { label: '目的地', value: item.destination },
       ]
     : [
-        { label: "地點", value: item.location },
-        ...(item.kind === "schoolTrip"
-          ? [{ label: "適合對象", value: item.suitableFor }]
+        { label: '地點', value: item.location },
+        ...(item.kind === 'schoolTrip'
+          ? [{ label: '適合對象', value: item.suitableFor }]
           : []),
       ];
 
@@ -103,9 +105,9 @@ export function ExploreDetailPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.coverImage}
-          srcSet={`${responsiveSource(720)} 720w, ${responsiveSource(1200)} 1200w, ${responsiveSource(1800)} 1800w`}
+          srcSet={responsiveSource(720) + ' 720w, ' + responsiveSource(1200) + ' 1200w, ' + responsiveSource(1800) + ' 1800w'}
           sizes="(max-width: 680px) calc(100vw - 24px), calc(100vw - 40px)"
-          alt={`${item.title}，${item.description}`}
+          alt={item.title + '，' + item.description}
           width={1400}
           height={820}
           fetchPriority="high"

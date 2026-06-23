@@ -1,4 +1,5 @@
 import type { KnowledgeFaq, KnowledgeLink } from "@/src/data/knowledge";
+import { getAttractionImageByDestination } from "@/lib/attractionImages";
 
 export type CharterRouteEntry = {
   slug: string;
@@ -22,8 +23,6 @@ export type CharterRouteEntry = {
 export const routePriceNotice =
   "實際價格依日期、人數、車型、工時、行李與停靠點調整，可由浮雲小幫手快速初估。";
 
-const image = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1400&q=82`;
 
 const commonFaq = (title: string): KnowledgeFaq[] => [
   {
@@ -54,7 +53,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
       { href: "/knowledge/jiufen-old-street-travel-guide", label: "九份老街攻略" },
     ],
     faq: commonFaq("台北到九份包車"),
-    coverImage: image("photo-1518005020951-eccb494ad742"),
+    coverImage: getAttractionImageByDestination("九份"),
     updatedAt: "2026-06-23",
   },
   {
@@ -77,7 +76,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
       { href: "/knowledge/jiufen-shifen-yehliu-day-trip", label: "九份十分野柳一日遊" },
     ],
     faq: commonFaq("台北到野柳包車"),
-    coverImage: image("photo-1497436072909-f5e4be1713c0"),
+    coverImage: getAttractionImageByDestination("野柳"),
     updatedAt: "2026-06-23",
   },
   {
@@ -97,7 +96,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     ],
     relatedKnowledge: [{ href: "/knowledge/taiwan-round-island-eight-days", label: "台灣行程安排原則" }],
     faq: commonFaq("台北到淡水包車"),
-    coverImage: image("photo-1500530855697-b586d89ba3ee"),
+    coverImage: getAttractionImageByDestination("淡水"),
     updatedAt: "2026-06-23",
   },
   {
@@ -114,7 +113,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/jiufen", label: "九份老街" }],
     relatedKnowledge: [{ href: "/knowledge/taoyuan-airport-to-jiufen-transfer", label: "桃園機場到九份接送攻略" }],
     faq: commonFaq("桃園機場到九份接送"),
-    coverImage: image("photo-1436491865332-7a61a109cc05"),
+    coverImage: getAttractionImageByDestination("九份"),
     updatedAt: "2026-06-23",
   },
   {
@@ -135,7 +134,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
       { href: "/knowledge/sun-moon-lake-day-trip-guide", label: "日月潭一日遊攻略" },
     ],
     faq: commonFaq("樹林到日月潭包車"),
-    coverImage: image("photo-1476514525535-07fb3b4ae5f1"),
+    coverImage: getAttractionImageByDestination("日月潭"),
     updatedAt: "2026-06-23",
   },
   {
@@ -153,7 +152,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/alishan", label: "阿里山" }],
     relatedKnowledge: [{ href: "/knowledge/alishan-two-day-trip-guide", label: "阿里山二天兩夜攻略" }],
     faq: commonFaq("板橋到阿里山包車"),
-    coverImage: image("photo-1441974231531-c6227db76b6e"),
+    coverImage: getAttractionImageByDestination("阿里山"),
     updatedAt: "2026-06-23",
   },
   {
@@ -173,7 +172,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     ],
     relatedKnowledge: [{ href: "/knowledge/sun-moon-lake-cingjing-three-days", label: "日月潭清境三天兩夜" }],
     faq: commonFaq("台北到清境包車"),
-    coverImage: image("photo-1500534623283-312aade485b7"),
+    coverImage: getAttractionImageByDestination("清境"),
     updatedAt: "2026-06-23",
   },
   {
@@ -190,7 +189,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/sun-moon-lake", label: "延伸前往日月潭" }],
     relatedKnowledge: [{ href: "/knowledge/sun-moon-lake-day-trip-guide", label: "日月潭行程參考" }],
     faq: commonFaq("台北到台中包車"),
-    coverImage: image("photo-1449824913935-59a10b8d2000"),
+    coverImage: getAttractionImageByDestination("台中"),
     updatedAt: "2026-06-23",
   },
   {
@@ -207,7 +206,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/taroko", label: "太魯閣" }],
     relatedKnowledge: [{ href: "/knowledge/taiwan-round-island-eight-days", label: "台灣環島八天七夜" }],
     faq: commonFaq("台北到花蓮包車"),
-    coverImage: image("photo-1469474968028-56623f02e42e"),
+    coverImage: getAttractionImageByDestination("花蓮"),
     updatedAt: "2026-06-23",
   },
   {
@@ -224,7 +223,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/kenting", label: "墾丁" }],
     relatedKnowledge: [{ href: "/knowledge/taiwan-round-island-eight-days", label: "台灣環島八天七夜" }],
     faq: commonFaq("台北到墾丁包車"),
-    coverImage: image("photo-1507525428034-b723cf961d3e"),
+    coverImage: getAttractionImageByDestination("墾丁"),
     updatedAt: "2026-06-23",
   },
   {
@@ -241,7 +240,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/liufu-village", label: "六福村主題遊樂園" }],
     relatedKnowledge: [{ href: "/knowledge/leofoo-village-school-trip-bus", label: "六福村校外教學遊覽車攻略" }],
     faq: commonFaq("新北到六福村校外教學"),
-    coverImage: image("photo-1513883049090-d0b7439799bf"),
+    coverImage: getAttractionImageByDestination("六福村"),
     updatedAt: "2026-06-23",
   },
   {
@@ -258,7 +257,7 @@ export const charterRouteEntries: CharterRouteEntry[] = [
     relatedAttractions: [{ href: "/attractions/flying-cow-ranch", label: "飛牛牧場" }],
     relatedKnowledge: [{ href: "/knowledge/flying-cow-ranch-school-trip-charter", label: "飛牛牧場校外教學包車" }],
     faq: commonFaq("樹林到飛牛牧場校外教學"),
-    coverImage: image("photo-1500595046743-cd271d694d30"),
+    coverImage: getAttractionImageByDestination("飛牛牧場"),
     updatedAt: "2026-06-23",
   },
 ];
