@@ -18,3 +18,4 @@ __pycache__/
 *.pyc
 backend/chroma_db/
 chroma_db/
+.env.local
