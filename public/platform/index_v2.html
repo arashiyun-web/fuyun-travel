@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>浮雲輕旅｜專業包車旅遊服務</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section class="push-consent hidden" id="push-consent" aria-label="推播通知提示">
+      <div>
+        <strong>開啟手機/瀏覽器系統通知？</strong>
+        <p>會員已預設接收新品與優惠通知；開啟後可額外收到系統通知。</p>
+      </div>
+      <div class="action-row">
+        <button class="secondary-button" id="push-dismiss" type="button">暫不</button>
+        <button class="primary-button" id="push-enable" type="button">允許通知</button>
+      </div>
+    </section>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">浮雲輕旅</p>
+        <h1>專業包車旅遊服務</h1>
+      </div>
+      <div class="topbar-actions">
+        <nav class="view-tabs" aria-label="主要導覽">
+          <button type="button" data-route="#services">服務</button>
+          <button type="button" data-route="#fleet">車型</button>
+          <button type="button" data-route="#itineraries">行程</button>
+          <button type="button" data-route="#contact">聯絡</button>
+        </nav>
+        <button class="primary-button top-inquiry" type="button" data-route="#tour:t-japan">立即詢價</button>
+        <button class="secondary-button top-login" type="button" data-route="#login">註冊登入</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home-view" class="view active">
+        <section class="entry-hero" aria-label="首頁入口">
+          <div class="entry-copy">
+            <p class="eyebrow">浮雲輕旅｜專業包車旅遊服務</p>
+            <h2>專業包車旅遊服務</h2>
+          </div>
+          <div class="entry-actions">
+            <button class="primary-button" type="button" data-route="#tour:t-japan">立即詢價</button>
+            <button class="secondary-button" type="button" data-route="#itineraries">查看行程</button>
+            <a class="secondary-button link-button" href="https://www.facebook.com/share/g/1NPbXN8THD/" target="_blank" rel="noreferrer">Facebook</a>
+          </div>
+        </section>
+
+        <section class="brand-quick-links" aria-label="浮雲輕旅入口">
+          <button type="button" data-route="#services">
+            <strong>服務</strong>
+            <span>包車、接送、企業接待</span>
+          </button>
+          <button type="button" data-route="#fleet">
+            <strong>車型</strong>
+            <span>大型車、中巴、商務車</span>
+          </button>
+          <button type="button" data-route="#itineraries">
+            <strong>行程</strong>
+            <span>精選旅遊、報名選位</span>
+          </button>
+          <button type="button" data-route="#contact">
+            <strong>聯絡</strong>
+            <span>LINE、電話、表單詢價</span>
+          </button>
+        </section>
+      </section>
+
+      <section id="itineraries-view" class="view">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">ITINERARIES</p>
+            <h2>精選行程報名</h2>
+          </div>
+          <p id="result-count" class="result-count"></p>
+        </div>
+        <div class="shop-layout">
+          <aside class="filter-panel">
+            <div class="filter-header">
+              <h3>篩選搜尋</h3>
+              <button class="ghost-button" id="clear-filters" type="button">清除</button>
+            </div>
+            <label class="search-box">
+              關鍵字
+              <input id="search-input" type="search" placeholder="日本、溫泉、歐洲..." />
+            </label>
+            <div id="filter-groups"></div>
+          </aside>
+          <section>
+            <div id="tour-grid" class="tour-grid"></div>
+            <div id="empty-state" class="empty-state hidden">目前沒有符合條件的行程</div>
+          </section>
+        </div>
+      </section>
+
+      <section id="services-view" class="view"></section>
+      <section id="fleet-view" class="view"></section>
+      <section id="contact-view" class="view"></section>
+      <section id="tour-view" class="view"></section>
+      <section id="checkout-view" class="view"></section>
+
+      <section id="login-view" class="view auth-page">
+        <form id="login-form" class="login-card">
+          <p class="eyebrow">Member Access</p>
+          <h2>登入</h2>
+          <p class="muted">請使用已核發的帳號登入平台。</p>
+          <label>帳號 <input name="username" autocomplete="username" required /></label>
+          <label>密碼 <input name="password" type="password" autocomplete="current-password" required /></label>
+          <button class="primary-button" type="submit">登入</button>
+          <p id="login-message" class="form-message"></p>
+          <div class="divider"></div>
+          <p class="eyebrow">New Member</p>
+          <h3>新會員註冊</h3>
+          <label>姓名 <input id="register-name" autocomplete="name" /></label>
+          <label>帳號 <input id="register-username" autocomplete="username" /></label>
+          <label>密碼 <input id="register-password" type="password" autocomplete="new-password" /></label>
+          <button id="register-button" class="secondary-button" type="button">註冊會員</button>
+        </form>
+      </section>
+
+      <section id="member-view" class="view"></section>
+      <section id="admin-view" class="view"></section>
+      <section id="preview-view" class="view"></section>
+    </main>
+
+    <button class="bell-button floating-bell" id="bell-button" type="button" aria-label="通知中心">
+      <span>通知</span>
+      <i id="notification-dot" class="hidden"></i>
+    </button>
+    <div id="auth-chip" class="hidden">訪客</div>
+    <button id="auth-action" class="hidden" type="button">登入</button>
+    <div id="notification-panel" class="notification-panel hidden"></div>
+    <div id="toast-root" class="toast-root"></div>
+
+    <script src="./app.js?v=official-member-register-v1"></script>
+    <script src="./inquiry-module.js"></script>
+    <script src="./fuyun-protect.js"></script>
+  </body>
+</html>

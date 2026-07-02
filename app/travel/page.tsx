@@ -1,72 +1,113 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { pageMeta } from "@/lib/site";
-import { keywordSeeds, travelCategories } from "@/lib/travelContent";
-import { listPublishedTravelArticles } from "@/lib/dynamicTravelArticles";
+import TravelExploreCard from "@/components/TravelExploreCard";
+import {
+  attractions,
+  charterRoutes,
+  explorePageMeta,
+  schoolTrips,
+} from "@/lib/travelExplore";
 
-export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = pageMeta({
-  title: "旅遊內容中心",
-  description: "浮雲輕鬆遊旅遊內容中心，收錄賞花、美食、景點、包車旅遊、校外教學、企業旅遊與機場接送攻略。",
+export const metadata: Metadata = explorePageMeta({
+  title: "旅遊探索中心",
+  description: "探索台灣熱門景點、包車路線與校外教學靈感，從圖片快速找到下一趟旅程。",
   path: "/travel",
+  image: "/images/hero/travel-destination-collage.jpg",
 });
 
-export default async function TravelPage() {
-  const articles = await listPublishedTravelArticles();
+// The exploration center favors visual discovery while deeper SEO content remains one level below.
+export default function TravelPage() {
   return (
-    <>
-      <h1>旅遊內容中心</h1>
-      <p className="lead">最新旅遊紀錄、熱門內容與 AI 行程規劃統一放在第二層，不佔用首頁主視覺。</p>
-
-      <section>
-        <h2>內容入口</h2>
-        <div className="card-grid">
-          <Link className="card" href="/featured-trips">
-            <h3>熱門旅遊內容</h3>
-            <p>社群熱門貼文、旅遊紀錄與精選行程集中在這裡。</p>
-          </Link>
-          <Link className="card" href="/ai-trip-planner">
-            <h3>AI行程規劃</h3>
-            <p>依出發地、日期、人數、預算與天數產生初步行程建議。</p>
-          </Link>
-          <Link className="card" href="/service/price">
-            <h3>包車價格說明</h3>
-            <p>價格、車型、服務時間與詢價前需要準備的資料。</p>
-          </Link>
+    <div className="travel-explore-shell travel-home">
+      <header className="travel-explore-hero travel-explore-hero--home">
+        <div className="travel-explore-hero__content">
+          <p>TRAVEL INSPIRATION</p>
+          <h1>探索台灣旅遊靈感</h1>
+          <span>熱門景點、包車行程、校外教學與旅遊攻略</span>
+          <div className="travel-hero__chips" aria-label="快速導覽">
+            <a href="#attractions-title">熱門景點</a>
+            <a href="#routes-title">包車路線</a>
+            <a href="#school-title">校外教學</a>
+          </div>
         </div>
-      </section>
+      </header>
 
-      <section>
-        <h2>文章分類</h2>
-        <div className="card-grid">
-          {travelCategories.map((category) => (
-            <div className="card" key={category}>
-              <h3>{category}</h3>
-              <p>建立可延伸的分類頁、標籤頁、聚合頁與 Landing Page。</p>
-            </div>
+      <section className="travel-explore-section" aria-labelledby="attractions-title">
+        <div className="travel-section-heading">
+          <div>
+            <p className="travel-section__eyebrow">DESTINATIONS</p>
+            <h2 id="attractions-title">熱門景點探索</h2>
+          </div>
+          <p>從一張風景開始，找到下一個想停留的地方。</p>
+        </div>
+        <div className="travel-visual-grid travel-visual-grid--featured">
+          {attractions.map((item) => (
+            <TravelExploreCard
+              key={item.slug}
+              href={'/attractions/' + item.slug}
+              image={item.coverImage}
+              title={item.title}
+              description={item.description}
+              meta={item.location}
+            />
           ))}
         </div>
       </section>
 
-      <section>
-        <h2>最新旅遊紀錄</h2>
-        <div className="card-grid">
-          {articles.map((article) => (
-            <article className="card" key={article.slug}>
-              <p className="lead">{article.category}｜{article.publishDate}</p>
-              <h3>{article.title}</h3>
-              <p>{article.description}</p>
-              <Link href={`/travel/${article.slug}`}>閱讀攻略</Link>
-            </article>
+      <section className="travel-explore-section" aria-labelledby="routes-title">
+        <div className="travel-section-heading">
+          <div>
+            <p className="travel-section__eyebrow">CHARTER ROUTES</p>
+            <h2 id="routes-title">熱門包車路線</h2>
+          </div>
+          <p>清楚的起點與目的地，讓團體移動更容易開始。</p>
+        </div>
+        <div className="travel-visual-grid">
+          {charterRoutes.map((item) => (
+            <TravelExploreCard
+              key={item.slug}
+              href={'/charter-routes/' + item.slug}
+              image={item.coverImage}
+              title={item.title}
+              description={item.description}
+              meta={item.origin + ' 出發'}
+            />
           ))}
         </div>
       </section>
 
-      <section>
-        <h2>自動關鍵字系統</h2>
-        <p className="lead">{keywordSeeds.join("、")}</p>
+      <section className="travel-explore-section" aria-labelledby="school-title">
+        <div className="travel-section-heading">
+          <div>
+            <p className="travel-section__eyebrow">SCHOOL TRIPS</p>
+            <h2 id="school-title">校外教學推薦</h2>
+          </div>
+          <p>兼顧學習主題、活動節奏與團體移動的推薦場域。</p>
+        </div>
+        <div className="travel-visual-grid">
+          {schoolTrips.map((item) => (
+            <TravelExploreCard
+              key={item.slug}
+              href={'/school-trips/' + item.slug}
+              image={item.coverImage}
+              title={item.title}
+              description={item.description}
+              meta={item.suitableFor}
+            />
+          ))}
+        </div>
       </section>
-    </>
+
+      <section className="travel-planner-entry travel-planner-entry--compact" aria-labelledby="planner-title">
+        <div className="travel-planner-entry__copy">
+          <p className="travel-section__eyebrow">AI TRIP PLANNER</p>
+          <h2 id="planner-title">從條件開始，找到適合的行程方向</h2>
+          <p>輸入基本旅遊條件，前往行程規劃入口。</p>
+        </div>
+        <Link className="travel-planner-entry__button" href="/travel-planner">
+          開始規劃
+        </Link>
+      </section>
+    </div>
   );
 }
