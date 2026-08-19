@@ -90,8 +90,8 @@ export function organizationJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "TravelAgency",
-    name: COMPANY.companyName,
-    alternateName: [COMPANY.siteName, COMPANY.fleetCompanyName],
+    name: COMPANY.siteName,
+    alternateName: [COMPANY.companyName, COMPANY.fleetCompanyName],
     url: SITE.url,
     telephone: COMPANY.phone,
     email: COMPANY.email,
