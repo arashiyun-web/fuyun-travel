@@ -82,13 +82,14 @@ export default function RootLayout({
         ) : null}
         <Script id="sw-register" strategy="afterInteractive">{`if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`}</Script>
         <Suspense fallback={null}>
-          <AnalyticsProvider />
+          <AnalyticsProvider>
+            <SummerUrgencyBanner />
+            <main className="page">{children}</main>
+            <Footer />
+            <FloatingContactBarV2 />
+            <FloatingLineButton />
+          </AnalyticsProvider>
         </Suspense>
-        <SummerUrgencyBanner />
-        <main className="page">{children}</main>
-        <Footer />
-        <FloatingContactBarV2 />
-        <FloatingLineButton />
       </body>
     </html>
   );

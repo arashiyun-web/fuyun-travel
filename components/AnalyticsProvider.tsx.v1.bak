@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { ReactNode, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 
@@ -16,9 +16,7 @@ function initPostHog() {
   posthogReady = true;
 }
 
-// 不再接收/渲染 children。這個元件只負責 useSearchParams 追蹤，
-// 回傳 null，避免它所在的 Suspense 邊界把整個頁面內容一起拖成 CSR-only。
-export default function AnalyticsProvider() {
+export default function AnalyticsProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -36,5 +34,5 @@ export default function AnalyticsProvider() {
     });
   }, [pathname, searchParams]);
 
-  return null;
+  return children;
 }
