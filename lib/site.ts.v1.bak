@@ -109,6 +109,5 @@ export function organizationJsonLd() {
     areaServed: "Taiwan",
     serviceType: COMPANY.business.split("、"),
     sameAs: [COMPANY.facebookUrl],
-    image: absoluteUrl(SITE.ogImage),
   };
 }
