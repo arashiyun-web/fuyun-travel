@@ -3,7 +3,6 @@ import { COMPANY } from "@/lib/site";
 export default function LegalInfo() {
   const rows: Array<[string, string]> = [
     ["旅行社", COMPANY.companyName],
-    ["登記證號", COMPANY.registrationNo],
     ["車隊", COMPANY.fleetCompanyName],
     ["品牌", COMPANY.siteName],
     ["統一編號", COMPANY.taxId],
