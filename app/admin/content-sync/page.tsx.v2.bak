@@ -11,12 +11,7 @@ type SyncItem = {
   batchLabel: string;
   status: string;
   createdAt: string;
-  rawPayload: { full_picture?: string } | null;
 };
-
-function itemPhotoUrl(item: SyncItem) {
-  return item.rawPayload?.full_picture || "";
-}
 
 type AuthorizedMember = {
   id: string;
@@ -200,7 +195,7 @@ export default function ContentSyncPage() {
     setFeatureFormId(item.id);
     setFeatureTitle("");
     setFeatureDescription(item.summary);
-    setFeaturePhotoUrl(itemPhotoUrl(item));
+    setFeaturePhotoUrl("");
     setFeatureMsg((prev) => ({ ...prev, [item.id]: "" }));
   }
 
@@ -417,23 +412,12 @@ export default function ContentSyncPage() {
                             placeholder="一句話說明"
                             className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                           />
-                          {featurePhotoUrl ? (
-                            <div>
-                              <p className="text-[11px] text-slate-500 mb-1">
-                                將沿用原貼文照片，確認發布代表你同意使用這張照片：
-                              </p>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={featurePhotoUrl}
-                                alt="原貼文照片預覽"
-                                className="max-h-40 rounded border border-slate-800"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-slate-500">
-                              這則貼文沒有留存照片，將以純文字卡片上首頁。
-                            </p>
-                          )}
+                          <input
+                            value={featurePhotoUrl}
+                            onChange={(e) => setFeaturePhotoUrl(e.target.value)}
+                            placeholder="照片網址（選填，需確認自己擁有使用權）"
+                            className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                          />
                           <div className="flex gap-2">
                             <button
                               type="button"
