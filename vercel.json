@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/content-sync/weekly-pull",
-      "schedule": "0 1 * * 1"
-    }
-  ]
-}
+{}
