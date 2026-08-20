@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_SOURCE_TYPES = ["page_official", "group_official", "group_whitelist", "group_other"];
+const ALLOWED_SOURCE_TYPES = ["group_official", "group_whitelist", "group_other"];
 
 function currentBatchLabel() {
   const now = new Date();
@@ -16,12 +16,10 @@ function currentBatchLabel() {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
-// 粉專貼文原本走 Facebook Graph API 自動排程（weekly-pull），社團貼文則因
-// Meta 平台政策限制，本來就無法用 Graph API 讀取（見
-// lib/content-sync/facebookGraph.ts 開頭說明）。現在改成粉專跟社團都統一由
-// 老闆觸發、Claude Code 電腦操作讀取畫面內容後寫入，這支路由是兩者共用的
-// 落地入口，來源身份（page_official/group_official/group_whitelist/
-// group_other）由讀取端依既有規則標註，這支路由不做任何自動判斷。
+// 社團貼文無法透過 Facebook Graph API 自動讀取（Meta 平台政策限制，見
+// lib/content-sync/facebookGraph.ts 開頭說明）。這支路由是備援：老闆自己把
+// 想收錄的社團貼文內容手動貼進來，並且親自標註來源身份（只有老闆知道
+// 「這則是白名單成員發的」還是「其他成員發的」），不做任何自動判斷。
 export async function POST(request: Request) {
   const authResult = verifyAdminToken(request.headers.get("authorization"));
   if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
@@ -31,8 +29,6 @@ export async function POST(request: Request) {
     sourceType: string;
     authorName?: string;
     postUrl?: string;
-    sourcePostId?: string;
-    postedAt?: string;
   };
   try {
     body = await request.json();
@@ -51,37 +47,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const sourcePostId = body.sourcePostId?.trim() || null;
-
-  let postedAt: Date | null = null;
-  if (body.postedAt?.trim()) {
-    const parsed = new Date(body.postedAt.trim());
-    if (Number.isNaN(parsed.getTime())) {
-      return NextResponse.json({ error: "postedAt 格式無法解析" }, { status: 400 });
-    }
-    postedAt = parsed;
-  }
-
-  if (sourcePostId) {
-    const existing = await prisma.contentSyncItem.findUnique({ where: { sourcePostId } });
-    if (existing) {
-      return NextResponse.json({ success: true, skipped: true, reason: "already exists", item: existing });
-    }
-  }
-
   const item = await prisma.contentSyncItem.create({
     data: {
-      sourcePostId,
       sourceType: body.sourceType,
       authorName: body.authorName?.trim() || null,
       summary: body.summary.trim(),
       postUrl: body.postUrl?.trim() || null,
-      postedAt,
       batchLabel: currentBatchLabel(),
       rawPayload: { message: body.summary.trim(), manualSubmit: true },
       status: "pending",
     },
   });
 
-  return NextResponse.json({ success: true, skipped: false, item });
+  return NextResponse.json({ success: true, item });
 }
