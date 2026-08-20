@@ -42,7 +42,7 @@ export default function AboutPage() {
 
           <h2 className="pt-4 text-2xl font-bold">品質與保障</h2>
           <ul className="list-disc space-y-2 pl-6">
-            <li>甲種旅行社登記證號：{COMPANY.registrationNo}</li>
+            <li>甲種旅行社</li>
             <li>品保協會會員編號：北2760</li>
             <li>統一編號：60675708</li>
             <li>履約保證保險：旺旺友聯產物保險新臺幣1,500萬元</li>
