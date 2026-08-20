@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE, organizationJsonLd, websiteJsonLd } from "@/lib/site";
+import { SITE, organizationJsonLd } from "@/lib/site";
 import HomeHeroV2 from "@/components/HomeHero_v2";
 
 export const metadata: Metadata = {
@@ -34,10 +34,7 @@ const navItems = [
 export default function HomePage() {
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify([organizationJsonLd(), websiteJsonLd()]) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} />
 
       <div className="home-page">
         <header className="home-nav" aria-label="浮雲輕鬆遊網站導覽">

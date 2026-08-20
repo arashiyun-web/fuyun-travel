@@ -89,9 +89,10 @@ export function pageMeta(args: {
 export function organizationJsonLd() {
   return {
     "@context": "https://schema.org",
-    "@type": "TravelAgency",
+    "@type": ["TravelAgency", "Organization"],
     name: COMPANY.siteName,
     alternateName: [COMPANY.companyName, COMPANY.fleetCompanyName],
+    description: SITE.defaultDescription,
     url: SITE.url,
     telephone: COMPANY.phone,
     email: COMPANY.email,
@@ -110,5 +111,15 @@ export function organizationJsonLd() {
     serviceType: COMPANY.business.split("、"),
     sameAs: [COMPANY.facebookUrl],
     image: absoluteUrl(SITE.ogImage),
+  };
+}
+
+export function websiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE.name,
+    url: SITE.url,
+    inLanguage: "zh-Hant",
   };
 }
