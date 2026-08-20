@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { COMPANY, absoluteUrl, organizationJsonLd, pageMeta } from "@/lib/site";
+import { absoluteUrl, organizationJsonLd, pageMeta } from "@/lib/site";
 import { serviceSchema } from "@/lib/seo/generateSchema";
 import { serviceItems } from "@/lib/siteContent";
 
@@ -34,10 +34,7 @@ export default function ServicesPage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <h1>服務項目</h1>
-      <p className="lead">
-        依人數、路線、季節與預算，安排合適車型與台灣旅遊動線。車隊規模達 {COMPANY.fleetSize} 輛遊覽車，在職專業駕駛約{" "}
-        {COMPANY.driverCount} 位，可依團體大小彈性調度。
-      </p>
+      <p className="lead">依人數、路線、季節與預算，安排合適車型與台灣旅遊動線。</p>
       <section className="card-grid">
         {serviceItems.map((service) => {
           const Icon = service.icon;

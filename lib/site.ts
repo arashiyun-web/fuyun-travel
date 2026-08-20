@@ -34,6 +34,8 @@ export const COMPANY = {
   facebookSource: companyConfig.facebookSource,
   facebookUrl: companyConfig.facebookUrl,
   geo: companyConfig.geo,
+  fleetSize: companyConfig.fleetSize,
+  driverCount: companyConfig.driverCount,
 } as const;
 
 export function absoluteUrl(path = "/") {
