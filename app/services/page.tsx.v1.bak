@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { absoluteUrl, organizationJsonLd, pageMeta } from "@/lib/site";
-import { serviceSchema } from "@/lib/seo/generateSchema";
+import { pageMeta } from "@/lib/site";
 import { serviceItems } from "@/lib/siteContent";
 
 export const metadata: Metadata = pageMeta({
@@ -10,29 +9,9 @@ export const metadata: Metadata = pageMeta({
   path: "/services",
 });
 
-function servicesJsonLd() {
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    url: absoluteUrl("/services"),
-    itemListElement: serviceItems.map((service, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item: serviceSchema({
-        name: service.title,
-        description: service.summary,
-        path: `/services/${service.slug}`,
-      }),
-    })),
-  };
-}
-
 export default function ServicesPage() {
-  const jsonLd = [organizationJsonLd(), servicesJsonLd()];
-
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <h1>服務項目</h1>
       <p className="lead">依人數、路線、季節與預算，安排合適車型與台灣旅遊動線。</p>
       <section className="card-grid">
