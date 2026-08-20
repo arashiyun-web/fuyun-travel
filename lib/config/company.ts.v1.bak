@@ -18,8 +18,6 @@ export const companyConfig = {
   facebookSource: "小羽旅遊趣",
   facebookUrl: "https://www.facebook.com/share/g/1NPbXN8THD/",
   ogImage: "/hero-bus-sunny.png",
-  fleetSize: 15,
-  driverCount: 20,
   geo: {
     latitude: 25.0065,
     longitude: 121.448,
