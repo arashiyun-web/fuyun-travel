@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { SITE } from "@/lib/site";
-import { pushLineText } from "@/lib/lineApi";
 
 export const dynamic = "force-dynamic";
 
@@ -223,36 +222,6 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
   });
 }
 
-// Fired independently of the database write (before prisma.inquiry.create), so a
-// human still sees the inquiry even if the DB insert itself fails for any reason.
-// Must never throw into the caller — a notification failure must not fail the
-// customer's form submission.
-async function notifyInquiryFallback(inquiry: InquiryRecord) {
-  const adminUserId = process.env.LINE_ADMIN_USER_ID || process.env.ADMIN_LINE_USER_ID || "";
-  if (!adminUserId) return;
-
-  const text = [
-    "【詢價表單通知（備援，不代表已存入系統）】",
-    "",
-    `姓名：${inquiry.name}`,
-    `電話：${inquiry.phone}`,
-    `LINE：${inquiry.line_id || "未填"}`,
-    `服務：${inquiry.trip_type}`,
-    `日期：${inquiry.start_date}`,
-    `人數：${inquiry.passenger_count}`,
-    `路線：${inquiry.pickup_location} → ${inquiry.destination}`,
-    `備註：${inquiry.special_requests || "未填"}`,
-    "",
-    `收到時間：${inquiry.created_at}`,
-  ].join("\n");
-
-  try {
-    await pushLineText(adminUserId, text);
-  } catch (err) {
-    console.error("inquiry fallback notify failed", { error: String(err) });
-  }
-}
-
 export async function GET(request: Request) {
   addAudit(request, "READ_INQUIRIES", "");
   const inquiries = await prisma.inquiry.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
@@ -306,10 +275,6 @@ export async function POST(request: Request) {
     if (!Number.isFinite(inquiry.passenger_count) || inquiry.passenger_count < 1) {
       return NextResponse.json({ success: false, message: "請填寫正確人數。" }, { status: 400 });
     }
-
-    // Independent fallback: fires before the DB write so a human still sees the
-    // inquiry even if prisma.inquiry.create() below fails for any reason.
-    await notifyInquiryFallback(inquiry);
 
     const created = await prisma.inquiry.create({
       data: {
