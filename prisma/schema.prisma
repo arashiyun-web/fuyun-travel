@@ -225,3 +225,22 @@ model ContentSyncItem {
   @@index([sourceType])
   @@map("content_sync_items")
 }
+
+// 首頁「這裡真好玩」公開展示卡片。老闆在 /admin/content-sync 對某則
+// ContentSyncItem 按「確認上首頁」時建立，直接以 published 狀態寫入——
+// 這個點擊動作本身就同時代表內容與版權都已經過老闆確認，不再另外審核。
+// 跟 ContentSyncItem 的「生成草稿」流程完全獨立，不共用狀態欄位。
+model FeaturedSpot {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  photoUrl      String?  @map("photo_url")
+  sourceUrl     String?  @map("source_url")
+  sourceItemId  String?  @map("source_item_id")
+  status        String   @default("draft")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("featured_spots")
+}

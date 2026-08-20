@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE, organizationJsonLd, websiteJsonLd } from "@/lib/site";
 import HomeHeroV2 from "@/components/HomeHero_v2";
+import FeaturedSpots from "@/components/FeaturedSpots";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: { absolute: SITE.defaultTitle },
@@ -63,6 +66,8 @@ export default function HomePage() {
 
         <HomeHeroV2 />
       </div>
+
+      <FeaturedSpots />
     </>
   );
 }
