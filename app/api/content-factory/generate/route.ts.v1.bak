@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { parseInput } from "@/lib/content-factory/parser";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/content-factory/systemPrompt";
@@ -9,7 +8,7 @@ import type { ContentFactoryInput, GeneratedContent } from "@/lib/content-factor
 export const dynamic = "force-dynamic";
 
 function stripFences(raw: string): string {
-  // Strip <think>...</think> blocks some models leave in plain text
+  // Strip qwen3 <think>...</think> blocks
   let text = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   // Strip markdown code fences
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -30,18 +29,15 @@ export async function POST(request: Request) {
   }
 
   const modelName = process.env.AI_MODEL_NAME;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiBase = process.env.AI_API_BASE;
+  const apiKey = process.env.AI_API_KEY || "placeholder";
 
-  if (!modelName || !apiKey) {
+  if (!modelName || !apiBase) {
     return NextResponse.json(
-      { error: "AI_MODEL_NAME 或 ANTHROPIC_API_KEY 環境變數未設定" },
+      { error: "AI_MODEL_NAME 或 AI_API_BASE 環境變數未設定" },
       { status: 503 },
     );
   }
-
-  // AI_API_BASE is an optional override (e.g. a self-hosted Anthropic-compatible
-  // proxy). Leave unset to use Anthropic's default https://api.anthropic.com.
-  const apiBase = process.env.AI_API_BASE || undefined;
 
   let body: ContentFactoryInput;
   try {
@@ -70,28 +66,41 @@ export async function POST(request: Request) {
   const systemPrompt = buildSystemPrompt(lineOaUrl);
   const userMessage = buildUserMessage(fullInput);
 
-  const client = new Anthropic({ apiKey, baseURL: apiBase, timeout: 300_000 });
-
   let rawText = "";
   try {
-    const response = await client.messages.create({
-      model: modelName,
-      max_tokens: 16000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
+    const llmResponse = await fetch(`${apiBase}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        stream: false,
+        temperature: 0.7,
+        options: { num_ctx: 8192 },
+      }),
+      signal: AbortSignal.timeout(300_000),
     });
 
-    const textBlock = response.content.find(
-      (block): block is Anthropic.TextBlock => block.type === "text",
-    );
-    rawText = textBlock?.text || "";
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
+    if (!llmResponse.ok) {
+      const errText = await llmResponse.text().catch(() => "");
       return NextResponse.json(
-        { error: `LLM 回應錯誤 ${err.status}`, raw: err.message },
+        { error: `LLM 回應錯誤 ${llmResponse.status}`, raw: errText },
         { status: 502 },
       );
     }
+
+    const llmData = await llmResponse.json();
+    rawText =
+      llmData?.choices?.[0]?.message?.content ||
+      llmData?.response ||
+      "";
+  } catch (err) {
     return NextResponse.json(
       { error: "無法連線到 LLM 服務", raw: String(err) },
       { status: 502 },
