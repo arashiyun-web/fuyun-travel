@@ -33,7 +33,6 @@ export async function POST(request: Request) {
     postUrl?: string;
     sourcePostId?: string;
     postedAt?: string;
-    photoUrl?: string;
   };
   try {
     body = await request.json();
@@ -70,8 +69,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const photoUrl = body.photoUrl?.trim() || undefined;
-
   const item = await prisma.contentSyncItem.create({
     data: {
       sourcePostId,
@@ -81,9 +78,7 @@ export async function POST(request: Request) {
       postUrl: body.postUrl?.trim() || null,
       postedAt,
       batchLabel: currentBatchLabel(),
-      // full_picture 沿用 weekly-pull（Facebook Graph API）既有的欄位命名，
-      // 讓 /api/content-sync/select 產生草稿時的封面圖邏輯兩邊共用同一個key。
-      rawPayload: { message: body.summary.trim(), manualSubmit: true, ...(photoUrl ? { full_picture: photoUrl } : {}) },
+      rawPayload: { message: body.summary.trim(), manualSubmit: true },
       status: "pending",
     },
   });
