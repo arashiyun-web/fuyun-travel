@@ -6,7 +6,6 @@ import "./globals.css";
 import FloatingContactBarV2 from "@/components/FloatingContactBar_v2";
 import FloatingLineButton from "@/components/FloatingLineButton";
 import Footer from "@/components/Footer";
-import SummerUrgencyBanner from "@/components/SummerUrgencyBanner";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -84,7 +83,6 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <AnalyticsProvider />
         </Suspense>
-        <SummerUrgencyBanner />
         <main className="page">{children}</main>
         <Footer />
         <FloatingContactBarV2 />
