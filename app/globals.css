@@ -321,21 +321,17 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 .card h3 { margin-top: 0; }
 .card .price { color: #ffd479; font-weight: 600; }
 
-/* /highlights 明亮溫柔改版（2026-08-21）。老闆指定這一頁要跟全站深色
-   基調不同——明亮、柔和、女性審美取向，刻意選擇，不是失誤。所有規則
-   都掛在 .highlights-page 這個 wrapper 底下，或用只有這頁會用到的
-   class 名（.spot-list / .spot-article / .highlights-hero 等），確保
-   不會動到其他頁面共用的 h1 / .lead / a 等全域樣式。
-   .highlights-page 用跟 .home-page 一樣的「打破 .page 容器」手法做滿版
-   底色，裡面再用 .highlights-page__inner 撐出原本 1180px 的閱讀寬度。 */
+/* /highlights 背景改白色（老闆指定：簡單乾淨的白底，不要複雜設計），
+   只 scope 在 .highlights-page 底下，不影響其他頁面。用跟 .home-page
+   一樣的「打破 .page 容器」手法做滿版白底。 */
 .highlights-page {
   width: 100vw;
   margin-top: -24px;
   margin-left: calc(50% - 50vw);
   margin-bottom: -48px;
-  padding: 40px 0 64px;
-  background: #fbf1ec;
-  color: #4a3a38;
+  padding: 24px 0 48px;
+  background: #fff;
+  color: #2b2b2b;
 }
 .highlights-page__inner {
   max-width: 1180px;
@@ -343,99 +339,67 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   padding: 0 20px;
 }
 .highlights-page .lead {
-  color: #8a726d;
+  color: #5a5a5a;
 }
 
-/* 完整列表：長文+多圖，用單欄堆疊卡片，不套用 .card-grid 的多欄小卡
-   版型（那個版型是給車隊/服務等短項目用的）。 */
+/* /highlights 完整列表：長文+多圖，用單欄堆疊卡片，不套用 .card-grid 的
+   多欄小卡版型（那個版型是給車隊/服務等短項目用的）。四張等寬縮圖
+   並排——不要放大任何一張，這些照片本來就是從 FB 縮圖截取，解析度
+   撐不住放大。 */
 .spot-list {
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  margin: 32px 0 0;
+  gap: 24px;
+  margin: 16px 0;
 }
 .spot-article {
-  background: #fffaf8;
-  border-radius: 22px;
-  padding: 26px 28px 28px;
-  box-shadow: 0 10px 30px rgba(198, 140, 140, .16), 0 2px 8px rgba(198, 140, 140, .08);
+  background: #f6f6f4;
+  border: 1px solid #e7e2dd;
+  border-radius: 12px;
+  padding: 20px 24px;
 }
 .spot-article h3 {
-  margin: 0 0 10px;
-  color: #4a3a38;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: .01em;
+  color: #2b2b2b;
+}
+.spot-article__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.spot-article__photos img {
+  width: 220px;
+  height: 165px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
 }
 .spot-article__text {
   white-space: pre-wrap;
-  margin: 0 0 16px;
-  color: #6b5854;
-  line-height: 1.9;
-  letter-spacing: .01em;
+  margin: 0 0 12px;
+  color: #444;
 }
 .spot-article__source {
   margin: 0;
 }
 .spot-article__source a {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 9px 20px;
-  border-radius: 999px;
-  background: #fbe4e6;
-  color: #b85566;
+  color: var(--primary);
   font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  transition: background .15s ease, color .15s ease;
-}
-.spot-article__source a:hover {
-  background: #f6cdd1;
-  color: #96323f;
-  text-decoration: none;
 }
 
-/* 照片：第一張大圖當視覺主角，其餘縮圖排在下方一排。 */
-.spot-article__photos {
-  margin-bottom: 20px;
-}
-.spot-article__photo-main img {
-  width: 100%;
-  max-height: 420px;
-  object-fit: cover;
-  border-radius: 18px;
-  display: block;
-}
-.spot-article__photo-thumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-.spot-article__photo-thumbs img {
-  width: 110px;
-  height: 84px;
-  object-fit: cover;
-  border-radius: 12px;
-  display: block;
-}
-
-/* 頁首櫻花 banner：保留照片背景，改用偏暖色調的漸層遮罩＋更圓潤的
-   圓角、柔和陰影，跟下方卡片的明亮溫柔風格呼應；標題文字維持白字＋
-   陰影，對比度不變。 */
+/* /highlights 頁首櫻花 banner——維持原樣不動，只有 banner 本身需要處理
+   對比度（深色漸層遮罩 + 白字陰影），跟下方卡片改白底無關。 */
 .highlights-hero {
   position: relative;
   display: flex;
   align-items: flex-end;
   min-height: 260px;
-  margin: 0 0 32px;
-  padding: 28px 32px 26px;
-  border-radius: 24px;
+  margin: 0 0 24px;
+  padding: 28px 28px 24px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 14px 36px rgba(198, 140, 140, .22);
   background-image:
-    linear-gradient(180deg, rgba(60, 30, 35, .28) 0%, rgba(50, 25, 30, .7) 100%),
+    linear-gradient(180deg, rgba(17, 17, 17, .45) 0%, rgba(17, 17, 17, .82) 100%),
     url("/images/highlights/sakura-banner.jpg");
   background-size: cover;
   background-position: center 30%;
@@ -455,24 +419,16 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 }
 
 @media (max-width: 640px) {
-  .highlights-page {
-    padding: 24px 0 40px;
-  }
   .highlights-hero {
     min-height: 200px;
     padding: 20px 20px 18px;
-    border-radius: 18px;
   }
-  .spot-article {
-    padding: 20px;
-    border-radius: 18px;
-  }
-  .spot-article__photo-main img {
-    max-height: 260px;
-  }
-  .spot-article__photo-thumbs img {
-    width: 84px;
-    height: 64px;
+}
+
+@media (max-width: 640px) {
+  .spot-article__photos img {
+    width: calc(50% - 4px);
+    height: 130px;
   }
 }
 

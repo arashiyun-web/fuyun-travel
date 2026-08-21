@@ -35,24 +35,15 @@ export default async function HighlightsPage() {
                 : spot.photoUrl
                   ? [spot.photoUrl]
                   : [];
-              const [mainPhoto, ...thumbPhotos] = photos;
 
               return (
                 <article className="spot-article" key={spot.id}>
-                  {mainPhoto ? (
+                  {photos.length > 0 ? (
                     <div className="spot-article__photos">
-                      <div className="spot-article__photo-main">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={mainPhoto} alt={spot.title} />
-                      </div>
-                      {thumbPhotos.length > 0 ? (
-                        <div className="spot-article__photo-thumbs">
-                          {thumbPhotos.map((url) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={url} src={url} alt={spot.title} />
-                          ))}
-                        </div>
-                      ) : null}
+                      {photos.map((url) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt={spot.title} />
+                      ))}
                     </div>
                   ) : null}
                   <h3>{spot.title}</h3>
