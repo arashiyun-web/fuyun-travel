@@ -15,12 +15,8 @@ export default async function HighlightsPage() {
 
   return (
     <>
-      <div className="highlights-hero">
-        <div className="highlights-hero__content">
-          <h1>這裡真好玩</h1>
-          <p className="lead">浮雲輕鬆遊真實走過的行程分享，完整列表。</p>
-        </div>
-      </div>
+      <h1>這裡真好玩</h1>
+      <p className="lead">浮雲輕鬆遊真實走過的行程分享，完整列表。</p>
 
       {spots.length === 0 ? (
         <p className="lead" style={{ padding: "24px 0" }}>
