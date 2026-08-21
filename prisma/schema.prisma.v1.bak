@@ -183,3 +183,65 @@ model ContentDraft {
   @@index([createdAt])
   @@map("content_drafts")
 }
+
+// 「已授權社團成員」白名單，老闆自行新增/移除，不需要工程師介入。
+// 名單內成員的社團貼文視同官方素材可較大幅度參考改寫；不在名單內的視為
+// 「僅供選題參考」，見 ContentSyncItem.sourceType。
+model AuthorizedGroupMember {
+  id           String   @id @default(cuid())
+  displayName  String   @map("display_name")
+  fbIdentifier String?  @map("fb_identifier")
+  note         String?
+  addedAt      DateTime @default(now()) @map("added_at")
+
+  @@map("authorized_group_members")
+}
+
+// 每週社群內容同步彙整清單的單一項目（一則貼文）。
+// sourceType 決定這則貼文在生成草稿時可以被怎麼使用：
+//   page_official    粉專「小羽旅遊趣」官方貼文，可大幅參考改寫
+//   group_official   社團內老闆／小羽帳號本人發的貼文，視同官方素材
+//   group_whitelist  社團內白名單成員（AuthorizedGroupMember）發的貼文，視同官方素材
+//   group_other      社團內其他成員發的貼文，僅供選題參考，不得照抄文字／照片
+//   manual           老闆手動提交（例如社團貼文轉貼/截圖，Graph API 讀不到時的備援）
+model ContentSyncItem {
+  id              String    @id @default(cuid())
+  sourcePostId    String?   @unique @map("source_post_id")
+  sourceType      String    @map("source_type")
+  authorName      String?   @map("author_name")
+  summary         String
+  postUrl         String?   @map("post_url")
+  postedAt        DateTime? @map("posted_at")
+  batchLabel      String    @map("batch_label")
+  rawPayload      Json?     @map("raw_payload")
+  selected        Boolean   @default(false)
+  status          String    @default("pending")
+  contentDraftId  String?   @map("content_draft_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([batchLabel])
+  @@index([sourceType])
+  @@map("content_sync_items")
+}
+
+// 首頁「這裡真好玩」公開展示卡片。老闆在 /admin/content-sync 對某則
+// ContentSyncItem 按「確認上首頁」時建立，直接以 published 狀態寫入——
+// 這個點擊動作本身就同時代表內容與版權都已經過老闆確認，不再另外審核。
+// 跟 ContentSyncItem 的「生成草稿」流程完全獨立，不共用狀態欄位。
+model FeaturedSpot {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  photoUrl      String?  @map("photo_url")
+  sourceUrl     String?  @map("source_url")
+  sourceItemId  String?  @map("source_item_id")
+  postedAt      DateTime? @map("posted_at")
+  status        String   @default("draft")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("featured_spots")
+}
