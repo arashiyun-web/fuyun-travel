@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deriveTitleFromSummary } from "@/lib/content-sync/deriveTitle";
 
 type SyncItem = {
   id: string;
@@ -9,7 +8,6 @@ type SyncItem = {
   authorName: string | null;
   summary: string;
   postUrl: string | null;
-  postedAt: string | null;
   batchLabel: string;
   status: string;
   createdAt: string;
@@ -57,9 +55,6 @@ export default function ContentSyncPage() {
   const [featurePhotoUrl, setFeaturePhotoUrl] = useState("");
   const [featureSubmitting, setFeatureSubmitting] = useState(false);
   const [featureMsg, setFeatureMsg] = useState<Record<string, string>>({});
-  const [featuredItemIds, setFeaturedItemIds] = useState<Set<string>>(new Set());
-  const [featureAllSubmitting, setFeatureAllSubmitting] = useState(false);
-  const [featureAllMsg, setFeatureAllMsg] = useState("");
 
   useEffect(() => {
     setToken(localStorage.getItem("admin_token") || "");
@@ -85,29 +80,10 @@ export default function ContentSyncPage() {
     if (data.success) setMembers(data.members);
   }
 
-  async function loadFeaturedStatus(t = token) {
-    if (!t) return;
-    const res = await fetch("/api/featured-spots", {
-      headers: { Authorization: `Bearer ${t}` },
-      cache: "no-store",
-    });
-    const data = await res.json();
-    if (data.success) {
-      setFeaturedItemIds(
-        new Set(
-          data.spots
-            .map((s: { sourceItemId: string | null }) => s.sourceItemId)
-            .filter((id: string | null): id is string => !!id),
-        ),
-      );
-    }
-  }
-
   useEffect(() => {
     if (token) {
       loadItems(token);
       loadMembers(token);
-      loadFeaturedStatus(token);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -222,9 +198,7 @@ export default function ContentSyncPage() {
 
   function openFeatureForm(item: SyncItem) {
     setFeatureFormId(item.id);
-    // 自動帶入標題，讓「確認發布」不用等老闆手動打字才會解除 disabled——
-    // 這是先前「按鈕按不下去」的根因，標題欄位還是可以再手動編輯。
-    setFeatureTitle(deriveTitleFromSummary(item.summary));
+    setFeatureTitle("");
     setFeatureDescription(item.summary);
     setFeaturePhotoUrl(itemPhotoUrl(item));
     setFeatureMsg((prev) => ({ ...prev, [item.id]: "" }));
@@ -247,7 +221,6 @@ export default function ContentSyncPage() {
           photoUrl: featurePhotoUrl.trim() || undefined,
           sourceUrl: item.postUrl || undefined,
           sourceItemId: item.id,
-          postedAt: item.postedAt || undefined,
         }),
       });
       const data = await res.json();
@@ -256,34 +229,11 @@ export default function ContentSyncPage() {
       } else {
         setFeatureMsg((prev) => ({ ...prev, [item.id]: "已上首頁「這裡真好玩」區塊" }));
         setFeatureFormId(null);
-        setFeaturedItemIds((prev) => new Set(prev).add(item.id));
       }
     } catch (error) {
       setFeatureMsg((prev) => ({ ...prev, [item.id]: String(error) }));
     } finally {
       setFeatureSubmitting(false);
-    }
-  }
-
-  async function featureAll() {
-    setFeatureAllSubmitting(true);
-    setFeatureAllMsg("");
-    try {
-      const res = await fetch("/api/content-sync/feature-all", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setFeatureAllMsg(data.error || "批次確認失敗");
-      } else {
-        setFeatureAllMsg(`已發布 ${data.created} 則到首頁，略過 ${data.skipped} 則（無照片或已處理過）`);
-        loadFeaturedStatus();
-      }
-    } catch (error) {
-      setFeatureAllMsg(String(error));
-    } finally {
-      setFeatureAllSubmitting(false);
     }
   }
 
@@ -407,31 +357,17 @@ export default function ContentSyncPage() {
 
       {/* 本週待選清單 */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex items-center justify-between mb-4 gap-3">
           <h2 className="text-base font-medium text-slate-200">本週待選清單</h2>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={featureAll}
-              disabled={featureAllSubmitting}
-              className="px-3 py-1.5 rounded-lg text-xs border border-sky-500/40 text-sky-300 hover:border-sky-400 hover:text-sky-200 transition-all disabled:opacity-50"
-            >
-              {featureAllSubmitting ? "發布中…" : "全部確認上首頁"}
-            </button>
-            <button
-              type="button"
-              onClick={pullNow}
-              disabled={pulling}
-              className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all disabled:opacity-50"
-            >
-              {pulling ? "拉取中…" : "立即拉取粉專貼文"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={pullNow}
+            disabled={pulling}
+            className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all disabled:opacity-50"
+          >
+            {pulling ? "拉取中…" : "立即拉取粉專貼文"}
+          </button>
         </div>
-        <p className="text-xs text-slate-500 mb-4">
-          「全部確認上首頁」只會發布有照片、還沒個別處理過的項目，標題自動從摘要生成，直接發布不用逐則確認。
-        </p>
-        {featureAllMsg ? <p className="text-xs text-slate-400 mb-4">{featureAllMsg}</p> : null}
         {pullMsg ? <p className="text-xs text-slate-400 mb-4">{pullMsg}</p> : null}
 
         {items.length === 0 ? (
@@ -466,11 +402,7 @@ export default function ContentSyncPage() {
                     ) : null}
 
                     <div className="mt-2">
-                      {featuredItemIds.has(item.id) ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] border border-emerald-500/40 text-emerald-300">
-                          ✓ 已上首頁
-                        </span>
-                      ) : featureFormId === item.id ? (
+                      {featureFormId === item.id ? (
                         <div className="space-y-2 bg-slate-900 border border-slate-800 rounded-lg p-3">
                           <input
                             value={featureTitle}

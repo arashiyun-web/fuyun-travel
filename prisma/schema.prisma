@@ -237,6 +237,7 @@ model FeaturedSpot {
   photoUrl      String?  @map("photo_url")
   sourceUrl     String?  @map("source_url")
   sourceItemId  String?  @map("source_item_id")
+  postedAt      DateTime? @map("posted_at")
   status        String   @default("draft")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
