@@ -321,31 +321,8 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 .card h3 { margin-top: 0; }
 .card .price { color: #ffd479; font-weight: 600; }
 
-/* /highlights 背景改白色（老闆指定：簡單乾淨的白底，不要複雜設計），
-   只 scope 在 .highlights-page 底下，不影響其他頁面。用跟 .home-page
-   一樣的「打破 .page 容器」手法做滿版白底。 */
-.highlights-page {
-  width: 100vw;
-  margin-top: -24px;
-  margin-left: calc(50% - 50vw);
-  margin-bottom: -48px;
-  padding: 24px 0 48px;
-  background: #fff;
-  color: #2b2b2b;
-}
-.highlights-page__inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-.highlights-page .lead {
-  color: #5a5a5a;
-}
-
 /* /highlights 完整列表：長文+多圖，用單欄堆疊卡片，不套用 .card-grid 的
-   多欄小卡版型（那個版型是給車隊/服務等短項目用的）。四張等寬縮圖
-   並排——不要放大任何一張，這些照片本來就是從 FB 縮圖截取，解析度
-   撐不住放大。 */
+   多欄小卡版型（那個版型是給車隊/服務等短項目用的）。 */
 .spot-list {
   display: flex;
   flex-direction: column;
@@ -353,13 +330,9 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   margin: 16px 0;
 }
 .spot-article {
-  background: #f6f6f4;
-  border: 1px solid #e7e2dd;
+  background: var(--card);
   border-radius: 12px;
   padding: 20px 24px;
-}
-.spot-article h3 {
-  color: #2b2b2b;
 }
 .spot-article__photos {
   display: flex;
@@ -377,18 +350,14 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 .spot-article__text {
   white-space: pre-wrap;
   margin: 0 0 12px;
-  color: #444;
 }
 .spot-article__source {
   margin: 0;
 }
-.spot-article__source a {
-  color: var(--primary);
-  font-weight: 600;
-}
 
-/* /highlights 頁首櫻花 banner——維持原樣不動，只有 banner 本身需要處理
-   對比度（深色漸層遮罩 + 白字陰影），跟下方卡片改白底無關。 */
+/* /highlights 頁首櫻花 banner。只做頂部標題區的背景，下方 .spot-article
+   卡片維持原本的 --card 深色底不動——這樣可讀性完全不受背景圖影響，
+   只有 banner 區塊本身需要處理對比度（深色漸層遮罩 + 白字陰影）。 */
 .highlights-hero {
   position: relative;
   display: flex;
