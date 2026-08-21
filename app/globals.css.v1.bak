@@ -254,7 +254,7 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   padding-bottom: 0;
 }
@@ -279,11 +279,6 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   background: rgba(209, 184, 117, .94);
 }
 
-.home-feature-card:nth-child(5) {
-  border-color: rgba(6, 109, 43, .6);
-  background: linear-gradient(110deg, rgba(6, 109, 43, .92), rgba(6, 60, 26, .92));
-}
-
 .home-feature-card h2 {
   margin: 0 0 8px;
   color: inherit;
@@ -298,6 +293,11 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   font-size: 16px;
   font-weight: 800;
   opacity: .86;
+}
+
+.home-feature-card--spots {
+  max-width: 420px;
+  cursor: pointer;
 }
 
 .btn-glass {
@@ -572,6 +572,10 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 
   .home-feature-card {
     min-height: 96px;
+  }
+
+  .home-feature-card--spots {
+    max-width: none;
   }
 }
 

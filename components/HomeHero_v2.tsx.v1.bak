@@ -9,7 +9,6 @@ const featureItems = [
   { href: "/services/airport-transfer", title: "機場接送", text: "航班接送、多點上下車、行李安排" },
   { href: "/travel", title: "旅遊攻略", text: "最新旅遊內容、熱門行程與包車建議" },
   { href: "/contact/inquiry?utm_content=hero", title: "立即詢價", text: "日期、人數、路線快速評估" },
-  { href: "/highlights", title: "這裡真好玩", text: "浮雲輕鬆遊真實走過的行程分享與照片，點進來看更多。" },
 ];
 
 const trustBadges = [
