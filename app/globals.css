@@ -295,6 +295,11 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   opacity: .86;
 }
 
+.home-feature-card--spots {
+  max-width: 420px;
+  cursor: pointer;
+}
+
 .btn-glass {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, .55);
@@ -315,6 +320,47 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 }
 .card h3 { margin-top: 0; }
 .card .price { color: #ffd479; font-weight: 600; }
+
+/* /highlights 完整列表：長文+多圖，用單欄堆疊卡片，不套用 .card-grid 的
+   多欄小卡版型（那個版型是給車隊/服務等短項目用的）。 */
+.spot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 16px 0;
+}
+.spot-article {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.spot-article__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.spot-article__photos img {
+  width: 220px;
+  height: 165px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+.spot-article__text {
+  white-space: pre-wrap;
+  margin: 0 0 12px;
+}
+.spot-article__source {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .spot-article__photos img {
+    width: calc(50% - 4px);
+    height: 130px;
+  }
+}
 
 .feature-grid {
   margin-top: -72px;
@@ -526,6 +572,10 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
 
   .home-feature-card {
     min-height: 96px;
+  }
+
+  .home-feature-card--spots {
+    max-width: none;
   }
 }
 

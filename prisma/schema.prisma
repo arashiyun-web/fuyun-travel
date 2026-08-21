@@ -235,6 +235,7 @@ model FeaturedSpot {
   title         String
   description   String
   photoUrl      String?  @map("photo_url")
+  photoUrls     String[] @default([]) @map("photo_urls")
   sourceUrl     String?  @map("source_url")
   sourceItemId  String?  @map("source_item_id")
   postedAt      DateTime? @map("posted_at")

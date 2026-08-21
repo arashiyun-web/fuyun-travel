@@ -23,21 +23,36 @@ export default async function HighlightsPage() {
           這裡真好玩專區準備中，敬請期待。
         </p>
       ) : (
-        <div className="card-grid">
-          {spots.map((spot) => (
-            <div className="card" key={spot.id}>
-              {spot.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={spot.photoUrl}
-                  alt={spot.title}
-                  style={{ width: "100%", borderRadius: 8, marginBottom: 12, display: "block" }}
-                />
-              ) : null}
-              <h3>{spot.title}</h3>
-              <p>{spot.description}</p>
-            </div>
-          ))}
+        <div className="spot-list">
+          {spots.map((spot) => {
+            const photos = spot.photoUrls.length > 0
+              ? spot.photoUrls
+              : spot.photoUrl
+                ? [spot.photoUrl]
+                : [];
+
+            return (
+              <article className="spot-article" key={spot.id}>
+                {photos.length > 0 ? (
+                  <div className="spot-article__photos">
+                    {photos.map((url) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={url} src={url} alt={spot.title} />
+                    ))}
+                  </div>
+                ) : null}
+                <h3>{spot.title}</h3>
+                <p className="spot-article__text">{spot.description}</p>
+                {spot.sourceUrl ? (
+                  <p className="spot-article__source">
+                    <a href={spot.sourceUrl} target="_blank" rel="noopener noreferrer">
+                      查看原始貼文 →
+                    </a>
+                  </p>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       )}
     </>
