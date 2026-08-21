@@ -13,6 +13,10 @@ export const SITE = {
 
 export const LINE_URL: string = getLineOaUrl();
 
+// 手動維護：公司/服務資料（COMPANY、SITE.defaultDescription 等）有實質異動時更新此日期。
+// 用於 JSON-LD dateModified，供 AI 爬蟲判斷內容新鮮度（AEO 稽核 2026-08-21 發現缺漏補上）。
+export const CONTENT_LAST_VERIFIED = "2026-08-21";
+
 export const COMPANY = {
   companyName: companyConfig.travelAgencyName,
   fleetCompanyName: companyConfig.transportCompanyName,
@@ -113,6 +117,7 @@ export function organizationJsonLd() {
     serviceType: COMPANY.business.split("、"),
     sameAs: [COMPANY.facebookUrl],
     image: absoluteUrl(SITE.ogImage),
+    dateModified: CONTENT_LAST_VERIFIED,
   };
 }
 
@@ -123,5 +128,6 @@ export function websiteJsonLd() {
     name: SITE.name,
     url: SITE.url,
     inLanguage: "zh-Hant",
+    dateModified: CONTENT_LAST_VERIFIED,
   };
 }
