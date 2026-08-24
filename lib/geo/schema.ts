@@ -55,34 +55,31 @@ function orgNode(): Record<string, unknown> {
     telephone: TRUST.phone,
     email: TRUST.email,
     foundingDate: "2014",
+    taxID: TRUST.uin,
+    identifier: [
+      {
+        "@type": "PropertyValue",
+        propertyID: `${TRUST.agencyType}旅行社登記證號`,
+        value: TRUST.agencyNo,
+      },
+      {
+        "@type": "PropertyValue",
+        propertyID: "品保協會會員編號",
+        value: TRUST.qaNo,
+      },
+    ],
     address: {
       "@type": "PostalAddress",
       streetAddress: TRUST.address,
       addressCountry: "TW",
     },
     areaServed: "TW",
-    hasCredential: [
-      {
-        "@type": "Grant",
-        name: `${TRUST.agencyType}旅行社登記證號`,
-        value: TRUST.agencyNo,
-      },
-      {
-        "@type": "Grant",
-        name: "品保協會會員編號",
-        value: TRUST.qaNo,
-      },
-      {
-        "@type": "Grant",
-        name: "統一編號 (UIN)",
-        value: TRUST.uin,
-      },
-      {
-        "@type": "Grant",
-        name: "履約保證保險",
-        value: `${TRUST.bondProvider} ${TRUST.bondAmount}`,
-      },
-    ],
+    hasCredential: {
+      "@type": "Credential",
+      name: "履約保證保險",
+      credentialCategory: "履約保證保險",
+      description: `${TRUST.bondProvider} ${TRUST.bondAmount}`,
+    },
   };
 }
 

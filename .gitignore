@@ -10,6 +10,8 @@ yarn-error.log*
 pnpm-debug.log*
 *.tsbuildinfo
 .DS_Store
+.codex/
+.loopx/
 
 .tools
 .env*
