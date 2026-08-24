@@ -59,7 +59,7 @@ function orgNode(): Record<string, unknown> {
     identifier: [
       {
         "@type": "PropertyValue",
-        propertyID: `${TRUST.agencyType}旅行社登記證號`,
+        propertyID: `${TRUST.agencyType}登記證號`,
         value: TRUST.agencyNo,
       },
       {
