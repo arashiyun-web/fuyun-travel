@@ -22,14 +22,22 @@ const sections = {
 };
 
 const notFoundRoutes = {
-  "/missing": "zh-Hant",
-  "/en/missing": "en",
+  "/missing/deep/path": "zh-Hant",
+  "/en/missing/deep/path": "en",
   "/ja/missing": "ja",
   "/zh-cn/missing": "zh-Hans",
   "/ko/missing": "ko",
   "/ms/missing": "ms",
   "/th/missing": "th",
   "/vi/missing": "vi",
+};
+
+const localeSmokeRoutes = {
+  "/ms": "ms",
+  "/th": "th",
+  "/vi": "vi",
+  "/zh": "zh-Hant",
+  "/zh-tw": "zh-Hant",
 };
 
 function normalized(url) {
@@ -63,7 +71,14 @@ function validateGeoSchema(data, route) {
   if (!service?.provider?.["@id"] || service.provider["@id"] !== organization?.["@id"]) failures.push(`${route}: Service provider mismatch`);
   if (!Array.isArray(faq?.mainEntity) || faq.mainEntity.length === 0) failures.push(`${route}: FAQPage questions missing`);
   if (!organization?.taxID) failures.push(`${route}: taxID missing`);
-  if (!Array.isArray(organization?.identifier) || organization.identifier.length < 2 || organization.identifier.some((item) => item?.["@type"] !== "PropertyValue" || !item?.propertyID || !item?.value)) failures.push(`${route}: identifiers invalid`);
+  const expectedIdentifiers = [
+    ["甲種旅行社登記證號", "882200"],
+    ["品保協會會員編號", "北2760"],
+  ];
+  const actualIdentifiers = Array.isArray(organization?.identifier)
+    ? organization.identifier.map((item) => [item?.propertyID, String(item?.value)]).sort(([a], [b]) => String(a).localeCompare(String(b)))
+    : [];
+  if (JSON.stringify(actualIdentifiers) !== JSON.stringify(expectedIdentifiers.sort(([a], [b]) => a.localeCompare(b)))) failures.push(`${route}: exact identifier set invalid`);
   if (organization?.hasCredential?.["@type"] !== "Credential" || !organization.hasCredential.description) failures.push(`${route}: Credential invalid`);
   if (JSON.stringify(data).includes('"@type":"Grant"')) failures.push(`${route}: Grant credential remains`);
   schemaChecked += 1;
@@ -143,6 +158,24 @@ try {
     if (response.status !== 404) failures.push(`${route}: expected 404, got ${response.status}`);
     if (htmlAttrs.lang !== locale) failures.push(`${route}: 404 html lang=${htmlAttrs.lang ?? "MISSING"}, expected=${locale}`);
     if (!html.includes(`data-localized-not-found="${locale}"`)) failures.push(`${route}: branded localized 404 missing`);
+    if (!/text\/html;\s*charset=utf-8/i.test(response.headers.get("content-type") ?? "")) failures.push(`${route}: HTML UTF-8 content type missing`);
+    if ((response.headers.get("x-robots-tag") ?? "").toLowerCase() !== "noindex, follow") failures.push(`${route}: X-Robots-Tag noindex missing`);
+    if (!html.includes('<meta name="robots" content="noindex,follow">')) failures.push(`${route}: meta robots noindex missing`);
+  }
+
+  for (const [route, locale] of Object.entries(localeSmokeRoutes)) {
+    const response = await fetch(origin + route);
+    const html = await response.text();
+    const htmlAttrs = attrs(html.match(/<html\b[^>]*>/i)?.[0] ?? "");
+    if (response.status !== 200) failures.push(`${route}: locale smoke HTTP ${response.status}`);
+    if (htmlAttrs.lang !== locale) failures.push(`${route}: locale smoke html lang=${htmlAttrs.lang ?? "MISSING"}, expected=${locale}`);
+  }
+
+  for (const method of ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) {
+    for (const route of ["/api/unknown", "/en/missing"]) {
+      const response = await fetch(origin + route, { method });
+      if (response.status !== 404) failures.push(`${method} ${route}: expected 404, got ${response.status}`);
+    }
   }
 } catch (error) {
   failures.push(`test harness: ${error.message}; server output=${serverOutput.trim()}`);
@@ -158,6 +191,8 @@ try {
 console.log(`CORE_ROUTES_CHECKED=${routesChecked}`);
 console.log(`SCHEMA_BLOCKS_CHECKED=${schemaChecked}`);
 console.log(`LOCALIZED_404_ROUTES_CHECKED=${Object.keys(notFoundRoutes).length}`);
+console.log(`LOCALE_SMOKE_ROUTES_CHECKED=${Object.keys(localeSmokeRoutes).length}`);
+console.log("UNKNOWN_METHOD_CHECKS=10");
 console.log(`FAILURES=${failures.length}`);
 for (const failure of failures) console.log(`FAIL ${failure}`);
 process.exitCode = failures.length === 0 ? 0 : 1;

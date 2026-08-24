@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:geo": "node scripts/validate-geo-rendered.mjs",
+    "test:geo": "npm run build && node scripts/validate-geo-rendered.mjs",
     "content:generate": "node content-factory/scripts/generate-drafts.mjs",
     "content:review": "node content-factory/scripts/generate-review-list.mjs",
     "content:check": "node content-factory/scripts/check-output.mjs",
