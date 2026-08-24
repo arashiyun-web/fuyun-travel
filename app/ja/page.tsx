@@ -1,18 +1,35 @@
-import Link from "next/link";
-import { pageMeta } from "@/lib/site";
+import type { Metadata } from "next";
+import GeoPage from "@/components/GeoPage";
+import { geoContent } from "@/lib/geo/content";
+import { geoAlternates } from "@/lib/geo/locales";
+import { buildGeoSchema } from "@/lib/geo/schema";
 
-export const metadata = pageMeta({
-  title: "日本語",
-  description: "台湾貸切チャーターと旅行相談の入口。",
-  path: "/ja",
-});
+const SECTION = "home" as Parameters<typeof geoContent>[0];
+const LOCALE = "ja" as string;
+const CANONICAL = "https://fuyuntravel.com/ja";
+const TITLE = "台湾 貸切バス・空港送迎・観光バス | 浮雲輕鬆遊";
+const DESCRIPTION = "浮雲輕鬆遊（台湾貸切バス・空港送迎・修学旅行対応）30分以内にお返事。";
+const BRAND = "浮雲輕鬆遊（Fuyun Travel）";
 
-export default function JaPage() {
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: geoAlternates(SECTION, LOCALE as Parameters<typeof geoAlternates>[1]),
+  robots: { index: true, follow: true },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
+};
+
+export default function Page() {
+  const content = geoContent(SECTION, LOCALE);
+  const schema = buildGeoSchema({
+    locale: LOCALE as Parameters<typeof buildGeoSchema>[0]["locale"],
+    service: { name: content.h1, description: content.lead, url: CANONICAL },
+    faq: content.faq.map((f) => ({ q: f.q, a: f.a })),
+  });
   return (
     <>
-      <h1>浮雲輕鬆遊</h1>
-      <p className="lead">台湾での貸切車、空港送迎、団体旅行の相談窓口です。</p>
-      <Link href="/contact/inquiry">見積もり相談</Link>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+      <GeoPage content={content} labels={{ brand: BRAND }} />
     </>
   );
 }

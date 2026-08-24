@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import { COMPANY, organizationJsonLd, pageMeta } from "@/lib/site";
+import { geoAlternates } from "@/lib/geo/locales";
 
-export const metadata: Metadata = pageMeta({
+const baseMetadata = pageMeta({
   title: "關於我們",
   description: "浮雲輕鬆遊品牌故事：創辦人雲惠民從遊覽車司機起家，至今仍親自服務旅客，重視安全、誠信與專業。",
   path: "/about",
 });
+
+export const metadata: Metadata = {
+  ...baseMetadata,
+  alternates: geoAlternates("about", "zh-Hant"),
+};
 
 export default function AboutPage() {
   return (

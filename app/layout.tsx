@@ -6,6 +6,7 @@ import "./globals.css";
 import FloatingContactBarV2 from "@/components/FloatingContactBar_v2";
 import FloatingLineButton from "@/components/FloatingLineButton";
 import Footer from "@/components/Footer";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -60,6 +61,7 @@ export default function RootLayout({
   return (
     <html lang="zh-Hant">
       <body>
+        <LanguageSwitcher />
         {gaId ? (
           <>
             <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />

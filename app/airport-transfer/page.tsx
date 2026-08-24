@@ -4,17 +4,17 @@ import { geoContent } from "@/lib/geo/content";
 import { geoAlternates } from "@/lib/geo/locales";
 import { buildGeoSchema } from "@/lib/geo/schema";
 
-const SECTION = "home" as Parameters<typeof geoContent>[0];
-const LOCALE = "en" as string;
-const CANONICAL = "https://fuyuntravel.com/en";
-const TITLE = "Taiwan Charter Bus, Airport Transfer & Coach | Fuyun Travel";
-const DESCRIPTION = "Fuyun Travel — licensed Taiwan charter bus, airport transfer, coach tours & school trips. Reply within 30 minutes.";
-const BRAND = "Fuyun Travel";
+const SECTION = "airport" as Parameters<typeof geoContent>[0];
+const LOCALE = "zh-Hant";
+const CANONICAL = "https://fuyuntravel.com/airport-transfer";
+const TITLE = "機場接送｜桃園、松山與各大機場包車接送 | 浮雲輕鬆遊";
+const DESCRIPTION = "浮雲輕鬆遊桃園、松山機場接送，團體行李、多點上下車、深夜航班安心接送，30分鐘內回覆。";
+const BRAND = "浮雲輕鬆遊（Fuyun Travel）";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: geoAlternates(SECTION, LOCALE as Parameters<typeof geoAlternates>[1]),
+  alternates: geoAlternates(SECTION, "zh-Hant"),
   robots: { index: true, follow: true },
   openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
 };
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export default function Page() {
   const content = geoContent(SECTION, LOCALE);
   const schema = buildGeoSchema({
-    locale: LOCALE as Parameters<typeof buildGeoSchema>[0]["locale"],
+    locale: "zh-Hant",
     service: { name: content.h1, description: content.lead, url: CANONICAL },
     faq: content.faq.map((f) => ({ q: f.q, a: f.a })),
   });

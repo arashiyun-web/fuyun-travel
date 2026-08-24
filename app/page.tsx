@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE, organizationJsonLd, websiteJsonLd } from "@/lib/site";
+import { geoAlternates } from "@/lib/geo/locales";
 import HomeHeroV2 from "@/components/HomeHero_v2";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { absolute: SITE.defaultTitle },
   description: SITE.defaultDescription,
-  alternates: { canonical: SITE.url },
+  alternates: geoAlternates("home", "zh-Hant"),
   openGraph: {
     title: SITE.defaultTitle,
     description: SITE.defaultDescription,

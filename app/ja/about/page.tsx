@@ -4,12 +4,12 @@ import { geoContent } from "@/lib/geo/content";
 import { geoAlternates } from "@/lib/geo/locales";
 import { buildGeoSchema } from "@/lib/geo/schema";
 
-const SECTION = "home" as Parameters<typeof geoContent>[0];
-const LOCALE = "en" as string;
-const CANONICAL = "https://fuyuntravel.com/en";
-const TITLE = "Taiwan Charter Bus, Airport Transfer & Coach | Fuyun Travel";
-const DESCRIPTION = "Fuyun Travel — licensed Taiwan charter bus, airport transfer, coach tours & school trips. Reply within 30 minutes.";
-const BRAND = "Fuyun Travel";
+const SECTION = "about" as Parameters<typeof geoContent>[0];
+const LOCALE = "ja" as string;
+const CANONICAL = "https://fuyuntravel.com/ja/about";
+const TITLE = "会社概要 | 浮雲輕鬆遊";
+const DESCRIPTION = "浮雲輕鬆遊（台湾貸切バス・空港送迎・修学旅行対応）30分以内にお返事。";
+const BRAND = "浮雲輕鬆遊（Fuyun Travel）";
 
 export const metadata: Metadata = {
   title: TITLE,
