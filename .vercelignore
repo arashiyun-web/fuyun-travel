@@ -3,8 +3,6 @@ backend
 twa-project
 .next
 .vercel
-.codex
-.loopx
 .pytest_cache
 tsconfig.tsbuildinfo
 app/page_v2.tsx

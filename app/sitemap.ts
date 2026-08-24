@@ -39,25 +39,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/ms",
     "/vi",
     "/th",
-    // ── GEO multilingual core pages (5 locales: zh-Hant default + en/ja/zh-cn/ko) ──
-    "/zh-cn",
-    "/en/about",
-    "/ja/about",
-    "/zh-cn/about",
-    "/airport-transfer",
-    "/en/airport-transfer",
-    "/ja/airport-transfer",
-    "/zh-cn/airport-transfer",
-    "/ko/airport-transfer",
-    "/charter-bus",
-    "/en/charter-bus",
-    "/ja/charter-bus",
-    "/zh-cn/charter-bus",
-    "/ko/charter-bus",
-    "/blog/taipei-jiufen-charter",
-    "/en/blog/taipei-to-jiufen-charter-bus-price",
-    "/ja/blog/taipei-jiufen-charter-rates",
-    "/zh-cn/blog/taipei-jiufen-charter",
   ];
 
   const dynamicPaths = [
