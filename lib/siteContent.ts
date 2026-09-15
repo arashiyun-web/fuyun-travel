@@ -22,6 +22,7 @@ export type ContentItem = {
   detail: string;
   icon: LucideIcon;
   keywords?: string[];
+  photos?: string[];
 };
 
 export const serviceItems: ContentItem[] = [
@@ -91,6 +92,21 @@ export const serviceItems: ContentItem[] = [
 ];
 
 export const fleetItems: ContentItem[] = [
+  {
+    slug: "coach-42",
+    title: "42 人座大巴（雲陞遊覽車）",
+    summary:
+      "42 人座高規格遊覽車，車內 LED 照明、航空座椅與多喇叭音響，適合企業團體、進香團與大型校外教學。",
+    detail:
+      "42 人座大巴適合大中型團體的長途與短途行程，車寬充裕可容納 15 個 29 吋行李；一日遊台北起 14000 元 / 10 小時，含油資、過路費與停車費。",
+    icon: BusFront,
+    keywords: ["42人座", "大巴", "遊覽車", "團體包車"],
+    photos: [
+      "/fleet/coach-42-exterior.webp",
+      "/fleet/coach-42-interior-a.webp",
+      "/fleet/coach-42-interior-b.webp",
+    ],
+  },
   {
     slug: "man",
     title: "MAN 遊覽車",
