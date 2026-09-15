@@ -3,6 +3,9 @@ import Link from "next/link";
 import { COMPANY, absoluteUrl, organizationJsonLd, pageMeta } from "@/lib/site";
 import { serviceSchema } from "@/lib/seo/generateSchema";
 import { serviceItems } from "@/lib/siteContent";
+import { charterFaqPageSchema, vehicleSchema } from "@/lib/seo/generateSchema";
+import { charterFaq } from "@/lib/charterFaq";
+import { fleetItems } from "@/lib/siteContent";
 
 export const metadata: Metadata = pageMeta({
   title: "服務項目",
@@ -28,7 +31,18 @@ function servicesJsonLd() {
 }
 
 export default function ServicesPage() {
-  const jsonLd = [organizationJsonLd(), servicesJsonLd()];
+  const jsonLd = [
+    organizationJsonLd(),
+    servicesJsonLd(),
+    vehicleSchema({
+      name: "42 人座大巴（雲陞遊覽車）",
+      description:
+        "42 人座高規格遊覽車，LED 照明、航空座椅、多喇叭音響；台北一日遊 14000 元 / 10 小時。",
+      path: "/fleet/coach-42",
+      seats: "42",
+    }),
+    charterFaqPageSchema(charterFaq),
+  ];
 
   return (
     <>
@@ -49,6 +63,48 @@ export default function ServicesPage() {
             </Link>
           );
         })}
+      </section>
+
+      <section className="mt-10">
+        <h2>車型專區</h2>
+        <div className="card-grid">
+          {fleetItems.map((vehicle) => {
+            const Icon = vehicle.icon;
+            const photo = vehicle.photos?.[0];
+            return (
+              <Link className="card" href={`/fleet/${vehicle.slug}`} key={vehicle.slug}>
+                {photo ? (
+                  <img
+                    src={photo}
+                    alt={vehicle.title}
+                    className="mb-3 h-36 w-full rounded object-cover"
+                  />
+                ) : (
+                  <Icon size={28} />
+                )}
+                <h3>{vehicle.title}</h3>
+                <p>{vehicle.summary}</p>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <h2>包車常見問題</h2>
+        {charterFaq.map((group) => (
+          <div className="card mb-4" key={group.vehicle}>
+            <h3>【{group.vehicle}】</h3>
+            <dl>
+              {group.items.map((item) => (
+                <div className="mb-3" key={item.question}>
+                  <dt className="font-bold">問：{item.question}</dt>
+                  <dd className="mt-1">答：{item.answer}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
       </section>
     </>
   );

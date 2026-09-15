@@ -17,9 +17,18 @@ export default function FleetPage() {
       <section className="card-grid">
         {fleetItems.map((vehicle) => {
           const Icon = vehicle.icon;
+          const photo = vehicle.photos?.[0];
           return (
             <Link className="card" href={`/fleet/${vehicle.slug}`} key={vehicle.slug}>
-              <Icon size={28} />
+              {photo ? (
+                <img
+                  src={photo}
+                  alt={vehicle.title}
+                  className="mb-3 h-36 w-full rounded object-cover"
+                />
+              ) : (
+                <Icon size={28} />
+              )}
               <h3>{vehicle.title}</h3>
               <p>{vehicle.summary}</p>
             </Link>

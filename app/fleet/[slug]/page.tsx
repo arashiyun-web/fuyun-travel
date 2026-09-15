@@ -40,7 +40,11 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
       name: vehicle.title,
       description: vehicle.summary,
       path: `/fleet/${vehicle.slug}`,
-      seats: vehicle.slug.includes("scania") || vehicle.slug === "man" ? "43" : undefined,
+      seats: vehicle.slug === "coach-42"
+        ? "42"
+        : vehicle.slug.includes("scania") || vehicle.slug === "man"
+          ? "43"
+          : undefined,
     }),
     faqSchema(faq),
   ];
@@ -54,7 +58,20 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
           返回車隊介紹
         </Link>
         <article className="mt-6 overflow-hidden rounded-md border border-[#d8ccb2] bg-white shadow-[0_18px_45px_rgba(48,39,24,0.12)]">
-          <img src="/hero-bus-sunny.png" alt={`${SITE.name} ${vehicle.title}`} className="h-72 w-full object-cover" />
+          {(vehicle.photos?.length ?? 0) > 0 ? (
+            <div className="grid gap-2 p-2">
+              {vehicle.photos!.map((src) => (
+                <img
+                  key={src}
+                  src={src}
+                  alt={`${SITE.name} ${vehicle.title}`}
+                  className="h-72 w-full object-cover"
+                />
+              ))}
+            </div>
+          ) : (
+            <img src="/hero-bus-sunny.png" alt={`${SITE.name} ${vehicle.title}`} className="h-72 w-full object-cover" />
+          )}
           <div className="p-8">
             <Icon className="text-[#b89b5e]" size={42} />
             <p className="mt-6 text-sm font-bold tracking-[0.25em] text-[#b89b5e]">FLEET</p>
