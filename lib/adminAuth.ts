@@ -51,3 +51,57 @@ export function verifyAdminToken(authHeader: string | null) {
   }
 }
 
+export const ADMIN_COOKIE_NAME = "fuyun_admin_session";
+
+function cookieToken(cookieHeader: string | null) {
+  const cookies = cookieHeader?.split(";").map((item) => item.trim()) || [];
+  const entry = cookies.find((item) => item.startsWith(`${ADMIN_COOKIE_NAME}=`));
+  if (!entry) return "";
+  try {
+    return decodeURIComponent(entry.slice(ADMIN_COOKIE_NAME.length + 1));
+  } catch {
+    return "";
+  }
+}
+
+export function verifyAdminRequest(request: Request) {
+  const authorization = request.headers.get("authorization");
+  const bearer = authorization?.startsWith("Bearer ") ? authorization : null;
+  return verifyAdminToken(bearer || `Bearer ${cookieToken(request.headers.get("cookie"))}`);
+}
+
+function sameOriginMutation(request: Request) {
+  const expectedOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("origin");
+  if (origin) return origin === expectedOrigin;
+  const referer = request.headers.get("referer");
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === expectedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cookie-authenticated state changes require a same-origin signal. Bearer
+ * callers (the local worker or an explicitly configured automation) are already
+ * separated from browser cookies and may call without Origin/Referer.
+ */
+export function verifyAdminMutationRequest(request: Request) {
+  const user = verifyAdminRequest(request);
+  if (!user) return null;
+  if (request.headers.get("authorization")?.startsWith("Bearer ")) return user;
+  return sameOriginMutation(request) ? user : null;
+}
+
+export function adminCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_SITE_URL?.startsWith("https://") === true,
+    path: "/",
+    maxAge: Math.floor(TOKEN_TTL_MS / 1000),
+  };
+}
+
