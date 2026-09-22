@@ -64,3 +64,53 @@ export function serviceSchema(args: {
     url: absoluteUrl(args.path),
   };
 }
+
+export function touristTripSchema(args: {
+  name: string;
+  description: string;
+  path: string;
+  price: number;
+  days: number;
+  departureDate?: string;
+  region?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "TouristTrip",
+    name: args.name,
+    description: args.description,
+    provider: organizationJsonLd(),
+    url: absoluteUrl(args.path),
+    touristType: "general",
+    duration: `P${args.days}D`,
+    startDate: args.departureDate,
+    areaServed: "Taiwan",
+    location: args.region
+      ? { "@type": "Place", name: `${args.region}（台灣）` }
+      : undefined,
+    offers: {
+      "@type": "Offer",
+      price: args.price,
+      priceCurrency: "TWD",
+      availability: "https://schema.org/InStock",
+      url: absoluteUrl("/contact/inquiry"),
+    },
+  };
+}
+
+export function charterFaqPageSchema(faq: Array<{ vehicle: string; items: { question: string; answer: string }[] }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.flatMap((group) =>
+      group.items.map((item) => ({
+        "@type": "Question",
+        name: `【${group.vehicle}】${item.question}`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      }))
+    ),
+  };
+}
