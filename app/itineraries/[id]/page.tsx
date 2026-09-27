@@ -3,6 +3,7 @@ import SeatBooking from "@/components/SeatBooking";
 import SiteHeader from "@/components/SiteHeader";
 import { findTourById, toursData } from "@/lib/tours";
 import { pageMeta } from "@/lib/site";
+import { touristTripSchema } from "@/lib/seo/generateSchema";
 
 type TourDetailPageProps = {
   params: {
@@ -31,8 +32,22 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
     notFound();
   }
 
+  const tripJsonLd = touristTripSchema({
+    name: tour.title,
+    description: tour.summary,
+    path: `/itineraries/${tour.id}`,
+    price: tour.price,
+    days: tour.days,
+    departureDate: tour.departureDate,
+    region: tour.region,
+  });
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(tripJsonLd) }}
+      />
       <SiteHeader active="travel" />
       <SeatBooking tour={tour} />
     </>

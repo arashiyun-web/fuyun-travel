@@ -83,3 +83,34 @@ test("rejects expired tokens and tokens for a different username", () => {
   assert.equal(auth.verifyAdminToken(forge({ v: 2, username: USER, role: "Admin", exp: Date.now() - 1 }, SECRET)), null);
   assert.equal(auth.verifyAdminToken(forge({ v: 2, username: "other", role: "Admin", exp: Date.now() + 60_000 }, SECRET)), null);
 });
+
+const COOKIE = auth.ADMIN_COOKIE_NAME;
+const req = (headers, url = "https://fuyuntravel.com/api/x") => new Request(url, { method: "POST", headers });
+
+test("cookie session: valid token accepted, old-key or legacy token rejected", () => {
+  configure();
+  const token = auth.createAdminToken();
+  assert.deepEqual(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${encodeURIComponent(token)}` })), { username: USER, role: "Admin" });
+  const oldKey = forge({ v: 2, username: USER, role: "Admin", exp: Date.now() + 60_000 }, "some-old-leaked-key").slice(7);
+  assert.equal(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${oldKey}` })), null);
+  const legacy = forge({ username: USER, role: "Admin", exp: Date.now() + 60_000 }, SECRET).slice(7);
+  assert.equal(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${legacy}` })), null);
+  assert.equal(auth.verifyAdminRequest(req({})), null);
+});
+
+test("cookie session is rejected when admin settings are missing", () => {
+  configure();
+  const token = auth.createAdminToken();
+  delete process.env.JWT_SECRET;
+  assert.equal(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${token}` })), null);
+});
+
+test("cookie-authenticated mutation requires same origin; bearer does not", () => {
+  configure();
+  const token = auth.createAdminToken();
+  const cookie = `${COOKIE}=${token}`;
+  assert.ok(auth.verifyAdminMutationRequest(req({ cookie, origin: "https://fuyuntravel.com" })));
+  assert.equal(auth.verifyAdminMutationRequest(req({ cookie, origin: "https://evil.example" })), null);
+  assert.equal(auth.verifyAdminMutationRequest(req({ cookie })), null);
+  assert.ok(auth.verifyAdminMutationRequest(req({ authorization: `Bearer ${token}` })));
+});

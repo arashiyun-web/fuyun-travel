@@ -80,6 +80,14 @@ export default function RootLayout({
           </Script>
         ) : null}
         <Script id="sw-register" strategy="afterInteractive">{`if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`}</Script>
+        <Script id="html-lang-from-path" strategy="beforeInteractive">{`
+(function(){
+  var map={en:'en',ja:'ja',ko:'ko',zh:'zh-Hant','zh-cn':'zh-CN',zhcn:'zh-CN',ms:'ms',vi:'vi',th:'th'};
+  var seg=(location.pathname.split('/').filter(Boolean)[0]||'').toLowerCase();
+  var tag=map[seg];
+  if(tag){document.documentElement.lang=tag;}
+})();
+`}</Script>
         <Suspense fallback={null}>
           <AnalyticsProvider />
         </Suspense>
