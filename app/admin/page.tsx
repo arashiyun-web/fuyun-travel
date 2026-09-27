@@ -25,7 +25,7 @@ const initialSummary: Summary = {
 };
 
 export default function AdminPage() {
-  const [username, setUsername] = useState("arashiyun6866");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [loginError, setLoginError] = useState("");

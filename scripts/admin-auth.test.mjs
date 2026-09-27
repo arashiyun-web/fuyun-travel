@@ -1,0 +1,85 @@
+// Run: node --test scripts/admin-auth.test.mjs   (Node >= 23.6 strips TS types natively)
+import { test, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { createHmac, randomBytes, scryptSync } from "node:crypto";
+
+const auth = await import("../lib/adminAuth.ts");
+
+const USER = "owner-test";
+const PASSWORD = "correct horse battery staple";
+const SECRET = randomBytes(32).toString("hex");
+
+function configure() {
+  const salt = randomBytes(16).toString("hex");
+  process.env.ADMIN_USERNAME = USER;
+  process.env.ADMIN_PASSWORD_SALT = salt;
+  process.env.ADMIN_PASSWORD_HASH = scryptSync(PASSWORD, salt, 64).toString("hex");
+  process.env.JWT_SECRET = SECRET;
+}
+
+function forge(payloadObject, key) {
+  const payload = Buffer.from(JSON.stringify(payloadObject)).toString("base64url");
+  const sig = createHmac("sha256", key).update(payload).digest("base64url");
+  return `Bearer ${payload}.${sig}`;
+}
+
+beforeEach(() => {
+  for (const key of ["ADMIN_USERNAME", "ADMIN_PASSWORD_SALT", "ADMIN_PASSWORD_HASH", "JWT_SECRET"]) delete process.env[key];
+});
+
+test("rejects every login when admin settings are missing", () => {
+  assert.equal(auth.isAdminAuthConfigured(), false);
+  assert.equal(auth.validateAdminCredentials(USER, PASSWORD), false);
+  assert.equal(auth.validateAdminCredentials("", ""), false);
+  assert.throws(() => auth.createAdminToken(), auth.AdminAuthNotConfiguredError);
+});
+
+test("accepts only the configured username and hashed password", () => {
+  configure();
+  assert.equal(auth.validateAdminCredentials(USER, PASSWORD), true);
+  assert.equal(auth.validateAdminCredentials(USER, "wrong-password"), false);
+  assert.equal(auth.validateAdminCredentials("someone-else", PASSWORD), false);
+  assert.equal(auth.validateAdminCredentials(USER, undefined), false);
+});
+
+test("rejects a short signing secret instead of falling back", () => {
+  configure();
+  process.env.JWT_SECRET = "too-short";
+  assert.equal(auth.isAdminAuthConfigured(), false);
+  assert.throws(() => auth.createAdminToken(), auth.AdminAuthNotConfiguredError);
+});
+
+test("issued token verifies; tampered token does not", () => {
+  configure();
+  const token = auth.createAdminToken();
+  assert.deepEqual(auth.verifyAdminToken(`Bearer ${token}`), { username: USER, role: "Admin" });
+  const [payload, sig] = token.split(".");
+  assert.equal(auth.verifyAdminToken(`Bearer ${payload}.${sig.slice(0, -2)}xx`), null);
+  assert.equal(auth.verifyAdminToken(token), null, "missing Bearer prefix");
+  assert.equal(auth.verifyAdminToken(null), null);
+});
+
+test("rejects legacy tokens without the version claim even with the current key", () => {
+  configure();
+  const legacy = forge({ username: USER, role: "Admin", exp: Date.now() + 60_000 }, SECRET);
+  assert.equal(auth.verifyAdminToken(legacy), null);
+});
+
+test("rejects tokens signed with any other key (e.g. the old exposed fallback)", () => {
+  configure();
+  const oldKeySigned = forge({ v: 2, username: USER, role: "Admin", exp: Date.now() + 60_000 }, "some-old-leaked-key");
+  assert.equal(auth.verifyAdminToken(oldKeySigned), null);
+});
+
+test("tokens stop verifying after the signing secret is rotated", () => {
+  configure();
+  const token = auth.createAdminToken();
+  process.env.JWT_SECRET = randomBytes(32).toString("hex");
+  assert.equal(auth.verifyAdminToken(`Bearer ${token}`), null);
+});
+
+test("rejects expired tokens and tokens for a different username", () => {
+  configure();
+  assert.equal(auth.verifyAdminToken(forge({ v: 2, username: USER, role: "Admin", exp: Date.now() - 1 }, SECRET)), null);
+  assert.equal(auth.verifyAdminToken(forge({ v: 2, username: "other", role: "Admin", exp: Date.now() + 60_000 }, SECRET)), null);
+});
