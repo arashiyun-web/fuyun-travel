@@ -262,3 +262,54 @@
   - 本機節流：同一 client 401×10 後回 429，其他 client 不受影響；JSON-LD startDate 為 2026-04-16
   - Git Preview dpl_C8RRvxd87F7Em9kUXMG2uujBrZpW（sha 92b30fb）：30/30 PASS（evidence/18、19）
 - PR #32 狀態：OPEN、REVIEW_REQUIRED；正式站未變更；PROD_SECURITY_APPLIED=FAIL；SAFE_ROLLBACK=NOT_AVAILABLE
+
+## 11. 第七輪（2026-09-27 22:40–23:15）：正式合併、正式驗證、回復基準、worker PR、Neon 備份
+### 11.1 合併（持有人明確授權：僅限 HEAD 92b30fbafdbed0870e561b86a30e3d3108e07ab5 使用管理員例外）
+- 合併前核對：
+  - PR head 與遠端分支皆為 92b30fb；checks：Vercel success、Vercel Preview Comments success
+  - 目前帳號 admin=true；branch protection enforce_admins=false、required reviews=1、無 rulesets
+- 執行 gh pr merge 32 --merge --admin --match-head-commit 92b30fb…
+  - MERGED 2026-09-27T14:41:09Z
+  - merge commit ceee1b5dbcd7ad3a2fe86ef43b9043dfa6965a1d（parents c0c4398、92b30fb）
+- 未修改 branch protection，未 force-push
+### 11.2 正式部署與驗證（evidence/20、21）
+- 部署：dpl_Fvr7bkz5LDvokpUGkX71a8ZfQ5wa，target=production，READY，source=git，sha=ceee1b5，ref=main
+  - aliases：fuyuntravel.com、yunsun.com.tw、www.yunsun.com.tw、fuyun-travel.vercel.app 等
+- 正式站 22/22 PASS：
+  - 公開頁 8 個 200
+  - 7 個 /charter-bus 頁：表單 8 欄；client JS 使用 oaMessage 指向 954fyicw，無 @fuyuntravel
+  - 公開 app.js 無 OWNER_ACCOUNT、無舊密碼；JSON-LD startDate 為 ISO
+  - 無 token 呼叫 me／profit-analysis 回 403；IG start 回 401
+  - 新管理密碼登入 200，新 session 呼叫 me 回 200
+- 正式站真瀏覽器（390px，無原生 WebMCP）：
+  - 過去日期被拒，且沒有留下 LINE 連結
+  - 合成資料產生 line.me/R/oaMessage/%40954fyicw/?…，8 欄完整
+  - 未開啟 LINE，也未送出任何資料
+- 依指示未對正式站探測舊密碼或偽造 token → PROD_OLD_CREDENTIAL_INVALIDATED：
+  - 程式層面：正式版本已沒有舊密碼與 fallback key，新設定已生效（新登入 200）
+  - 直接負向探測：NOT_TESTED
+- PROD_SECURITY_APPLIED=PASS（依上述證據）
+### 11.3 回復基準
+- tag safe-baseline-20260927 → ceee1b5（tag object 9a7879e5），已推送
+- SAFE_ROLLBACK = dpl_Fvr7bkz5LDvokpUGkX71a8ZfQ5wa
+- 更正 tag 訊息：訊息寫「earlier deployments accept the exposed legacy credentials」為過度陳述
+  - 已驗證的只有：舊版程式與公開 JS 含這些值；舊伺服器是否實際接受未測
+  - 已推送的 tag 不重寫，以本段更正為準
+### 11.4 worker
+- feat/ops-worker-integration-20260927 已 merge origin/main（e4331f7，無衝突）
+- tsc 0；build OK；admin 12/12；content-guard 11/11；line 3/3；乾跑 harness 17/17（evidence/22）
+- 已開 Draft PR #33，註明不可合併：
+  - 正式環境沒有 OPERATIONS_PERSISTENCE_MODE=database 與 R2_*；在 Vercel 上會落到唯讀、非持久的 local JSON
+  - IG 的 P1 項目尚未處理
+### 11.5 備份還原
+- LOCAL_RESTORE_6_FILES=PASS（見 §8.7）
+- NEON_BACKUP=PASS
+  - pg_dump 17.11（EDB portable binaries，未簽章；zip sha256 6eabdf00…，放在 %USERPROFILE%\.fuyun-tools\pgsql-17，未註冊為服務）
+  - 備份檔：FuyunBackups\20260927-neon-prod\neon-prod-20260927T145911Z.dump，28858 bytes，sha256 d82c7db44c9d85a9…；目錄 ACL：SYSTEM＋Administrator
+  - 連線資訊存於 .fuyun-secrets\neon-prod.env（ACL 同上）；vercel env pull 的暫存檔已刪除
+- NEON_RESTORE=PASS
+  - 還原到 127.0.0.1:55432 的暫時 PG 17.11（FuyunBackups\20260927-neon-prod-restore-check\run3，ACL 同上）
+  - 10 張表筆數與備份當分鐘的 Neon 筆數完全一致；還原後已停止 postgres
+- 另一次含正式站比對的還原腳本被 auto-mode 拒絕（Production Reads）；已改成只做本機還原，比對使用先前已取得的筆數
+- R2_BACKUP／R2_RESTORE=NOT_APPLICABLE：正式環境無 R2 設定，官網目前不使用 R2
+- restore-check 內的 run2／run3 pgdata 含客戶資料副本（ACL 受限），保留到驗收完成，之後由持有人決定刪除
