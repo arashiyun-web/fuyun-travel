@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { adminSessionTokenFromCookies } from "@/lib/adminSession";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,10 @@ async function loadAnalytics(sessionToken: string) {
   return (await response.json()) as AnalyticsData;
 }
 
-export default async function AdminAnalyticsPage({ searchParams }: { searchParams: { admin_token?: string } }) {
-  const legacyLink = Boolean(searchParams.admin_token);
+export default async function AdminAnalyticsPage({ searchParams }: { searchParams: { admin_token?: string; legacy?: string } }) {
+  // Old bookmarks carried the access token in the URL: drop it from the address bar at once.
+  if (searchParams.admin_token) redirect("/admin/analytics?legacy=1");
+  const legacyLink = searchParams.legacy === "1";
   const sessionToken = adminSessionTokenFromCookies();
   const data = sessionToken ? await loadAnalytics(sessionToken) : null;
 
