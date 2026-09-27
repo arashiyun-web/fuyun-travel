@@ -53,8 +53,36 @@ type QuoteSession = QuoteFields & {
 const sessions = new Map<string, QuoteSession>();
 
 function verifySignature(body: string, signature: string, secret: string) {
-  const digest = crypto.createHmac("sha256", secret).update(body).digest("base64");
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
+  const digest = Buffer.from(crypto.createHmac("sha256", secret).update(body).digest("base64"));
+  const supplied = Buffer.from(signature);
+  // timingSafeEqual throws on unequal lengths; a malformed header is simply an invalid signature.
+  return digest.length === supplied.length && crypto.timingSafeEqual(digest, supplied);
+}
+
+/**
+ * LINE may redeliver an event (deliveryContext.isRedelivery) with the same webhookEventId.
+ * An event is recorded only after it was handled, so a failed first attempt can still be retried,
+ * while a redelivery of a handled event does not create a second quote or admin push.
+ */
+// Dedupe must never block a customer inquiry: if the table is unavailable (e.g. migration not yet
+// applied), the event is handled as before and the failure is logged.
+async function eventAlreadyHandled(webhookEventId: string) {
+  if (!webhookEventId) return false;
+  try {
+    return (await prisma.lineWebhookEvent.count({ where: { webhookEventId } })) > 0;
+  } catch (error) {
+    console.error("line-webhook dedupe lookup failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+    return false;
+  }
+}
+
+async function markEventHandled(webhookEventId: string) {
+  if (!webhookEventId) return;
+  try {
+    await prisma.lineWebhookEvent.createMany({ data: [{ webhookEventId }], skipDuplicates: true });
+  } catch (error) {
+    console.error("line-webhook dedupe record failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+  }
 }
 
 function clean(value: unknown, limit = 500) {
@@ -494,21 +522,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid LINE signature" }, { status: 403 });
   }
 
-  const payload = JSON.parse(body) as { events?: Array<Record<string, any>> };
+  let payload: { events?: Array<Record<string, any>> };
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
+  }
   let replied = 0;
+  let skippedRedelivery = 0;
 
   for (const event of payload.events || []) {
     const message = event.message as { type?: string; text?: string } | undefined;
     if (event.type !== "message" || message?.type !== "text" || !message.text || !event.replyToken) continue;
 
+    const webhookEventId = clean(event.webhookEventId, 64);
+    if (await eventAlreadyHandled(webhookEventId)) {
+      skippedRedelivery += 1;
+      continue;
+    }
+
     const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
     const replyText = await buildReply(message.text, userId);
+    await markEventHandled(webhookEventId);
 
+    // Customer text is not logged; lengths are enough to trace the flow.
     console.info("line-webhook event", {
       handlerVersion: HANDLER_VERSION,
-      userId,
-      messageText: message.text,
-      replyText,
+      webhookEventId,
+      redelivery: Boolean(event.deliveryContext?.isRedelivery),
+      messageLength: message.text.length,
+      replyLength: replyText.length,
     });
 
     const response = await replyToLine(String(event.replyToken), replyText, accessToken);
@@ -516,7 +559,7 @@ export async function POST(request: Request) {
       const errorText = await response.text().catch(() => "");
       console.error("line-webhook reply failed", {
         handlerVersion: HANDLER_VERSION,
-        userId,
+        webhookEventId,
         status: response.status,
         errorText,
       });
@@ -524,5 +567,5 @@ export async function POST(request: Request) {
     replied += 1;
   }
 
-  return NextResponse.json({ ok: true, replied, handlerVersion: HANDLER_VERSION });
+  return NextResponse.json({ ok: true, replied, skippedRedelivery, handlerVersion: HANDLER_VERSION });
 }

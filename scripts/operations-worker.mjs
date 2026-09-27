@@ -46,6 +46,13 @@ await loadLocalEnvironment();
 
 const baseUrl = (process.env.OPERATIONS_AGENT_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 const token = process.env.OPERATIONS_CRON_TOKEN || "";
+// Only for protected Vercel Preview deployments (isolated E2E); production custom domains need none.
+const protectionBypass = process.env.OPERATIONS_AGENT_PROTECTION_BYPASS || "";
+const baseIsLoopback = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(baseUrl);
+if (!baseUrl.startsWith("https://") && !baseIsLoopback) {
+  console.error("OPERATIONS_AGENT_BASE_URL must be https (or loopback http); refusing to send credentials in clear text");
+  process.exit(2);
+}
 const loopMode = process.argv.includes("--loop") || process.env.OPERATIONS_WORKER_MODE === "loop";
 const intervalMs = Math.max(10_000, Number(process.env.OPERATIONS_WORKER_INTERVAL_MS || 60_000));
 const dataDir = resolveProjectPath(process.env.OPERATIONS_DATA_DIR || "data/operations");
@@ -100,7 +107,11 @@ async function runOnce() {
   try {
     const response = await fetch(`${baseUrl}/api/operations/process-due`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(protectionBypass ? { "x-vercel-protection-bypass": protectionBypass } : {}),
+      },
       body: "{}",
       signal: AbortSignal.timeout(120_000),
     });

@@ -460,3 +460,179 @@
 4. 審核並合併 PR #33（需一位 reviewer，或持有人另行授權例外）；合併前代理補完 Preview E2E
 5. 「羅東林場·辛巴和服體驗」的原意，以及其餘三個標題建議的核准
 6. （可選）手機 LINE 預填實測：開 /charter-bus/任一頁，以合成資料按「開啟 LINE 詢價」，確認 @954fyicw 並帶入內文，不送出
+
+## 13. 第九輪（2026-09-28 02:35 起）：隔離 Preview E2E 準備、升級演練、LINE 修正、輪換／ACL／SSH 方案
+分支 feat/ops-worker-integration-20260927（PR #33，Draft）。
+- 本節提交之前：程式 bb7e24b、HEAD 0cbda58。
+- 本節的程式與文件提交見 git log；Preview ID 以提交後 Vercel 的狀態為準。
+- 原始證據：主工作樹 recover/20260927-phase2-pre-integration/evidence/30–32（不在 Git）。
+
+### 13.1 平台授權（實查）
+- **Vercel CLI：** 已登入（arashiyun-web），可管理 fuyun-travel 的 env。
+  - Preview 受 Vercel Authentication 保護（ssoProtection=all_except_custom_domains）。
+  - 專案已有 2 組 automation-bypass secret（2026-08-19 建立）；E2E 與 worker 只在記憶體中使用，不輸出。
+- **Cloudflare：** 8940 沒有 wrangler、API token 或 MCP 授權。
+  - claude.ai 的 Cloudflare MCP 需持有人在 /mcp 授權。
+  - 已啟動官方 `wrangler login`（OAuth、localhost 回呼）並提供真實入口，但無人完成就逾時。
+  - 注意：wrangler 預設 OAuth 範圍沒有獨立的 r2 scope。若 `r2 bucket create` 被拒，改由持有人在同一個 R2 頁面多按一次建立 bucket。
+  - bucket 限定的 Object Read & Write 憑證（S3 Access Key／Secret）只能在 R2 控制台建立（或用具 token 管理權限的 API），OAuth 無法代建。
+- **Neon：** 8940 沒有 neonctl、API key 或 MCP 授權；neonctl 6.2.3 支援 `branches create --schema-only`。
+  - 已啟動官方 `neonctl auth`，60 秒逾時。
+  - 正式 DB 變數由 Vercel Neon 整合同時注入 Production／Preview／Development，共 16 個名稱。
+
+### 13.2 已備妥（授權後可直接執行）
+- **scripts/test-support/provision-preview-e2e.mjs**
+  - `neon`：以正式 endpoint 比對找出專案與主分支，建立 schema-only 分支 pr33-ops-e2e，並只在該分支建立獨立角色 e2e_app（不沿用正式角色密碼）。
+  - `migrate`：先確認分支沒有任何資料列，再補 10 筆 migration 歷史並 `migrate deploy`。
+  - `secrets`：已執行。Preview 專用的測試管理帳密、JWT、cron token、ADMIN_ACCESS_TOKEN（測試值）與 IG 金鑰已產生於 .fuyun-secrets\preview-e2e.env（ACL：本人＋SYSTEM）。
+  - `r2-bucket`：私有 bucket fuyun-ops-pr33-e2e，不掛 r2.dev 或自訂網域。
+  - `vercel-env`：只寫入 Git 分支 feat/ops-worker-integration-20260927 的 Preview env。
+    - 覆寫全部 16 個 DB 名稱與營運／管理／R2 設定。
+    - OPERATIONS_PERSISTENCE_MODE=database，OPERATIONS_LIVE_PUBLISH_ENABLED=false；不改 Production。
+- **scripts/test-support/save-r2-credentials.ps1：** 持有人以隱藏輸入保存 R2 Access Key／Secret，不經聊天、命令列或歷史紀錄。
+- **scripts/operations-preview-e2e.mjs（run／sched／verify）**
+  - 先檢查 DB endpoint 不同於正式、無客戶資料列才繼續。
+  - 驗證項目：
+    - Cookie：HttpOnly、Secure、SameSite=Lax；跨來源與無 Origin 拒絕、同源通過。
+    - 報價授權：header 通過，query、錯誤 token 拒絕。
+    - 營運流程：並行相同收件去重、R2 物件與 SHA-256、未簽名 GET 被拒、60 秒簽名 URL 可讀、runtime 憑證不能列出其他 bucket；事實檢查、三路並行 process-due 各 claim 一次；核准後改動使整筆失效、lease 逾時轉待核對、manual_required 不被 claim。
+  - verify：換新部署後資料與圖片 hash 仍在。
+- **scripts/test-support/scheduled-identity-preview-check.ps1：** 用與正式 worker 相同的 S4U／Limited 身份建立臨時排程，對隔離 Preview 跑一次 worker，結束即移除排程與臨時 env；正式 worker 設定不動。
+- **worker（scripts/operations-worker.mjs）：** 新增可選的 OPERATIONS_AGENT_PROTECTION_BYPASS（只供受保護的 Preview）；非 https 的遠端 base URL 一律拒絕（exit 2）。
+
+### 13.3 Migration 基準與升級演練（evidence/30）
+- **MIGRATION_BASELINE：** 正式 `_prisma_migrations` 共 10 筆，全部 finished、無 rollback。
+  - checksum 與 git blob（LF）一致，migration 歷史沒有漂移。
+  - Windows worktree 因 autocrlf 變成 CRLF 才會看似不符 → 正式 migration 必須從 LF checkout 執行。
+- **UPGRADE_REHEARSAL＝PASS：** 用正式 dump 的 schema-only 還原（只載入 migration 歷史列）＋ `migrate deploy`。
+  - 只套用 202609280001 與 202609280002。
+  - 既有物件前後 `pg_dump -s` 完全相同；新表與 schema.prisma 無差異。
+  - schema-only 路徑（沒有歷史列）先補 10 筆歷史再 deploy，同樣 PASS。
+- **既有漂移：** vehicles、line_users、fb_import_logs、suppliers、content_drafts 只在 schema.prisma；playing_with_neon 及部分 index／default 只在 DB。
+  - 這些早於本 PR，本次不處理；不用 reset、drop 或 resolve 修補。
+- `next build` 不跑 migration，Preview 與正式都需要明確執行 `migrate deploy`。
+
+### 13.4 LINE webhook（evidence/31）
+- 離線實測（fetch 全數攔截、合成 DB）發現三個問題：
+  - 簽章長度不符時丟例外（500）。
+  - JSON 格式錯誤時丟例外。
+  - 重送事件會重複建立報價並重複推播管理員（1→2）。
+  - 另外 log 記錄了客人訊息全文。
+- 已修正：
+  - 先比長度再驗簽 → 403。
+  - JSON 錯誤 → 400。
+  - 以 webhookEventId 去重，新增表 line_webhook_events（migration 202609280002，只新增）；處理成功後才記錄，因此失敗的首次處理仍可重試。
+  - 去重表不可用時照原流程處理（fail-open），不會擋下客人詢價。
+  - log 只記事件 ID、是否重送與長度。
+- 修正後 9/9 PASS（含 fail-open）。真實收發未做（需要已核准的測試對象）。
+
+### 13.5 回歸（evidence/32）
+- tsc 0、next build 0、DB harness 21/21（新 DB、含 worker）、LINE 9/9。
+- 報價授權程式本輪未改，19/19 仍有效。
+
+### 13.6 ADMIN_ACCESS_TOKEN 輪換
+- **呼叫端盤點：**
+  - repo 內只有 lib/adminQuoteAuth.ts 會讀取；前端 localStorage 的 `admin_token` 是 JWT，只是同名。
+  - 8940 本機只有未部署、無 remote 的舊專案 2026-06-04/next-js-postgresql-line-messaging-api 的 proxy.ts 會用。
+  - 其他 4 個 Vercel 專案都沒有這個變數。
+  - GX10／Hermes 端是否呼叫，本機無法得知 → 需分身民確認。
+- **準備：** scripts/ops/rotate-admin-access-token.mjs
+  - `prepare` 已執行：新值只存在 .fuyun-secrets\admin-access-token.env，fp d3c45fa759。
+  - `apply`：與 #33 同一次發版時經 stdin 替換 Production 值；舊值不留、不雙收。
+  - `verify`：用不存在的報價 ID，新值 header 應回 404（不回傳資料）、query 應回 401。
+  - 舊值從未存在本機，所以不做舊值探測；由單值替換保證失效，並記錄 env 更新時間。
+- ROTATION_APPLIED=NO（等 #33 合併部署）。
+
+### 13.7 正式升級次序（待 #33 驗收與有效合併；本輪不執行）
+1. 備份基準：neon-backup.cjs 產生新的 dump 與 SHA256。
+2. 從 LF checkout 對正式 DB 執行 `prisma migrate deploy`（只會套 202609280001、202609280002）。
+   - 舊版 ceee1b5 與新表相容，可先於程式部署。
+3. 設定 Production 值：正式 R2 bucket 與 bucket 限定憑證（與 Preview 分開）、OPERATIONS_PERSISTENCE_MODE=database、OPERATIONS_CRON_TOKEN、ADMIN_ACCESS_TOKEN（apply）、OPERATIONS_LIVE_PUBLISH_ENABLED=false。
+4. 正常 Git 合併部署。
+5. 驗證：公開頁、登入、同源與跨來源、報價 header 授權、營運 intake 與 dry-run（以合成內容，完成後由 admin 刪除或標記）；rotate verify。
+6. worker.env 指向正式網址與 cron token，啟用 Fuyun-Operations-Worker，保持 dry-run。
+- **回復：** 程式回 ceee1b5／dpl_Fvr7b…（新表保留、不影響舊版）；程式回復不會自動回復資料 migration。
+
+### 13.8 C:\fuyun_backup：ACL 與 SSH 分開（都未套用）
+- **現況：** 目錄 ACL 繼承自 C:\ 預設：Administrators FC、SYSTEM FC、Users RX、Authenticated Users Modify（因此過寬）。
+  - 檔案擁有者為 Administrators。
+  - 回復紀錄：acl-records\fuyun_backup-acl-20260927.txt（icacls /save 格式）→ `icacls C:\ /restore <file>`。
+- **ACL_CHANGESET（只改目錄 ACL、不用 /T）：**
+  ```
+  icacls C:\fuyun_backup /inheritance:d
+  icacls C:\fuyun_backup /remove:g *S-1-5-11 *S-1-5-32-545
+  icacls C:\fuyun_backup /grant:r "<8940>\Administrator:(OI)(CI)M"
+  ```
+  - 最後一條是明確保留寫入者本人：如果 SSH 登入 token 被 UAC 過濾，只靠 Administrators 群組會寫不進去。
+  - 子檔案經繼承自動套用；不使用 /T，避免重演 (OI)(CI) 套到檔案上的事故。
+  - 驗證：前後 icacls（目錄與最新檔）；以 Administrator 建立並刪除測試檔；下一個整點新檔落地；可還原讀取。
+- **SSH_CHANGESET（兩機協作）：**
+  - 8940 為 OpenSSH_for_Windows 9.5p2，支援 from= 與 restrict。
+  - 候選設定已用 `sshd -t -f` 驗證：只作用在 fuyunbackup；Administrator 的現有設定不變。
+  ```
+  Match User fuyunbackup
+         AuthorizedKeysFile __PROGRAMDATA__/ssh/fuyunbackup_authorized_keys
+         PasswordAuthentication no
+         KbdInteractiveAuthentication no
+         ForceCommand internal-sftp
+         ChrootDirectory C:\fuyun_backup
+         AllowTcpForwarding no
+         AllowAgentForwarding no
+         PermitTTY no
+         X11Forwarding no
+  ```
+  - 本機低權帳號 fuyunbackup（非 Administrators）。
+  - chroot 根 C:\fuyun_backup 由 SYSTEM／Administrators 擁有、帳號不可寫；新增 C:\fuyun_backup\incoming 只給 fuyunbackup Modify。
+  - key 行：`from="100.85.105.46",restrict ssh-ed25519 <GX10 新產生的公鑰> gx10-backup`（私鑰只留在 GX10）。
+  - 不改全域 PasswordAuthentication、AllowUsers 或 DenyGroups。
+- **CROSS_HOST_DEPENDENCY：**
+  - GX10 的上傳腳本目前每小時兩段連線，實際用 scp、sftp 或遠端指令未知（sshd 預設 log 等級看不出）。
+  - 改用 internal-sftp 後，遠端 shell 指令（mkdir、刪除舊檔）無法使用，需改為 sftp 批次。
+  - 目的路徑改為 /incoming。
+  - 現行唯一的管理員 key 註解為 windows@arashiyun，可能也是持有人自己電腦的 key → 新身份上傳與整點備份都驗證後，只從 GX10 移除它使用的那份私鑰；8940 上這把 key 不刪。
+
+### 13.9 標題對照（公開頁 /highlights 原文；DB 未改，待持有人核准）
+| id | 現有標題 | 建議標題 | 正文（現狀） | 信心 |
+|---|---|---|---|---|
+| cmtmf8qsw0003ky04keb0sp3i | 新竰换村博物館 | 新竹市眷村博物館 | 走進换村的歷史空間，看老物件、感受换村文化與美學記憶，新竰一日文化體驗，適合带輨陣或對歷史有興趣的同行者。 | 標題高（文化部、新竹市文化局；曾公告整修，需確認是否已重開）；正文 换→眷、新竰→新竹 高，「带輨陣」原意不明 |
+| cmtmf8pbm0000ky048uxi22df | 東山新庐帅布·宜蘇羅東一日 | 冬山新寮瀑布·宜蘭羅東一日 | 上午遊覽羅東林場文化國區，中午在羅東心惡齋享用素食臨助吃到餗，下午到新庐帅布豹帅、溪邊玩水消暑，一日行程關松又盡興。 | 高；正文 國區→園區、臨助吃到餗→自助吃到飽、新庐帅布豹帅→新寮瀑布步道、關松→輕鬆 高；「心惡齋」店名需確認 |
+| cmtmf8qee0002ky04ddqvs97r | 北埔冷泉·冷気泡腿放鬆行 | 北埔冷泉·冷泉泡腳放鬆行 | 夏天就是要應的！北埔冷泉冷沌沌的泡腿太舒服，搭配周邊山區步道，午弾散散步消消暑，半天到一日都合適的放鬆行程。 | 泡腳高、冷泉中；正文「要應的」「冷沌沌」「午弾」原意不明 |
+| cmtmf8py60001ky04rvh2nupw | 羅東林場·辛巴和服體驗 | 待持有人說明 | 天氣晴晴，換上和服走進羅東林場新開的辛巴區，森林系和風搭配自然光，拍照散步都超有feel，一日關松文化體驗。 | 低：羅東林業文化園區未見「辛巴區」；園區斜對面有和服租借店。四筆皆無照片與來源連結 |
+
+### 13.10 本機清理
+- LOCAL_SYNTHETIC_DB_STATE：已停止並刪除。
+  - opsdb-test（55433，PID 28248）經持有人同意刪除。
+  - 本輪演練用的 migration-rehearsal pgdata（55434）也已刪除。
+  - 保留：prisma-migrations-history.sql 與 schema dump。
+- CUSTOMER_RESTORE_RETENTION：
+  - run2 核實只有 initdb 範本庫（base 1/4/5），沒有還原任何資料庫，也不含客戶資料。
+  - run3 含還原資料庫（16384）。
+  - 兩者 postgres 皆停止、ACL 限縮。
+  - 未取得同意前不刪；建議驗收後刪 run2 全部與 run3 pgdata，保留 dump＋SHA256SUMS。
+
+### 13.11 狀態欄
+- PR33_HEAD／CODE_SHA：本節提交；DRAFT_STATUS＝draft。
+- PREVIEW_ID：提交後的 Git Preview 仍共用正式 DB 且未設 persistence → fail-closed；隔離 Preview 待授權後建立。
+- CLOUDFLARE_AUTH=NOT_GRANTED（入口已提供）；R2_TEST_BUCKET=PREPARED(fuyun-ops-pr33-e2e)；R2_PROD_ISOLATION=DESIGNED；R2_S3_ACCESS_VERIFIED=NO
+- NEON_PROJECT＝以正式 endpoint 比對取得（授權後）；TEST_BRANCH=pr33-ops-e2e（未建立）；SCHEMA_ONLY=PLANNED（neonctl --schema-only）；SYNTHETIC_DATA=E2E 腳本產生；PROD_ENDPOINT_DIFFERENT＝腳本強制檢查
+- MIGRATION_BASELINE=10/10 checksum 相符；UPGRADE_REHEARSAL=PASS（本機、正式 schema）；PRODUCTION_MIGRATION_PLAN=13.7
+- ENV_SCOPE＝Git 分支 Preview override（16 個 DB 名稱＋營運設定），待寫入；OPERATIONS_PERSISTENCE_MODE（Preview 分支）=database（待寫入），Production 未設 → fail-closed；OPERATIONS_LIVE_PUBLISH_ENABLED=false
+- PREVIEW_E2E／COOKIE_AND_ORIGIN／QUOTE_HEADER_AUTH／IMAGE_HASH／PERSISTENCE=READY_NOT_RUN（BLOCKED：Cloudflare／Neon 授權）
+- CLAIM／DEDUPE／APPROVAL_BINDING／LEASE_RECOVERY／FACT_VALIDATION＝本機 PASS（21/21）；雲端待跑
+- SCHEDULED_IDENTITY_TO_PREVIEW=READY_NOT_RUN；WORKER_ENABLED=NO；CLOUD_ACCESS＝bypass 已驗證（現有 Preview：/ 200、未授權 API 401）
+- ADMIN_ACCESS_TOKEN_ROTATION_PREPARED=YES；CALLERS_READY＝repo 與 8940 已清點，GX10 待確認；ROTATION_APPLIED=NO
+- BACKUP_WRITER_CONFIRMED=YES（GX10→sshd→Administrator）；ACL_CHANGESET=READY（未套用）；SSH_CHANGESET=READY（sshd -t PASS，未套用）；CROSS_HOST_DEPENDENCY＝GX10 上傳方式與 key 用途
+- TITLE_COMPARISON=READY（13.9）；TITLE_APPROVAL=PENDING
+- LOCAL_SYNTHETIC_DB_STATE=DELETED；CUSTOMER_RESTORE_RETENTION＝run2 無資料、run3 有，均保留待同意
+- OVERALL=PARTIAL
+
+### 13.12 OWNER_ACTION（只列必須本人做的）
+1. **在 8940 的終端完成兩個官方登入**（瀏覽器會在 8940 開啟）：
+   - `! npx -y neonctl@6.2.3 auth`
+   - `! npx -y wrangler@4.142.0 login`
+2. **Cloudflare 控制台 → R2 → Manage API tokens → Create API token：**
+   - 權限 Object Read & Write，Specify bucket 只選 fuyun-ops-pr33-e2e（bucket 由代理建立）。
+   - 在 8940 自己的 PowerShell 執行 `powershell -File scripts\test-support\save-r2-credentials.ps1` 貼入兩個值。
+3. **標題：** 核准 13.9 的三個建議，並說明「辛巴區」、「心惡齋」、「带輨陣」的原意。
+4. **C:\fuyun_backup：** 是否套用 ACL_CHANGESET（可獨立進行）；SSH 改造需請分身民提供 GX10 上傳腳本的內容。
+5. **E2E 通過後，PR #33 需要 reviewer 核准。**

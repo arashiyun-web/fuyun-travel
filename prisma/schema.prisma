@@ -327,3 +327,12 @@ model InstagramLoginToken {
 
   @@map("instagram_login_tokens")
 }
+
+/// LINE webhook events already handled (redelivery dedupe by webhookEventId).
+model LineWebhookEvent {
+  webhookEventId String   @id @map("webhook_event_id")
+  handledAt      DateTime @default(now()) @map("handled_at")
+
+  @@index([handledAt])
+  @@map("line_webhook_events")
+}
