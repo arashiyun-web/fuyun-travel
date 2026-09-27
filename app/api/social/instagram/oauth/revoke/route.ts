@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       success: true,
       localTokenCleared: cleared,
       providerRevocationRequired: true,
-      note: "僅清除本機加密 token；Meta 端撤銷需由擁有者依官方流程處理。",
+      note: "僅清除本站保存的加密 token；Meta 端撤銷需由擁有者依官方流程處理。",
     });
   } catch {
     return NextResponse.json({ success: false, error: "本機 token 無法安全清除" }, { status: 503 });

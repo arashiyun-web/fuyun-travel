@@ -8,8 +8,17 @@ export const INSTAGRAM_OAUTH_SCOPES = [
   "instagram_business_content_publish",
 ] as const;
 
-const DEFAULT_TOKEN_STORE = "data/operations/instagram-login-token.enc.json";
 const MAX_CODE_LENGTH = 4096;
+const TOKEN_SLOT = "default";
+
+/**
+ * Where the encrypted token lives.
+ *   INSTAGRAM_LOGIN_TOKEN_STORE unset or "database" → Neon table instagram_login_tokens (durable,
+ *     shared by every serverless instance; requires DATABASE_URL).
+ *   "file:<path>" → local file, for isolated single-host tests only; refused on Vercel.
+ * Any other value, or a present-but-malformed value, is a configuration error.
+ */
+export type TokenStoreLocation = { kind: "database" } | { kind: "file"; path: string };
 
 export type InstagramOAuthConfig = {
   appId: string;
@@ -17,8 +26,11 @@ export type InstagramOAuthConfig = {
   redirectUri: string;
   stateSecret: Buffer;
   tokenEncryptionKey: Buffer;
-  tokenStorePath: string;
+  tokenStore: TokenStoreLocation;
 };
+
+/** Accepts either a resolved location or (tests, legacy) an explicit file path. */
+type TokenStoreRef = { tokenStore?: TokenStoreLocation; tokenStorePath?: string };
 
 export type InstagramStoredToken = {
   accountId: string;
@@ -79,10 +91,26 @@ export function decodeKey(value: string, expectedBytes: number) {
   return key;
 }
 
-function resolveTokenStorePath(env: Record<string, string | undefined>) {
-  const configured = env.INSTAGRAM_LOGIN_TOKEN_STORE?.trim() || DEFAULT_TOKEN_STORE;
-  if (/[\r\n]/.test(configured)) throw new InstagramOAuthError("configuration");
-  return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
+/** Resolve the token store; the same rules are used by insta-diag. */
+export function resolveTokenStore(env: Record<string, string | undefined>): TokenStoreLocation {
+  const raw = env.INSTAGRAM_LOGIN_TOKEN_STORE;
+  if (raw === undefined || raw.trim() === "database") {
+    const db = env.DATABASE_URL?.trim() || "";
+    if (!db || db.includes("replace-with-existing")) throw new InstagramOAuthError("configuration");
+    return { kind: "database" };
+  }
+  const value = raw.trim();
+  if (!value || /[\r\n]/.test(value) || !value.startsWith("file:")) throw new InstagramOAuthError("configuration");
+  if (env.VERCEL) throw new InstagramOAuthError("configuration");
+  const filePath = value.slice("file:".length);
+  if (!filePath) throw new InstagramOAuthError("configuration");
+  return { kind: "file", path: path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath) };
+}
+
+function storeOf(ref: TokenStoreRef): TokenStoreLocation {
+  if (ref.tokenStore) return ref.tokenStore;
+  if (ref.tokenStorePath) return { kind: "file", path: ref.tokenStorePath };
+  throw new InstagramOAuthError("configuration");
 }
 
 export function readInstagramOAuthConfig(env: Record<string, string | undefined> = process.env): InstagramOAuthConfig {
@@ -92,13 +120,13 @@ export function readInstagramOAuthConfig(env: Record<string, string | undefined>
   const stateSecret = decodeKey(required(env, "INSTAGRAM_LOGIN_STATE_SECRET"), 32);
   const tokenEncryptionKey = decodeKey(required(env, "INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY"), 32);
   if (!numericId(appId) || !publicHttpsRedirect(redirectUri)) throw new InstagramOAuthError("configuration");
-  return { appId, appSecret, redirectUri, stateSecret, tokenEncryptionKey, tokenStorePath: resolveTokenStorePath(env) };
+  return { appId, appSecret, redirectUri, stateSecret, tokenEncryptionKey, tokenStore: resolveTokenStore(env) };
 }
 
 function readTokenStoreKey(env: Record<string, string | undefined> = process.env) {
   const raw = env.INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY?.trim();
   if (!raw) return null;
-  return { key: decodeKey(raw, 32), tokenStorePath: resolveTokenStorePath(env) };
+  return { key: decodeKey(raw, 32), tokenStore: resolveTokenStore(env) };
 }
 
 export function createInstagramOAuthState(config: Pick<InstagramOAuthConfig, "stateSecret">) {
@@ -142,10 +170,40 @@ function validAccountId(value: unknown): value is string {
   return typeof value === "string" && numericId(value);
 }
 
-async function jsonBody(response: Response) {
-  const value: unknown = await response.json().catch(() => null);
+/**
+ * Parse a provider JSON body without losing precision in `user_id`.
+ * Instagram account IDs can exceed Number.MAX_SAFE_INTEGER and may arrive as JSON numbers;
+ * the reviver takes the original source text (Node >= 22 exposes context.source).
+ * If that is unavailable and the number is not a safe integer, the value is rejected
+ * rather than stored with rounded digits.
+ */
+export function parseProviderJson(text: string): Record<string, unknown> {
+  let value: unknown;
+  try {
+    value = JSON.parse(text, function reviver(key, parsed, context?: { source?: string }) {
+      if (key === "user_id" && typeof parsed === "number") {
+        if (context?.source && /^[0-9]{1,32}$/.test(context.source)) return context.source;
+        const match = /"user_id"\s*:\s*([0-9]{1,32})\b/.exec(text);
+        if (match) return match[1];
+        return Number.isSafeInteger(parsed) ? String(parsed) : null;
+      }
+      return parsed;
+    });
+  } catch {
+    throw new InstagramOAuthError("provider");
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new InstagramOAuthError("provider");
   return value as Record<string, unknown>;
+}
+
+async function jsonBody(response: Response) {
+  const text = await response.text().catch(() => "");
+  return parseProviderJson(text);
+}
+
+function accountIdOf(body: Record<string, unknown>) {
+  const value = body.user_id;
+  return typeof value === "string" && numericId(value) ? value : null;
 }
 
 function providerRequestInit(body: URLSearchParams): RequestInit {
@@ -181,7 +239,8 @@ export async function exchangeInstagramAuthorizationCode(
     if (error instanceof InstagramOAuthError) throw error;
     throw new InstagramOAuthError("provider");
   }
-  if (!shortResponse.ok || !validToken(shortBody.access_token) || !validAccountId(String(shortBody.user_id ?? ""))) {
+  const shortAccountId = accountIdOf(shortBody);
+  if (!shortResponse.ok || !validToken(shortBody.access_token) || !shortAccountId) {
     throw new InstagramOAuthError("provider");
   }
 
@@ -204,7 +263,7 @@ export async function exchangeInstagramAuthorizationCode(
   }
   const obtainedAt = new Date().toISOString();
   return {
-    accountId: validAccountId(String(longBody.user_id ?? "")) ? String(longBody.user_id) : String(shortBody.user_id),
+    accountId: accountIdOf(longBody) ?? shortAccountId,
     accessToken: String(longBody.access_token),
     obtainedAt,
     expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
@@ -257,42 +316,98 @@ function decryptToken(serialized: string, key: Buffer): InstagramStoredToken {
   }
 }
 
-export async function saveInstagramLoginToken(config: Pick<InstagramOAuthConfig, "tokenEncryptionKey" | "tokenStorePath">, token: InstagramStoredToken) {
-  if (!validAccountId(token.accountId) || !validToken(token.accessToken)) throw new InstagramOAuthError("input");
-  const directory = path.dirname(config.tokenStorePath);
-  await mkdir(directory, { recursive: true }).catch(() => { throw new InstagramOAuthError("storage"); });
-  const temporary = `${config.tokenStorePath}.${randomBytes(8).toString("hex")}.tmp`;
+async function tokenTable() {
   try {
-    await writeFile(temporary, encryptToken(token, config.tokenEncryptionKey), { encoding: "utf8", mode: 0o600, flag: "wx" });
-    await rename(temporary, config.tokenStorePath);
+    const { prisma } = await import("../prisma.ts");
+    return prisma.instagramLoginToken;
+  } catch {
+    throw new InstagramOAuthError("storage");
+  }
+}
+
+export async function saveInstagramLoginToken(config: TokenStoreRef & { tokenEncryptionKey: Buffer }, token: InstagramStoredToken) {
+  if (!validAccountId(token.accountId) || !validToken(token.accessToken)) throw new InstagramOAuthError("input");
+  const store = storeOf(config);
+  const encrypted = encryptToken(token, config.tokenEncryptionKey);
+  if (store.kind === "database") {
+    const table = await tokenTable();
+    try {
+      await table.upsert({
+        where: { slot: TOKEN_SLOT },
+        create: { slot: TOKEN_SLOT, encrypted, accountId: token.accountId, expiresAt: new Date(token.expiresAt) },
+        update: { encrypted, accountId: token.accountId, expiresAt: new Date(token.expiresAt) },
+      });
+    } catch {
+      throw new InstagramOAuthError("storage");
+    }
+    return;
+  }
+  await mkdir(path.dirname(store.path), { recursive: true }).catch(() => { throw new InstagramOAuthError("storage"); });
+  const temporary = `${store.path}.${randomBytes(8).toString("hex")}.tmp`;
+  try {
+    await writeFile(temporary, encrypted, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    await rename(temporary, store.path);
   } catch {
     await unlink(temporary).catch(() => undefined);
     throw new InstagramOAuthError("storage");
   }
 }
 
-export async function readInstagramLoginToken(config: Pick<InstagramOAuthConfig, "tokenEncryptionKey" | "tokenStorePath">) {
-  let serialized: string;
-  try {
-    serialized = await readFile(config.tokenStorePath, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
-    throw new InstagramOAuthError("storage");
-  }
-  const token = decryptToken(serialized, config.tokenEncryptionKey);
-  if (Date.parse(token.expiresAt) <= Date.now()) return null;
+/** Token status without exposing the token: absent / expired / valid. Throws "storage" when unreadable. */
+export async function inspectInstagramLoginToken(config: TokenStoreRef & { tokenEncryptionKey: Buffer }) {
+  const token = await readRawInstagramLoginToken(config);
+  if (!token) return { status: "absent" as const };
+  if (Date.parse(token.expiresAt) <= Date.now()) return { status: "expired" as const, expiresAt: token.expiresAt };
+  return { status: "valid" as const, expiresAt: token.expiresAt };
+}
+
+/** Returns the decrypted token, or null when absent or expired. Throws "storage" when unreadable. */
+export async function readInstagramLoginToken(config: TokenStoreRef & { tokenEncryptionKey: Buffer }) {
+  const token = await readRawInstagramLoginToken(config);
+  if (!token || Date.parse(token.expiresAt) <= Date.now()) return null;
   return token;
+}
+
+async function readRawInstagramLoginToken(config: TokenStoreRef & { tokenEncryptionKey: Buffer }) {
+  const store = storeOf(config);
+  let serialized: string | null;
+  if (store.kind === "database") {
+    const table = await tokenTable();
+    try {
+      serialized = (await table.findUnique({ where: { slot: TOKEN_SLOT } }))?.encrypted ?? null;
+    } catch {
+      throw new InstagramOAuthError("storage");
+    }
+  } else {
+    try {
+      serialized = await readFile(store.path, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
+      throw new InstagramOAuthError("storage");
+    }
+  }
+  if (!serialized) return null;
+  return decryptToken(serialized, config.tokenEncryptionKey);
 }
 
 export async function readStoredInstagramLoginTokenFromEnvironment(env: Record<string, string | undefined> = process.env) {
   const store = readTokenStoreKey(env);
   if (!store) return null;
-  return readInstagramLoginToken({ tokenEncryptionKey: store.key, tokenStorePath: store.tokenStorePath });
+  return readInstagramLoginToken({ tokenEncryptionKey: store.key, tokenStore: store.tokenStore });
 }
 
-export async function clearInstagramLoginToken(config: Pick<InstagramOAuthConfig, "tokenStorePath">) {
+export async function clearInstagramLoginToken(config: TokenStoreRef) {
+  const store = storeOf(config);
+  if (store.kind === "database") {
+    const table = await tokenTable();
+    try {
+      return (await table.deleteMany({ where: { slot: TOKEN_SLOT } })).count > 0;
+    } catch {
+      throw new InstagramOAuthError("storage");
+    }
+  }
   try {
-    await unlink(config.tokenStorePath);
+    await unlink(store.path);
     return true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return false;
@@ -303,5 +418,5 @@ export async function clearInstagramLoginToken(config: Pick<InstagramOAuthConfig
 export async function clearStoredInstagramLoginTokenFromEnvironment(env: Record<string, string | undefined> = process.env) {
   const store = readTokenStoreKey(env);
   if (!store) return false;
-  return clearInstagramLoginToken({ tokenStorePath: store.tokenStorePath });
+  return clearInstagramLoginToken({ tokenStore: store.tokenStore });
 }

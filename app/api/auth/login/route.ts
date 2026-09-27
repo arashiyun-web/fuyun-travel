@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminToken, isAdminAuthConfigured, validateAdminCredentials } from "@/lib/adminAuth";
+import { ADMIN_COOKIE_NAME, adminCookieOptions, createAdminToken, isAdminAuthConfigured, validateAdminCredentials } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,12 @@ export async function POST(request: Request) {
 
   attempts.delete(key);
   try {
-    return NextResponse.json({ success: true, token: createAdminToken() });
+    const token = createAdminToken();
+    // Bearer token for the existing admin pages, plus an HttpOnly session cookie so browser
+    // navigations (e.g. the Instagram OAuth start redirect) are authenticated too.
+    const response = NextResponse.json({ success: true, token });
+    response.cookies.set(ADMIN_COOKIE_NAME, token, adminCookieOptions(request));
+    return response;
   } catch {
     return NextResponse.json({ success: false, error: "管理員安全設定未完成" }, { status: 503 });
   }

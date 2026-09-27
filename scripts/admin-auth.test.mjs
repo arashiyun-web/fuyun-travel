@@ -125,3 +125,12 @@ test("sessions are revoked when any admin setting is removed (fail closed)", asy
   delete process.env.ADMIN_PASSWORD_SALT;
   assert.equal(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${token}` })), null);
 });
+
+test("same-origin check uses the addressed host (Host / x-forwarded-host), not an internal request.url host", () => {
+  const internal = (headers) => new Request("http://localhost:3000/api/x", { method: "POST", headers });
+  assert.equal(auth.isSameOriginRequest(internal({ host: "127.0.0.1:3260", origin: "http://127.0.0.1:3260" })), true);
+  assert.equal(auth.isSameOriginRequest(internal({ host: "fuyuntravel.com", "x-forwarded-host": "fuyuntravel.com", "x-forwarded-proto": "https", origin: "https://fuyuntravel.com" })), true);
+  assert.equal(auth.isSameOriginRequest(internal({ host: "fuyuntravel.com", "x-forwarded-proto": "https", origin: "https://evil.example" })), false);
+  assert.equal(auth.isSameOriginRequest(internal({ host: "fuyuntravel.com", "x-forwarded-proto": "https", origin: "http://fuyuntravel.com" })), false);
+  assert.equal(auth.isSameOriginRequest(internal({ host: "fuyuntravel.com" })), false);
+});
