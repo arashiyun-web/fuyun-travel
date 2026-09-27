@@ -32,3 +32,6 @@ public/apk/
 
 # Static manifest copy (generated from app/manifest.ts)
 public/manifest.webmanifest
+
+# operations runtime data (state, uploads, logs, locks)
+data/operations/

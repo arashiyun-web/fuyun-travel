@@ -1,0 +1,51 @@
+.shell { max-width: 1180px; margin: 0 auto; padding: 8px 0 48px; color: #e8e8e8; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.back { color: #9cc4ff; font-size: 13px; }
+.eyebrow { margin: 12px 0 4px; color: #d8bf7a; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.title { margin: 0; color: #f6dc75; font-size: 28px; }
+.subtitle { margin: 6px 0 0; color: #9aa0a6; font-size: 13px; }
+.panel { margin: 16px 0; padding: 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(20,20,20,.9); }
+.panelTitle { margin: 0 0 14px; color: #f6dc75; font-size: 17px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.fieldWide { grid-column: 1 / -1; }
+.label { color: #bfc4ca; font-size: 13px; font-weight: 700; }
+.input, .textarea, .select { width: 100%; padding: 10px 12px; border: 1px solid #555; border-radius: 8px; background: #2a2a2a; color: #f2f2f2; font: inherit; }
+.textarea { min-height: 170px; resize: vertical; }
+.hint { color: #9aa0a6; font-size: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 10px; }
+.check { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid #555; border-radius: 8px; color: #e8e8e8; font-size: 13px; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.photo { width: 78px; height: 78px; object-fit: cover; border-radius: 8px; border: 1px solid #555; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.primary, .secondary, .danger { min-height: 42px; padding: 9px 15px; border: 0; border-radius: 8px; font-weight: 800; cursor: pointer; }
+.primary { color: #242424; background: #d1b875; }
+.secondary { color: #f1f1f1; border: 1px solid #666; background: #303030; }
+.danger { color: #ffd0d0; border: 1px solid #824646; background: #421f1f; }
+.primary:disabled, .secondary:disabled { opacity: .5; cursor: not-allowed; }
+.message { margin-top: 12px; padding: 10px 12px; border-radius: 8px; color: #b8f0cf; border: 1px solid #2f6f4a; background: #1d3a2a; font-size: 13px; }
+.error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; color: #ffb3b3; border: 1px solid #824646; background: #3b2020; font-size: 13px; }
+.record { display: grid; gap: 12px; margin-top: 12px; padding: 14px; border: 1px solid #454545; border-radius: 10px; background: #262626; }
+.recordTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.recordTitle { margin: 0; color: #fff; font-size: 16px; }
+.meta { color: #a7adb4; font-size: 12px; }
+.badge { display: inline-flex; padding: 3px 8px; border: 1px solid #6e5a2e; border-radius: 999px; color: #f6dc75; font-size: 11px; white-space: nowrap; }
+.platformGrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.platform { min-width: 0; padding: 10px; border: 1px solid #454545; border-radius: 8px; background: #1f1f1f; }
+.platformName { color: #f6dc75; font-size: 13px; font-weight: 800; }
+.status { margin-top: 5px; color: #9aa0a6; font-size: 11px; word-break: break-word; }
+.caption { max-height: 160px; overflow: auto; margin-top: 8px; padding: 8px; border-radius: 6px; background: #171717; color: #d8d8d8; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.platformActions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.smallButton { padding: 6px 8px; border: 1px solid #666; border-radius: 6px; background: #303030; color: #eee; font-size: 11px; cursor: pointer; }
+.empty { padding: 24px 8px; color: #777; text-align: center; font-size: 13px; }
+.notice { margin: 0 0 12px; padding: 10px 12px; border-left: 3px solid #d1b875; color: #c7c7c7; background: #242424; font-size: 12px; }
+
+@media (max-width: 700px) {
+  .shell { padding: 0 0 36px; }
+  .header { display: block; }
+  .grid, .platformGrid { grid-template-columns: 1fr; }
+  .fieldWide { grid-column: auto; }
+  .panel { padding: 14px; border-radius: 10px; }
+  .recordTop { display: block; }
+  .badge { margin-top: 8px; }
+}
