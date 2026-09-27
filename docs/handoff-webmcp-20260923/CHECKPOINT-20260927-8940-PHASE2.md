@@ -313,3 +313,150 @@
 - 另一次含正式站比對的還原腳本被 auto-mode 拒絕（Production Reads）；已改成只做本機還原，比對使用先前已取得的筆數
 - R2_BACKUP／R2_RESTORE=NOT_APPLICABLE：正式環境無 R2 設定，官網目前不使用 R2
 - restore-check 內的 run2／run3 pgdata 含客戶資料副本（ACL 受限），保留到驗收完成，之後由持有人決定刪除
+
+## 12. 第八輪（2026-09-27 23:20 – 09-28 02:15）：營運持久化、IG 修正、worker 常駐、媒體與備份範圍
+分支 feat/ops-worker-integration-20260927（PR #33，Draft，未合併）HEAD bb7e24be1e5481e3d84ed0d4394de6d0f9e354ca；live publish 仍關閉。
+原始證據：主工作樹 recover/20260927-phase2-pre-integration/evidence/23–29（不在 Git）。
+
+### 12.1 資料權威與持久化（c466c65）
+- 正式 Neon 從未建立 content_drafts：舊 database 模式在正式環境從來不可用（schema.prisma 與 migration 長期漂移，另有 vehicles、line_users、fb_import_logs、suppliers）
+- 新增 migration 202609280001_add_operations_tables（只新增表，不動既有 10 表）：operations_contents、operations_jobs、operations_events、instagram_login_tokens
+  - 隔離 PG 套用全部 11 筆 migration；diff 顯示新表與 models 完全一致
+- 資料權威：
+  - 內容與 Job 以 Neon 為唯一權威
+  - 營運圖片存私有物件儲存（R2 設定名），寫入與讀出都比對 SHA-256
+  - IG 只拿短時 presigned URL，bucket 不公開
+- OPERATIONS_PERSISTENCE_MODE 必須明確設定：
+  - database：需要資料庫＋物件儲存
+  - file：只供單機隔離測試，需明確設定 OPERATIONS_DATA_DIR，Vercel 上拒絕
+  - 未設定或不完整：回 503 與不含值的診斷；公開頁不受影響
+- 原子性：
+  - claim 為單一條件 updateMany（狀態、租約、排程、caption 未變、核准 hash、內容已核准）
+  - 結果寫回需 lockOwner 一致；lease 逾時轉待核對、不重送
+  - 去重靠 fingerprint unique；並行相同收件只產生一筆
+- 核准快照涵蓋內容內所有未執行 Job：任一變動即撤銷整筆核准，所有未執行 Job 回 pending_approval（file 模式同步修正）
+- 事實檢查會阻擋核准：未通過時需核准人明確確認並記錄；live 執行時未確認的 Job 一律 manual_required
+- 驗證：
+  - 隔離 PG 17.11＋本機 S3 mock、雙 Next instance：21/21（evidence/23）
+    - 項目：並行相同收件、圖片私有且 hash 一致、事實檢查擋核准、三路並行 process-due、雙 worker、竄改、lease 逾時、manual_required、fail-closed
+  - 重啟後資料保留 PASS；file 模式回歸 17/17（evidence/24）
+- PR #33 Git Preview dpl_5RuG4EdEruvB57WTyuaG1tCt6oVe（sha bb7e24b）（evidence/28）：
+  - 公開頁與 /admin/operations 200
+  - 營運寫入 503，storage 診斷只含 reason 與布林值（serverless=true）
+  - content-factory 上傳 503；未授權 401
+  - Preview 與 Production 共用 DATABASE_URL，故刻意不呼叫會讀 DB 的路由
+- 完整 E2E（收件→圖片→草稿→核准→乾跑→查狀態）在 Git Preview 上：BLOCKED，需隔離的 Neon branch＋真實 R2（見 12.9）
+
+### 12.2 IG（9a9a773）
+- IG_DURABLE_TOKEN_STORE=PASS
+  - 預設存 Neon instagram_login_tokens（AES-256-GCM，沿用既有加密金鑰）
+  - file:<path> 只供本機測試，Vercel 拒絕；值存在但格式錯誤視為設定錯誤
+- SESSION_COOKIE=PASS
+  - 登入同時發 HttpOnly、SameSite=Lax、Path=/、12h cookie；Secure 依實際 scheme
+  - /api/auth/logout 只接受同源
+  - 同源判定改用 Host／x-forwarded-host（Next 會把 request.url 重建成 localhost）
+- LOSSLESS_USER_ID=PASS：reviver 取原始字面值；超過安全整數且無法無損取得時拒絕
+- DIAGNOSTIC_VALIDITY=PASS
+  - token store 以 runtime resolver 驗證
+  - 狀態：CONFIG_INCOMPLETE／STORAGE_UNAVAILABLE／NOT_AUTHORIZED／EXPIRED／AUTHORIZED
+  - admin-only GET /api/social/instagram/status，不回值
+- 測試：instagram-oauth-store 7/7（含隔離 PG）；路由 harness 16/16（evidence/25，provider 只在測試 server 程序內 mock）；原有 4/4＋10/10；admin-auth 13/13
+- IG_REAL_AUTH／IG_PUBLISH：NOT_DONE（需 PR #33 部署、正式 database 模式、持有人以 Meta 帳號完成一次授權；未公開任何貼文）
+
+### 12.3 worker 常駐（a936072）
+- 排程 Fuyun-Operations-Worker：AtStartup、S4U、RunLevel Limited、IgnoreNew
+- supervisor：run-operations-worker-supervisor.ps1；node.exe 固定為 C:\Program Files\nodejs\node.exe v24.16.0；退避 5→60 s；UTF-8 log
+- 設定：%USERPROFILE%\.fuyun-secrets\worker.env（ACL：SYSTEM＋本人）
+- 已死程序遺留的 lock 會立即接手
+- 以真實排程身份對隔離 stack 驗證：
+  - 讀得到設定；核准後 6 s 內處理完、每個 Job 只 claim 一次
+  - 砍掉 worker 約 14 s 恢復並接手 lock
+  - 重複啟動 task 與手動第二個 worker 都被拒
+  - parent＝svchost（Task Scheduler），與終端無關
+- 目前狀態：Disabled，worker.env 只有 placeholder（無 token）
+  - 啟用條件：PR #33 部署並設定正式 database 模式＋OPERATIONS_CRON_TOKEN 之後
+- runtime 副本位於 %USERPROFILE%\.fuyun-tools\worker，雜湊與分支檔案一致（DEPLOYED.sha256）
+- WORKER_TASK_IDENTITY＝本機 Administrator（S4U，未存密碼，Limited）
+- 開機未登入與實際重開機：NOT_TESTED（未確認可中斷時機）
+
+### 12.4 模型（沿用 §8）
+- Ollama 0.34.4、qwen3:4b-instruct Q4_K_M、digest 0edcdef3…
+- 只監聽 127.0.0.1；Fuyun-Ollama-Serve（S4U＋supervisor）
+- UNATTENDED_START_CONFIGURED=PASS；UNATTENDED_START_VERIFIED／BOOT_VERIFIED=NOT_TESTED
+
+### 12.5 媒體與備份範圍（39ef713＋evidence/26）
+- MEDIA_STORAGE_INVENTORY：
+  - 官網圖片全部是 Git public/（37 檔）；featured_spots 的 29 個照片 URL 全部指向 /images/featured-spots（Git 追蹤 23 檔）
+  - 文章內文無圖片
+  - content_sync_items 只有 Facebook 貼文連結（第三方，不算自有備份）
+  - lib/storage/r2（social generate）因 R2 未設定而不存檔
+- R2_CONFIGURED=NO
+- MEDIA_BACKUP=PASS（Git origin＋本機 clone）；MEDIA_RESTORE=PASS：safe-baseline-20260927 與正式站 37/37 byte-identical
+- content-factory/upload 原本寫入 public/uploads（serverless 不持久或唯讀）→ 改為 Vercel 上回 503
+- 權限事故更正：§8.7 與 worker 目錄使用 icacls /T 搭配 (OI)(CI) 收緊 ACL，導致既有檔案變成任何人都不可讀
+  - 已對檔案 /reset 繼承目錄 ACL（目錄仍只有 SYSTEM＋本人）
+  - 重驗：ops-data archive OK、還原 6/6 OK、Neon dump OK
+- LOCAL_RESTORE_6_FILES=PASS；NEON_BACKUP=PASS
+- NEON_RESTORE_SCOPE：還原成功＋十表筆數一致（非逐欄 hash）
+- RESTORE_COPY_PATHS：FuyunBackups\20260927-neon-prod-restore-check\run2、run3（含客戶資料副本，ACL 限縮，postgres 已停止）
+  - RETENTION：保留至本輪驗收
+  - CLEANUP_PLAN：驗收後只刪 run2（未還原、無資料）與 run3 pgdata，保留 dump＋SHA256SUMS；需持有人同意
+- 隔離測試資料：%USERPROFILE%\.fuyun-tools\opsdb-test（只含合成資料），可隨時刪除
+
+### 12.6 C:\fuyun_backup（其他服務，未修改）
+- OTHER_BACKUP_WRITER＝GX10（tailscale gx10-f6b2，100.85.105.46）
+  - 每整點以 ED25519 key 經 8940 OpenSSH（sshd）登入本機 Administrator，兩段短連線上傳 fuyun_ai_platform_*.sql.gz
+  - 證據：Security 4624 type 3 由 sshd.exe 產生；OpenSSH/Operational 的 Accepted publickey from 100.85.105.46；00:00:07 即時觀察到新檔與 sshd 子程序
+  - 無排程、服務或 SMB 參與
+- 現況 ACL 已存 %USERPROFILE%\.fuyun-tools\acl-records\fuyun_backup-acl-20260927.txt（可用 icacls /restore）
+- OTHER_BACKUP_ACL_PLAN（未套用）：
+  1. 目錄停止繼承，只保留 Administrators、SYSTEM Full；移除 Users RX 與 Authenticated Users Modify（寫入方為 Administrator，不受影響）
+  2. SSH 最小權限（需同時改 GX10 端，不在 8940 單方施作）：
+     - 新建本機低權帳號 fuyunbackup，只給 C:\fuyun_backup 寫入
+     - authorized_keys 加 from="100.85.105.46",restrict；sshd Match User 設 ForceCommand internal-sftp、ChrootDirectory
+     - GX10 改用此帳號後，移除 administrators_authorized_keys 內該 key
+  3. sshd_config 明確設定 PasswordAuthentication no
+- 套用後需驗證：下一個整點新檔正常；Administrators 可讀可還原；一般帳號無寫入權
+- OTHER_BACKUP_ACL_APPLIED=NO
+
+### 12.7 其他項目
+- ADMIN_QUOTE_TOKEN_MIGRATION=PASS（f87d717、bb7e24b）
+  - ?admin_token= 不再接受
+  - API 接受 session（cookie／admin JWT）或 header 內的 ADMIN_ACCESS_TOKEN（timing-safe）；cookie mutation 需同源
+  - 頁面改用 session；舊連結 307 導向 ?legacy=1，不回顯 token
+  - 路由 harness 19/19（evidence/27；送 LINE 只測拒絕路徑）
+  - 部署後應輪換 ADMIN_ACCESS_TOKEN（曾出現在 URL）
+- TITLE_REVIEW：四篇皆在 featured_spots，對照表見 evidence/29.md；未改 DB
+  - 新竹市眷村博物館：高
+  - 冬山新寮瀑布·宜蘭羅東一日：高
+  - 北埔冷泉·冷泉泡腳放鬆行：泡腳高、冷泉中
+  - 「辛巴和服」：低，待確認
+- FACEBOOK_GROUP：Meta 已於 2024-04-22 移除 Groups API（Graph API v19，含 publish_to_groups），任何第三方都無法自動發到社團
+  - 維持 facebook_group_manual：交付完整圖文，由人工在社團發布後回填連結；不以粉專 API 充數
+- LINE_WEBHOOK：程式存在（app/api/line/webhook），Production 有 LINE_CHANNEL_* 名稱
+  - 本輪未做收發測試（需既有核准的測試對象）
+  - 詢價入口（oaMessage→@954fyicw）已上線；MOBILE_CHAT_PREFILL=NOT_TESTED
+- WEBMCP_NATIVE：正式站沒有 origin isolation 與 origin trial，原生註冊不會發生；人類表單正常。沒有注入假 API
+
+### 12.8 狀態欄
+- PR32_MERGED_SHA=ceee1b5dbcd7ad3a2fe86ef43b9043dfa6965a1d；PROD_SECURITY_APPLIED=PASS
+- PRODUCTION_DEPLOYMENT=dpl_Fvr7bkz5LDvokpUGkX71a8ZfQ5wa（fuyuntravel.com、yunsun.com.tw 等）
+- SAFE_BASELINE_TAG=safe-baseline-20260927；SAFE_ROLLBACK=dpl_Fvr7b…；HISTORY_SECRET_CLEAN=NO
+- PR33=#33 Draft HEAD bb7e24b；LIVE_PUBLISH_ENABLED=false
+- DATA_AUTHORITY=Neon＋私有物件儲存；OPERATIONS_PERSISTENCE_MODE（正式環境）＝未設定 → fail closed
+- DATABASE_CLAIM／DEDUPE／APPROVAL_BINDING／TIMEOUT_RECOVERY／CONTENT_FACT_VALIDATION：隔離 DB 驗證 PASS
+- PREVIEW＝dpl_5RuG4…，fail-closed PASS；完整 DRYRUN_E2E 於 Preview：BLOCKED
+- WORKER_SERVICE＝Fuyun-Operations-Worker（Disabled）；SINGLE_INSTANCE／CRASH_RECOVERY＝PASS
+- OVERALL=PARTIAL
+
+### 12.9 剩餘阻塞與持有人步驟（只列本人必做）
+1. Cloudflare：建立私有 R2 bucket，與只限該 bucket 的 API token（Object Read & Write）
+   - 原因：營運圖片需要持久私有儲存，代理無 Cloudflare 帳號權限
+   - 完成標準：4 個 R2_* 設定可由代理寫入 Vercel（值不經聊天）
+2. Neon：建立一個 Preview 專用 branch（或授權代理使用 Neon API key）
+   - 原因：Preview 與 Production 目前共用 DATABASE_URL，不能在 Preview 寫入測試資料
+   - 完成標準：Preview 環境的 DATABASE_URL 指向該 branch
+3. 決定 C:\fuyun_backup ACL 與 GX10 SSH 最小權限方案（12.6）是否施作；後者需分身民同步修改 GX10
+4. 審核並合併 PR #33（需一位 reviewer，或持有人另行授權例外）；合併前代理補完 Preview E2E
+5. 「羅東林場·辛巴和服體驗」的原意，以及其餘三個標題建議的核准
+6. （可選）手機 LINE 預填實測：開 /charter-bus/任一頁，以合成資料按「開啟 LINE 詢價」，確認 @954fyicw 並帶入內文，不送出
