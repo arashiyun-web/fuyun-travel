@@ -10,7 +10,8 @@ const STORE = {
   session: "travel-commerce-session-v1",
 };
 
-const OWNER_ACCOUNT = { id: "u-owner", name: "最高權限管理員", username: "arashiyun6866", password: "y12345678", role: "admin" };
+// Owner/admin sign-in is verified only by /api/auth/login; no real account is embedded in this file.
+// The admin/editor/customer users below are fictional localStorage demo accounts.
 
 // Demo VAPID public key. In production this comes from the backend and pairs
 // with the private VAPID key used by web-push on the server.
@@ -134,7 +135,8 @@ function ensureSystemUser(account) {
 }
 
 ensureSystemUser({ id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" });
-ensureSystemUser(OWNER_ACCOUNT);
+// Drop the owner record that earlier versions cached in localStorage (it held a real password).
+state.users = state.users.filter((user) => user.id !== "u-owner");
 ensureSystemUser({ id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" });
 ensureSystemUser({ id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" });
 save("users");
@@ -1227,15 +1229,6 @@ async function loginOwnerDashboard(username, password) {
 }
 
 function login(username, password) {
-  if (username === OWNER_ACCOUNT.username && String(password).trim() === OWNER_ACCOUNT.password) {
-    ensureSystemUser(OWNER_ACCOUNT);
-    save("users");
-    const owner = state.users.find((item) => item.username === OWNER_ACCOUNT.username) || OWNER_ACCOUNT;
-    setSession(owner);
-    go("#admin");
-    renderRoute();
-    return true;
-  }
   const user = state.users.find((item) => item.username === username && item.password === password);
   if (!user) return false;
   setSession(user);
@@ -1275,16 +1268,12 @@ function bind() {
     const message = $("#login-message");
     const submit = event.currentTarget.querySelector("button[type='submit']");
     message.textContent = "";
-    if (username === OWNER_ACCOUNT.username) {
-      submit.disabled = true;
-      loginOwnerDashboard(username, password)
-        .catch((error) => {
-          message.textContent = error.message || "登入失敗，請確認帳號資訊。";
-          submit.disabled = false;
-        });
-      return;
-    }
-    if (!login(username, password)) message.textContent = "登入失敗，請確認帳號資訊。";
+    submit.disabled = true;
+    // Try the server-verified admin login first; fall back to the local demo accounts.
+    loginOwnerDashboard(username, password).catch(() => {
+      submit.disabled = false;
+      if (!login(username, password)) message.textContent = "登入失敗，請確認帳號資訊。";
+    });
   });
   $$("[data-demo-login]").forEach((button) => {
     button.addEventListener("click", () => {

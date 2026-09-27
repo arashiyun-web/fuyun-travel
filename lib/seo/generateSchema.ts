@@ -34,6 +34,20 @@ export function faqSchema(faq: Array<{ question: string; answer: string }>) {
   };
 }
 
+/**
+ * FAQPage for grouped charter FAQ. Each question is prefixed with its vehicle so
+ * answers (prices differ per vehicle) are never read as applying to another group.
+ */
+export function charterFaqPageSchema(
+  groups: Array<{ vehicle: string; items: Array<{ question: string; answer: string }> }>,
+) {
+  return faqSchema(
+    groups.flatMap((group) =>
+      group.items.map((item) => ({ question: `【${group.vehicle}】${item.question}`, answer: item.answer })),
+    ),
+  );
+}
+
 export function vehicleSchema(args: {
   name: string;
   description: string;
