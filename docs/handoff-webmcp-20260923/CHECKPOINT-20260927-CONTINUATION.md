@@ -69,8 +69,8 @@
 
 ## 5) 密碼/密鑰輪換（C）— 已準備未執行
 ### 需輪換
-1. 管理員（`lib/adminAuth.ts:3-4` 硬編碼）：ADMIN_USERNAME/ADMIN_PASSWORD（arashiyun6866 / y12345678）→ 影響 9 條 admin/social API 的登入與 Bearer token 簽發
-2. `JWT_SECRET` fallback（`FuYunSecure8888`，.env.local 未設→用 fallback）→ 所有 admin JWT 簽名
+1. 管理員（`lib/adminAuth.ts:3-4` 硬編碼）：ADMIN_USERNAME/ADMIN_PASSWORD（username=arashiyun6866；密碼 9 字元明碼，值見該檔，不列於本文）→ 影響 9 條 admin/social API 的登入與 Bearer token 簽發
+2. `JWT_SECRET` fallback（15 字元明碼，值見 `lib/adminAuth.ts:8`，.env.local 未設→用 fallback）→ 所有 admin JWT 簽名
 3. Neon DB 密碼（.env.local DATABASE_URL，fuyun_platform/****）
 4. Vercel 帳號 session（`auth.json` token 已 invalidToken）
 ### 已準備的切換面
