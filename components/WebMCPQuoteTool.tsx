@@ -19,7 +19,7 @@
  *       + 刪 lib/webmcp-{quote-utils,tool}.{mjs,d.ts} + scripts/harness-webmcp.mjs 即可全撤。
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { buildWebMCPTool, runGetQuote } from "@/lib/webmcp-tool";
 import { LINE_OA_CODE } from "@/lib/webmcp-quote-utils";
 
@@ -84,8 +84,32 @@ function useRegisterWebMCPTool() {
   }, []);
 }
 
+type CopyState = "idle" | "copied" | "failed";
+
+function summaryText(r: QuoteResult) {
+  if (!r.ok) return `❌ 欄位不完整\n\n${(r.errors ?? []).join("\n")}`;
+  return `✅ 草稿已建立\n\n${r.message}\n\nLINE: ${r.lineUrl}\nmailto: ${r.mailtoUrl}\n\n下一步：\n${(r.next ?? []).join("\n")}`;
+}
+
 export default function WebMCPQuoteTool() {
   useRegisterWebMCPTool();
+  const [result, setResult] = useState<QuoteResult | null>(null);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
+
+  // Any edit after a draft invalidates it, so a stale LINE link is never offered.
+  function onInput() {
+    if (result) setResult(null);
+    setCopyState("idle");
+  }
+
+  async function copyMessage(message: string) {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -105,15 +129,8 @@ export default function WebMCPQuoteTool() {
       contactName: get("contactName"),
       contactPhone: get("contactPhone"),
     };
-    const r = runGetQuote(args);
-    const out = form.querySelector("#webmcp-quote-output") as HTMLElement | null;
-    if (!out) return;
-    if (r.ok) {
-      out.textContent = `✅ 草稿已建立\n\n${r.message}\n\nLINE: ${r.lineUrl}\nmailto: ${r.mailtoUrl}\n\n下一步：\n${(r.next ?? []).join("\n")}`;
-    } else {
-      out.textContent = `❌ 欄位不完整\n\n${(r.errors ?? []).join("\n")}`;
-    }
-    out.hidden = false;
+    setCopyState("idle");
+    setResult(runGetQuote(args) as QuoteResult);
   }
 
   return (
@@ -125,7 +142,7 @@ export default function WebMCPQuoteTool() {
         不用靠模擬點擊表單。人可直接在下面手動填——同一套邏輯。
       </p>
 
-      <form onSubmit={onSubmit} noValidate>
+      <form onSubmit={onSubmit} onInput={onInput} noValidate>
         <div className="form-row">
           <label>出發地 <input name="from" required aria-label="出發地" placeholder="例：台北" /></label>
           <label>目的地 <input name="to" required aria-label="目的地" placeholder="例：阿里山" /></label>
@@ -143,7 +160,24 @@ export default function WebMCPQuoteTool() {
           <label>備註(可選) <input name="notes" aria-label="備註" placeholder="例：含午餐" /></label>
         </div>
         <button type="submit">送出報價請求（產生 LINE 深連結）</button>
-        <pre id="webmcp-quote-output" hidden className="quote-result" aria-live="polite"></pre>
+        <pre id="webmcp-quote-output" hidden={!result} className="quote-result" aria-live="polite">
+          {result ? summaryText(result) : ""}
+        </pre>
+        {result?.ok && result.lineUrl && result.message ? (
+          <div className="quote-actions" data-testid="quote-actions">
+            <a className="btn" href={result.lineUrl} target="_blank" rel="noopener noreferrer">
+              開啟 LINE 詢價（{LINE_OA_CODE}）
+            </a>{" "}
+            <button type="button" onClick={() => copyMessage(result.message as string)}>
+              複製詢價內容
+            </button>{" "}
+            {result.mailtoUrl ? <a href={result.mailtoUrl}>改用 Email 詢價</a> : null}
+            <p className="quote-note" role="status">
+              {copyState === "copied" ? "已複製。" : copyState === "failed" ? "無法自動複製，請手動選取上方內容。" : ""}
+              手機 LINE 會帶入詢價內容，確認後由您自行按送出；電腦版 LINE 不支援自動帶入，請複製內容後加入 {LINE_OA_CODE} 傳送。
+            </p>
+          </div>
+        ) : null}
       </form>
     </section>
   );

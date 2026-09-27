@@ -22,8 +22,9 @@ function section(title) { console.log(`\n=== ${title} ===`); }
 
 // -------- 常數 --------
 section("constants");
-check("LINE_OA_CODE", LINE_OA_CODE === "@fuyuntravel", `got ${LINE_OA_CODE}`);
-check("LINE_BASE prefix", LINE_BASE.startsWith("https://line.me/R/ti/p/@fuyuntravel"), `got ${LINE_BASE}`);
+// 官網公開 LINE 按鈕的官方帳號（2026-09-27 核對 fuyuntravel.com 各頁皆為 @954fyicw）
+check("LINE_OA_CODE = 官網官方帳號", LINE_OA_CODE === "@954fyicw", `got ${LINE_OA_CODE}`);
+check("LINE_BASE = 官方帳號頁（@ 編碼）", LINE_BASE === "https://line.me/R/ti/p/%40954fyicw", `got ${LINE_BASE}`);
 check("FALLBACK_EMAIL", /^yunyi6866@gmail\.com$/.test(FALLBACK_EMAIL), `got ${FALLBACK_EMAIL}`);
 
 // -------- validateQuote --------
@@ -115,23 +116,45 @@ section("buildQuoteMessage");
 
 // -------- buildLineUrl --------
 section("buildLineUrl");
+// LINE 官方格式：https://line.me/R/oaMessage/{percent-encoded LINE ID}/?{percent-encoded text}
+const OA_PREFIX = "https://line.me/R/oaMessage/%40954fyicw/?";
+function decodeOaMessage(url) {
+  const u = new URL(url);
+  return { path: u.pathname, hash: u.hash, text: decodeURIComponent(u.search.slice(1)), rawQuery: u.search.slice(1) };
+}
 {
   const msg = "測試訊息 123";
   const url = buildLineUrl(msg);
-  check("LINE url 前綴", url.startsWith(LINE_BASE + "?text="), url);
-  check("LINE url 編碼", decodeURIComponent(url.slice(LINE_BASE.length + 6)) === msg, url);
+  check("oaMessage 前綴（官方帳號、@→%40）", url.startsWith(OA_PREFIX), url);
+  check("不再使用 /ti/p/?text= 形式", !url.includes("/ti/p/") && !url.includes("text="), url);
+  const d = decodeOaMessage(url);
+  check("路徑 /R/oaMessage/%40954fyicw/", d.path === "/R/oaMessage/%40954fyicw/", d.path);
+  check("解碼後內文一致", d.text === msg, d.text);
+}
+{
+  const msg = "第一行\n第二行 a&b=c#d?e+f %20 /斜線";
+  const url = buildLineUrl(msg);
+  const d = decodeOaMessage(url);
+  check("中文、換行、& = # ? + % / 完整往返", d.text === msg, JSON.stringify(d.text));
+  check("原始查詢字串無未編碼的 & # 或換行", !/[&#\n]/.test(d.rawQuery) && d.hash === "", d.rawQuery.slice(0, 60));
+  check("只編碼一次（查詢字串 === encodeURIComponent(內文)）", d.rawQuery === encodeURIComponent(msg), d.rawQuery.slice(0, 80));
 }
 {
   const url = buildLineUrl("");
-  check("空訊息 → 純 base", url === LINE_BASE, url);
+  check("空訊息 → 官方帳號頁", url === LINE_BASE, url);
 }
 {
   const url = buildLineUrl(null);
-  check("null → 純 base", url === LINE_BASE, url);
+  check("null → 官方帳號頁", url === LINE_BASE, url);
 }
 {
-  const url = buildLineUrl("a&b=c#d?e");
-  check("特殊字元不破坏 url", ["&", "=", "#", "?"].every(c => !url.includes(`?text=a&b=${c}`) || url.includes(`text=a%26b%3D`)) , url);
+  const fields = { from: "台北車站", to: "九份 & 十分", date: "2026-11-20", party: 18, luggage: "5 件", contactName: "測試旅客", contactPhone: "0900-000-000", notes: "合成測試#請勿回覆\n第二行" };
+  const msg = buildQuoteMessage(fields);
+  const d = decodeOaMessage(buildLineUrl(msg));
+  check("八欄訊息經 LINE URL 往返後完全相同", d.text === msg, JSON.stringify(d.text).slice(0, 120));
+  for (const v of ["台北車站", "九份 & 十分", "2026-11-20", "18 人", "5 件", "測試旅客", "0900000000", "合成測試#請勿回覆"]) {
+    check(`訊息保留 ${v}`, d.text.includes(v), d.text);
+  }
 }
 
 // -------- buildMailto --------

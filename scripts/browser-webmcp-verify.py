@@ -123,7 +123,7 @@ def main():
             execres = state.get("exec") or {}
             check("executeTool 回 ok=true", execres.get("ok") is True, str(execres)[:300] + f" | execErr={state.get('execErr')}")
             line_url = execres.get("lineUrl") or ""
-            check("executeTool 回傳 LINE 深連結", "line.me/R/ti/p/" in line_url, line_url[:80])
+            check("executeTool 回傳 LINE oaMessage 預填連結", "line.me/R/oaMessage/%40954fyicw/?" in line_url, line_url[:80])
             check("executeTool 回傳 message 含 12 人", "12 人" in (execres.get("message") or ""), (execres.get("message") or "")[:80])
             if execres.get("message"):
                 print("  --- executeTool message 前 6 行 ---")
@@ -145,7 +145,9 @@ def main():
         for ln in out_text.splitlines()[:8]:
             print("   |", ln)
         check("表單提交 → 顯示「草稿已建立」", "草稿已建立" in out_text, out_text[:120])
-        check("表單提交 → 顯示 LINE 連結", "line.me" in out_text, out_text[:120])
+        check("表單提交 → 顯示 LINE 連結", "line.me/R/oaMessage/" in out_text, out_text[:120])
+        line_href = page.locator('[data-testid="quote-actions"] a[href^="https://line.me/R/oaMessage/"]').get_attribute("href") or ""
+        check("表單提交 → 可點擊的 LINE 詢價連結", line_href.startswith("https://line.me/R/oaMessage/%40954fyicw/?"), line_href[:80])
 
         print("\n=== 頁面 console 末 10 行 ===")
         for l in logs[-10:]:
