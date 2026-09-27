@@ -11,6 +11,7 @@ import {
   LINE_OA_CODE,
   LINE_BASE,
   FALLBACK_EMAIL,
+  todayInTaipei,
 } from "../lib/webmcp-quote-utils.mjs";
 
 let passed = 0, failed = 0;
@@ -30,21 +31,21 @@ check("FALLBACK_EMAIL", /^yunyi6866@gmail\.com$/.test(FALLBACK_EMAIL), `got ${FA
 // -------- validateQuote --------
 section("validateQuote");
 {
-  const r = validateQuote({ from: "台北", to: "阿里山", date: "2026-09-05", party: 12 });
-  check("valid 台北→阿里山 2026-09-05 12人", r.ok === true && r.normalized.party === 12, JSON.stringify(r));
+  const r = validateQuote({ from: "台北", to: "阿里山", date: "2030-09-05", party: 12 });
+  check("valid 台北→阿里山 2030-09-05 12人", r.ok === true && r.normalized.party === 12, JSON.stringify(r));
   check("valid normalized.from", r.normalized.from === "台北");
-  check("valid normalized.date", r.normalized.date === "2026-09-05");
+  check("valid normalized.date", r.normalized.date === "2030-09-05");
 }
 {
   const r = validateQuote({ party: 12 });
   check("missing from/to/date → !ok", r.ok === false && r.errors.length >= 3, JSON.stringify(r.errors));
 }
 {
-  const r = validateQuote({ from: "台北", to: "阿里山", date: "2026-09-05", party: 0 });
+  const r = validateQuote({ from: "台北", to: "阿里山", date: "2030-09-05", party: 0 });
   check("party=0 → !ok", r.ok === false && /party/.test(r.errors.join(" ")), JSON.stringify(r.errors));
 }
 {
-  const r = validateQuote({ from: "台北", to: "阿里山", date: "2026-09-05", party: 61 });
+  const r = validateQuote({ from: "台北", to: "阿里山", date: "2030-09-05", party: 61 });
   check("party=61 → !ok", r.ok === false, JSON.stringify(r.errors));
 }
 {
@@ -62,15 +63,15 @@ section("validateQuote");
 }
 {
   const long = "x".repeat(200);
-  const r = validateQuote({ from: long, to: "阿里山", date: "2026-09-05", party: 12 });
+  const r = validateQuote({ from: long, to: "阿里山", date: "2030-09-05", party: 12 });
   check("from 過長 → !ok", r.ok === false, "");
 }
 {
-  const r = validateQuote({ from: "  台北  ", to: "  阿里山  ", date: " 2026-09-05 ", party: "12" });
+  const r = validateQuote({ from: "  台北  ", to: "  阿里山  ", date: " 2030-09-05 ", party: "12" });
   check("whitespace trim + 字串轉數字", r.ok === true && r.normalized.from === "台北" && r.normalized.party === 12, JSON.stringify(r.normalized));
 }
 {
-  const r = validateQuote({ from: "", to: "阿里山", date: "2026-09-05", party: 12 });
+  const r = validateQuote({ from: "", to: "阿里山", date: "2030-09-05", party: 12 });
   check("from=空字串 → !ok", r.ok === false && /from/.test(r.errors.join(" ")), JSON.stringify(r.errors));
 }
 
@@ -78,14 +79,14 @@ section("validateQuote");
 section("buildQuoteMessage");
 {
   const msg = buildQuoteMessage({
-    from: "台北", to: "阿里山", date: "2026-09-05", party: 12,
+    from: "台北", to: "阿里山", date: "2030-09-05", party: 12,
     luggage: "3 件", notes: "含午餐",
     contactName: "黃先生", contactPhone: "0912345678",
   });
   check("msg header", msg.startsWith("【浮雲包車報價請求】"), msg.slice(0, 60));
   check("msg 出發地", msg.includes("出發地: 台北"));
   check("msg 目的地", msg.includes("目的地: 阿里山"));
-  check("msg 日期", msg.includes("日期: 2026-09-05"));
+  check("msg 日期", msg.includes("日期: 2030-09-05"));
   check("msg 人數", msg.includes("人數: 12 人"));
   check("msg 行李", msg.includes("行李件數: 3 件"));
   check("msg 備註", msg.includes("備註: 含午餐"));
@@ -94,7 +95,7 @@ section("buildQuoteMessage");
 }
 {
   // 缺欄位 → 不 crash，欄位留空
-  const msg = buildQuoteMessage({ from: "台北", to: "阿里山", date: "2026-09-05", party: 12 });
+  const msg = buildQuoteMessage({ from: "台北", to: "阿里山", date: "2030-09-05", party: 12 });
   check("空行李不出現", !msg.includes("行李件數"), "");
   check("空備註不出現", !msg.includes("備註:"), "");
   check("缺聯絡人 fallback", msg.includes("(未填)"));
@@ -102,16 +103,26 @@ section("buildQuoteMessage");
 {
   {
     const big = "x".repeat(200);
-    const r = validateQuote({ from: big, to: "阿里山", date: "2026-09-05", party: 12 });
+    const r = validateQuote({ from: big, to: "阿里山", date: "2030-09-05", party: 12 });
     check("from 過長 → !ok（校驗嚴格，不靜默截斷）", r.ok === false && /from/.test(r.errors.join(" ")), JSON.stringify(r.errors));
   }
   {
     const big = "x".repeat(500);
-    const msg = buildQuoteMessage({ from: big, to: "阿里山", date: "2026-09-05", party: 12, notes: big });
+    const msg = buildQuoteMessage({ from: big, to: "阿里山", date: "2030-09-05", party: 12, notes: big });
     // 過長欄位 → buildQuoteMessage 中 textOk 回 null → 顯示為空
     check("過長 from → 顯示為空", msg.includes("出發地: \n"), JSON.stringify(msg.slice(0, 60)));
     check("過長 notes 截到 ≤160", !msg.includes("x".repeat(161)), "");
   }
+}
+
+// -------- past dates (business timezone Asia/Taipei) --------
+section("past dates");
+{
+  const r = validateQuote({ from: "台北", to: "阿里山", date: "2026-09-26", party: 12 }, { today: "2026-09-27" });
+  check("昨天 → !ok 且說明不可早於今天", r.ok === false && r.errors.some((e) => e.includes("不可早於今天")), JSON.stringify(r.errors));
+  const t = validateQuote({ from: "台北", to: "阿里山", date: "2026-09-27", party: 12 }, { today: "2026-09-27" });
+  check("今天 → ok", t.ok === true, JSON.stringify(t.errors));
+  check("todayInTaipei 以台灣時區換日", todayInTaipei(new Date("2026-09-27T16:30:00Z")) === "2026-09-28" && todayInTaipei(new Date("2026-09-27T15:30:00Z")) === "2026-09-27");
 }
 
 // -------- buildLineUrl --------

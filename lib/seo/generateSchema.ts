@@ -83,7 +83,8 @@ export function touristTripSchema(args: {
     url: absoluteUrl(args.path),
     touristType: "general",
     duration: `P${args.days}D`,
-    startDate: args.departureDate,
+    // schema.org expects ISO 8601; source data uses YYYY/MM/DD.
+    startDate: args.departureDate?.split("/").join("-"),
     areaServed: "Taiwan",
     location: args.region
       ? { "@type": "Place", name: `${args.region}（台灣）` }

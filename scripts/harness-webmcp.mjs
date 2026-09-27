@@ -74,7 +74,7 @@ console.log("\n=== Step 3: executeTool(name, args)（agent 調用）===");
 {
   // 3a: 正常路徑
   const r = globalThis_.document.modelContext.executeTool("get_quote", {
-    from: "台北", to: "阿里山", date: "2026-09-05", party: 12, luggage: "3 件", contactName: "黃先生", contactPhone: "0912345678",
+    from: "台北", to: "阿里山", date: "2030-09-05", party: 12, luggage: "3 件", contactName: "黃先生", contactPhone: "0912345678",
   });
   check("ok=true", r.ok === true, JSON.stringify(r));
   check("message 非空", r.message && r.message.includes("台北"));
@@ -96,7 +96,7 @@ console.log("\n=== Step 3: executeTool(name, args)（agent 調用）===");
   check("不存在日期 → errors 提到 date", (bad2.errors || []).join(" ").includes("date"));
 
   // 3d: party 越界
-  const bad3 = globalThis_.document.modelContext.executeTool("get_quote", { from: "台北", to: "阿里山", date: "2026-09-05", party: 9999 });
+  const bad3 = globalThis_.document.modelContext.executeTool("get_quote", { from: "台北", to: "阿里山", date: "2030-09-05", party: 9999 });
   check("party=9999 → ok=false", bad3.ok === false);
 
   // 3e: 未註冊 tool

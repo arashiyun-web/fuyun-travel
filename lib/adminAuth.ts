@@ -1,4 +1,7 @@
-import { createHmac, scryptSync, timingSafeEqual } from "crypto";
+import { createHmac, scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt) as (password: string, salt: string, keylen: number) => Promise<Buffer>;
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const MIN_SECRET_LENGTH = 32;
@@ -42,7 +45,8 @@ function sign(payload: string) {
   return secret ? createHmac("sha256", secret).update(payload).digest("base64url") : null;
 }
 
-export function validateAdminCredentials(username: unknown, password: unknown) {
+/** Async scrypt so a login attempt never blocks the event loop for other requests. */
+export async function validateAdminCredentials(username: unknown, password: unknown): Promise<boolean> {
   const configuredUsername = adminUsername();
   const salt = process.env.ADMIN_PASSWORD_SALT?.trim() || "";
   const encodedHash = process.env.ADMIN_PASSWORD_HASH?.trim() || "";
@@ -53,7 +57,7 @@ export function validateAdminCredentials(username: unknown, password: unknown) {
   try {
     const expected = Buffer.from(encodedHash, "hex");
     if (expected.length === 0) return false;
-    const actual = scryptSync(password, salt, expected.length);
+    const actual = await scryptAsync(password, salt, expected.length);
     return timingSafeEqual(expected, actual);
   } catch {
     return false;
@@ -80,6 +84,8 @@ export function verifyAdminToken(authHeader: string | null) {
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
   const [payload, signature, extra] = token.split(".");
   if (!payload || !signature || extra !== undefined) return null;
+  // Fail closed: removing any admin setting (e.g. to disable admin access) also revokes issued sessions.
+  if (!isAdminAuthConfigured()) return null;
 
   const expected = sign(payload);
   if (!expected) return null;
