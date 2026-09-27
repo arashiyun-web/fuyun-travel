@@ -27,8 +27,36 @@
 - app/admin/page.tsx：移除帳號預填
 - scripts/provision-admin-credentials.mjs：產生隨機密碼／hash／JWT_SECRET，寫到 %USERPROFILE%\.fuyun-secrets（ACL 限本人），不輸出任何值
 - 測試：node --test scripts/admin-auth.test.mjs，8/8 PASS（Node v24.16.0）
-- 未完成：乾淨 build 被 §3 的既有錯誤阻擋；尚未推送；正式站未套用
-- 正式站是否仍接受舊憑證：未驗證（對正式站的 live probe 被 auto-mode 拒絕，需持有人核准）
+- worktree：Documents\Codex\2026-05-31\fuyun-travel-sec，commit 5f52a83（伺服器端）＋ 2ee8034（建置修復與公開 JS），僅本機，未推送
 
-## 5. 其他風險
-- public/platform/app.js 的 demo OWNER_ACCOUNT 在公開 JS 中含明文 demo 密碼（僅 localStorage demo，不經伺服器登入）；需確認該密碼未在其他地方重用
+### 4.1 建置修復（2ee8034）
+- 錯誤 1：app/services/page.tsx(6,10) TS2305，charterFaqPageSchema 不存在 → 在 lib/seo/generateSchema.ts 新增，重用 faqSchema，每題前加【車型】，避免兩車型報價混用
+- 錯誤 2：components/WebMCPQuoteTool.tsx(23,46)(24,30) TS2307，lib/webmcp-tool、lib/webmcp-quote-utils 未提交 → 此元件無任何引用，本分支移除；待 GX10 WebMCP 交接合併時恢復（不在 8940 平行重做）
+
+### 4.2 public/platform/app.js（2ee8034）
+- 原本判斷是 demo，這是錯的：OWNER_ACCOUNT 的密碼與舊管理員密碼完全相同，而且此頁由首頁與 /admin 連入、會呼叫 /api/auth/login，是正式登入入口
+- 已移除前端帳號；一律先走伺服器登入，失敗才落回 localStorage 的虛構示範帳號（admin／editor／customer，僅在瀏覽器本地）
+- 載入時清除舊版快取在瀏覽器中的 u-owner 紀錄；app.js 快取參數改為 admin-auth-hardening-20260927
+
+### 4.3 驗證（2026-09-27，C:\Program Files\nodejs\node.exe v24.16.0）
+- 證據位於主工作樹 recover/20260927-phase2-pre-integration/evidence/（不入 git）：01 baseline tsc EXIT=1（3 個錯誤）；02 修復後 tsc EXIT=0；03 next build（未設任何管理 env）EXIT=0；04 本機整合；05 390px 截圖
+- 本機 next start（127.0.0.1，未碰正式站）：
+  - 有設定：12/12 PASS（舊憑證 401；舊 fallback key 簽發的 token，新舊格式均 403；新憑證 200）
+  - 無設定：8/8 PASS（login 503；/ 與 /services 200；FAQPage JSON-LD 存在）
+- 真瀏覽器（Playwright，localhost）：
+  - 錯誤帳密：呼叫伺服器後失敗，停在 #login，沒有 admin_token
+  - 虛構 customer 帳號可登入並導向 #member
+  - 真正重載後，舊 u-owner 紀錄已清除
+- 最終 build（BUILD_ID Z_fd1f7EQHGR4Pta7Mxm0）的 .next 掃描：不含舊密碼與舊 fallback key。原始碼只剩 app/admin/page.tsx.v1.bak 含舊帳號名（不含密碼，Next 不會提供此檔）
+
+### 4.4 未完成
+- 未推送、未做 Preview，正式站未套用
+- 正式站曝險：UNKNOWN。正式站 deployment iklolu4l1 的來源未核；依指示未對正式站送出舊憑證
+- 若正式站提供的是舊版 platform/app.js，舊管理員密碼等同已公開在網站 JS 中。部署修補時必須同時在正式環境設定新的 ADMIN_* 與 JWT_SECRET，並把舊密碼視為已洩漏
+
+## 5. 權限拒絕紀錄
+- 2026-09-27 第一輪兩次拒絕，工具都是 Bash，來源是 Claude Code auto mode classifier：
+  - 對正式站送出舊憑證：標註 Production Reads
+  - 讀 app/services/page.tsx 等：server-side 分類器，未說明原因
+- 兩次都不是 settings 明確 deny，也不是 hook、工作目錄界線或 OS／沙箱限制
+- 持有人確認範圍後，改用 Read 讀專案檔成功。對正式站的主動測試依指示不再執行
