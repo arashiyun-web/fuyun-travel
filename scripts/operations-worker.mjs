@@ -5,8 +5,11 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 async function loadLocalEnvironment() {
-  for (const fileName of [".env.local", ".env"]) {
-    const filePath = path.join(projectRoot, fileName);
+  // A service run points OPERATIONS_WORKER_ENV_FILE at a protected config file; development
+  // runs fall back to the project's .env.local / .env. Existing process env always wins.
+  const explicit = process.env.OPERATIONS_WORKER_ENV_FILE;
+  const files = explicit ? [explicit] : [path.join(projectRoot, ".env.local"), path.join(projectRoot, ".env")];
+  for (const filePath of files) {
     let contents;
     try {
       contents = await readFile(filePath, "utf8");
@@ -55,6 +58,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function processAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
 async function acquireLock() {
   await mkdir(path.dirname(lockPath), { recursive: true });
   try {
@@ -65,9 +78,13 @@ async function acquireLock() {
     if (error?.code !== "EEXIST") throw error;
     try {
       const contents = await readFile(lockPath, "utf8");
+      const [pidText] = contents.split(":");
       const lockAt = Number(contents.split(":").at(-1));
       const lockStat = await stat(lockPath);
-      if ((Number.isFinite(lockAt) && Date.now() - lockAt > staleLockMs) || Date.now() - lockStat.mtimeMs > staleLockMs) {
+      const stale = (Number.isFinite(lockAt) && Date.now() - lockAt > staleLockMs) || Date.now() - lockStat.mtimeMs > staleLockMs;
+      // A lock left by a crashed worker is taken over at once instead of blocking restarts
+      // until it goes stale (process.kill(pid, 0) only checks existence).
+      if (stale || !processAlive(Number(pidText))) {
         await unlink(lockPath);
         return acquireLock();
       }
