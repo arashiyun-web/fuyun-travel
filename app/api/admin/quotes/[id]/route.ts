@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { unauthorized, verifyAdminRequest } from "@/lib/adminQuoteAuth";
+import { unauthorized, verifyAdminMutation, verifyAdminRequest } from "@/lib/adminQuoteAuth";
 import { prisma } from "@/lib/prisma";
 import { cleanText } from "@/lib/quoteWorkflow";
 
@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  if (!verifyAdminRequest(request)) return unauthorized();
+  if (!verifyAdminMutation(request)) return unauthorized();
   const body = await request.json().catch(() => ({}));
   const quote = await prisma.charterQuote.update({
     where: { id: params.id },

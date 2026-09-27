@@ -17,15 +17,16 @@ type Quote = {
   sentAt: string | null;
 };
 
-export default function QuoteEditPage({ params, searchParams }: { params: { id: string }; searchParams: { admin_token?: string } }) {
-  const adminToken = searchParams.admin_token || "";
+export default function QuoteEditPage({ params }: { params: { id: string } }) {
+  // Authenticated by the HttpOnly admin session cookie (same-origin fetch); no token in the URL.
   const [quote, setQuote] = useState<Quote | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   async function loadQuote() {
-    const response = await fetch(`/api/admin/quotes/${params.id}?admin_token=${encodeURIComponent(adminToken)}`, { cache: "no-store" });
+    const response = await fetch(`/api/admin/quotes/${params.id}`, { cache: "no-store" });
     const data = await response.json();
+    if (response.status === 401) throw new Error("請先在 /admin 登入管理員");
     if (!response.ok || !data.success) throw new Error(data.error || "讀取失敗");
     setQuote(data.quote);
   }
@@ -34,7 +35,7 @@ export default function QuoteEditPage({ params, searchParams }: { params: { id: 
     if (!quote) return;
     setMessage("");
     setError("");
-    const response = await fetch(`/api/admin/quotes/${params.id}?admin_token=${encodeURIComponent(adminToken)}`, {
+    const response = await fetch(`/api/admin/quotes/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -52,7 +53,7 @@ export default function QuoteEditPage({ params, searchParams }: { params: { id: 
   async function sendQuote() {
     setMessage("");
     setError("");
-    const response = await fetch(`/api/admin/quotes/${params.id}/send?admin_token=${encodeURIComponent(adminToken)}`, { method: "POST" });
+    const response = await fetch(`/api/admin/quotes/${params.id}/send`, { method: "POST" });
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.error || "送出失敗");
     setQuote(data.quote);
@@ -64,14 +65,13 @@ export default function QuoteEditPage({ params, searchParams }: { params: { id: 
     loadQuote().catch((err) => setError(err instanceof Error ? err.message : "讀取失敗"));
   }, []);
 
-  if (!adminToken) return <div className="p-6 text-red-300">缺少 admin_token。</div>;
   if (error && !quote) return <div className="p-6 text-red-300">{error}</div>;
   if (!quote) return <div className="p-6 text-slate-300">讀取中...</div>;
 
   return (
     <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-6">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-2">
-        <Link href={`/admin/quotes?admin_token=${encodeURIComponent(adminToken)}`} className="text-xs text-amber-400">返回詢價清單</Link>
+        <Link href="/admin/quotes" className="text-xs text-amber-400">返回詢價清單</Link>
         <h1 className="text-xl font-bold text-amber-400">編輯正式報價</h1>
         <p className="text-xs text-slate-500">{quote.pickup || "未填"} → {quote.destination || "未填"} / {quote.passengerCount || "-"} 人 / {quote.tripDate || "未填日期"}</p>
       </div>
