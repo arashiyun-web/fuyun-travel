@@ -30,6 +30,9 @@ export interface StoredImage {
   fileName: string;
   publicUrl?: string;
   instagramPublicUrl?: string;
+  /** Object-store key (database mode); objects are private and served through the admin route. */
+  storageKey?: string;
+  instagramStorageKey?: string;
 }
 
 export interface PlatformDraft {

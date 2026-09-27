@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminMutationRequest } from "@/lib/adminAuth";
+import { operationsErrorResponse } from "@/lib/operations/http";
 import { recordFacebookManualResult } from "@/lib/operations/store";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,6 @@ export async function POST(request: NextRequest, { params }: { params: { jobId: 
     const result = await recordFacebookManualResult(params.jobId, body.externalId, body.postUrl);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "人工回填失敗" }, { status: 400 });
+    return operationsErrorResponse(error, "人工回填失敗");
   }
 }

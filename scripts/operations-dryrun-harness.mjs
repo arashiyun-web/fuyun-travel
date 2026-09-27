@@ -51,7 +51,7 @@ const s = state(); const c2 = s.contents.find((c) => c.id === b.content.id); c2.
 await due();
 const c2after = content(b.content.id);
 chk("caption changed after approval → approval invalidated, IG job not run", c2after.platforms.instagram.status === "pending_approval" && c2after.approval.status === "pending" && !c2after.platforms.instagram.approvalHash, `${c2after.platforms.instagram.status}/${c2after.approval.status}`);
-chk("sibling jobs of the invalidated content are not run", ["website", "facebook_group"].every((p) => c2after.platforms[p].status === "queued"), ["website", "facebook_group"].map((p) => c2after.platforms[p].status).join(","));
+chk("sibling jobs of the invalidated content are not run (returned to pending_approval)", ["website", "facebook_group"].every((p) => c2after.platforms[p].status === "pending_approval" && c2after.platforms[p].attempts === 0), ["website", "facebook_group"].map((p) => c2after.platforms[p].status).join(","));
 chk("approval_invalidated event recorded", state().events.some((e) => e.type === "approval_invalidated" && e.contentId === b.content.id));
 // 6. lease expiry (simulated crash mid-publish)
 const c = await post(intake("合成測試 墾丁", "合成測試內容三。"));
