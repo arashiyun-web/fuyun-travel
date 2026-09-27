@@ -181,3 +181,63 @@
 - 兩個目錄 ACL：SYSTEM＋Administrator
 - 範圍僅限 file 模式營運資料；Neon DB 與 R2 未備份還原
 - C:\fuyun_backup 內有其他服務的每小時 DB dump，ACL 含 Authenticated Users:M，屬外部風險，未更動
+
+## 9. 第五輪（2026-09-27 21:40–22:20）：PR #32 LINE 詢價修正、worker 整合
+### 9.1 LINE 詢價（PR #32 新 HEAD a762709f0a9d664b69b36162391c2130e85441e1）
+- 公開正式頁 /、/contact、/charter-bus/taipei、/download 的 LINE 連結全部是 @954fyicw
+  - 程式中的 @fuyuntravel 找不到與前者為同一帳號的依據 → 改用 @954fyicw
+- 新增 lib/config/line.mjs 作為單一來源：解析公開 NEXT_PUBLIC_LINE_OA_URL／NEXT_PUBLIC_LINE_URL，fallback @954fyicw
+  - COMPANY.line（也用於社群 caption）、WebMCP 工具、詢價表單、/download 全部改用它
+- 依 LINE 官方文件，預填改為 https://line.me/R/oaMessage/{encodeURIComponent(ID)}/?{encodeURIComponent(text)}
+  - /R/ti/p/ 只開帳號頁，不能預填
+  - URL scheme 只支援 iOS／Android，電腦版 LINE 不支援
+- 表單：保留文字預覽；新增可鍵盤操作的「開啟 LINE 詢價（@954fyicw）」連結、複製按鈕、Email 連結、電腦版提示
+  - 以 React state 安全渲染
+  - 欄位被修改或送出錯誤時清掉舊草稿
+- 測試：line-config 3/3；WebMCP quote 51/51（新的 9 項斷言在 b7c2628 上會失敗，證明能抓到這個問題）；harness 23/23；admin 11/11；IG 4/4＋10/10；tsc／build EXIT=0
+- 真瀏覽器（390px、無原生 WebMCP）：
+  - 連結指向 oaMessage/%40954fyicw，target=_blank、rel=noopener noreferrer
+  - 8 欄往返完整
+  - 可聚焦；輸入 HTML 只當文字顯示
+  - 修改或錯誤後沒有殘留連結
+  - 證據：evidence/14、15
+- Git Preview dpl_3JBgREus6Y1n2R5XFKoqacFAYYGc（sha a762709，source=git）：22/22 PASS；client bundle LINE 檢查 8/8 PASS（evidence/16）
+  - 首次 7 個 FAIL 屬於誤報：來自無關的 wa.me/?text= WhatsApp 按鈕；縮窄檢查範圍後重跑全 PASS
+- MOBILE_CHAT_PREFILL=NOT_TESTED（需實體 iOS／Android LINE）
+- PR #32：REVIEW_REQUIRED（main 需 1 個核准）；描述已更新為新 HEAD 的驗證結果
+### 9.2 worker 整合（feat/ops-worker-integration-20260927 = 01f78772a1b961225ab29bf8008b3ece07787838，已推送）
+- 基底：feat/ops-content-guard-20260927 ← b7c2628
+- 帶入 8940 未提交的營運新檔 16 個（掃描乾淨）
+  - 未帶入：舊 adminAuth、deploy-production*.ps1、recover、rotate 腳本（已被取代）
+  - lib/social/instagram-login-v2.ts 與 GX10 版本相同；instagram-oauth.ts 只差 3 個 export
+- 核准綁定：
+  - 核准時存 approvalHash（caption、圖片 sha、平台、目標帳號）
+  - claim 時比對不符 → 撤銷核准、job 回 pending_approval、記錄 approval_invalidated
+  - claim 另要求內容本身為 approved
+- 收件時每個平台 caption 記錄 factCheck（contentGuard；員工填的出發日期視為已核准日期）
+- 修正既有問題：runDueJobs 不再自動重取 manual_required（避免把 FB 待人工的 job 改成 dry_run 結果，也避免 attempts 無限增加）
+- data/operations/ 加入 .gitignore
+- 隔離乾跑 17/17 PASS（evidence/17；腳本 scripts/operations-dryrun-harness.mjs）
+  - 同內容去重
+  - 兩個 process-due 並行時，每個 job 只被 claim 一次；完成後重跑不會重送
+  - 兩個 worker 程序競爭鎖：一個執行，另一個退出（exit 1）
+  - 核准後竄改 → 核准失效，其他平台 job 也不跑
+  - lease 逾時 → 轉為待核對、不重送，其他平台照常
+  - manual_required 不會被自動 claim
+- 測試環境：temp OPERATIONS_DATA_DIR、temp 管理與 cron 憑證（已刪除）、無 IG env、live 發布開關未設
+- 尚未完成：worker 常駐（Windows task／supervisor）、接真實 Neon＋R2 的 database 模式、與正式部署整合
+  - 此分支須等 PR #32 合併後再 rebase 到 main，另開 PR
+### 9.3 C:\fuyun_backup（只讀盤點，未修改）
+- 狀態：48 個每小時 fuyun_ai_platform_*.sql.gz，最新 2026-09-27 22:00
+- 檔案 owner：BUILTIN\Administrators；不是由本機任何 scheduled task 寫入；WSL／docker 均停止；SMB 只有管理共享 C$
+- ACL 繼承自 C:\：Administrators、SYSTEM Full；Users RX；Authenticated Users Modify
+- 最小調整方案（未套用）：
+  - 停止繼承，只保留 Administrators、SYSTEM
+  - 移除 Users RX 與 Authenticated Users Modify
+  - 寫入方具管理員權限，理論上不受影響；套用前需先確認寫入來源（可能是其他主機經由 C$ 寫入）並觀察下一個整點備份是否正常
+### 9.4 仍未完成
+- Neon 與 R2 的備份及還原
+- IG／FB／LINE 真實接線
+- 四篇文章標題
+- adminQuoteAuth 的 URL token（應改為 header／cookie）
+- 開機未登入的實測
