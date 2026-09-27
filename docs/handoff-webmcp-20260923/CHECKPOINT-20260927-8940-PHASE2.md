@@ -85,3 +85,43 @@
   - dpl_hJXzjauBmRhS4BMKTMcCnhq5Sgqh（有新 env）：舊密碼 401；舊 fallback key 簽發的 token（新舊格式）403；新密碼 200；新 token 200；無 token 403
 - 正式部署尚未執行：本分支沒有 GX10 WebMCP 程式，直接上線會使 7 個 /charter-bus 頁面失去 WebMCP 報價表單，需持有人決定
 - 證據：主工作樹 recover/20260927-phase2-pre-integration/evidence/06、07
+
+## 7. 第三輪（2026-09-27 17:00–18:00，接續 42cfbed）
+### 7.1 分支推送
+- origin/fix/admin-auth-hardening-20260927：REMOTE_SHA = LOCAL_HEAD = 42cfbed72d220678cd2cc74d8966cacd9de54b0e
+- 推送前掃描新增行：不含舊／新秘密值；generic key pattern 0；無 evidence、env、recover 檔
+- repo 為 PUBLIC，代表舊密碼與舊 fallback key 一直存在公開的 git 歷史中；不重寫歷史，以更換秘密處理
+### 7.2 Vercel 部署權限
+- 原始拒絕：dpl_FJdzDhkpTBUaid7t81r4xrwy8BEA「The deployment was blocked because the commit author doesn't have permission to create deployments for this project.」
+  - 路徑：CLI 部署，附 git metadata；commit author／committer 均為 Codex Deploy <codex-deploy@fuyuntravel.com>（repo 本地 git config）
+- clean export 的 Preview（dpl_HL9ue…、dpl_hJXzj…）只作建置隔離證據，不 promote
+- 正規路徑（官方 troubleshoot-project-collaboration 文件：公開 repo 的協作免費）：推送分支後，Vercel Git 整合自動建立 dpl_AsZKPVqhcuLY4CqwyH9ipJue2Xa4
+  - source=git、sha=42cfbed、ref=本分支、author=Codex Deploy，READY
+  - 驗證 13/13 PASS（evidence/08）
+  - 正式部署走 PR 合併 main → Git 整合；作者身份未偽造、metadata 未刪
+### 7.3 WebMCPQuoteTool 移除審查：確認是功能退步，不是孤立元件
+- 正式站 /charter-bus/* 的公開 HTML 含報價請求表單（出發地、目的地、日期、人數…「送出報價請求（產生 LINE 深連結）」），並引用 webmcp
+- 候選移除此元件後，7 個 /charter-bus 頁會失去客戶詢價入口
+- 8940 所有磁碟與本機 clone 的 git 歷史均無 lib/webmcp-*；下載正式來源被 auto-mode 拒絕（Production Reads）
+- 結論：候選不可直接取代正式站。需 GX10 交接（或持有人授權取得正式 deployment 的 WebMCP 相關檔案）後整合再部署
+### 7.4 本地小模型（Ollama 0.34.4，winget Ollama.Ollama，原生 Windows）
+- qwen3:4b（Ollama 預設標籤為 Thinking 變體）：推理文字直接輸出為內容，think:false 與 /no_think 均無效；每題 58–209 s → 不適用，已移除
+- qwen3:4b-instruct（Qwen3-4B-Instruct-2507，Q4_K_M，2.5 GB 檔案）：
+  - 100% CPU（Radeon 780M 未使用）、約 20 tok/s、llama-server 約 3.1 GB 記憶體
+  - TTFT 0.27–0.44 s（冷載入 3.1 s），完整回應 2.5–21 s
+- 品質：FAQ 價格正確；未知價格回「待確認＋專人報價」正確；回顧文正常
+  - FAIL：招生文在第 4 輪自行編造住宿、餐食、門票、日期及「14,000 元／人」
+  - 結論：價格規則不能只靠 prompt。worker 需要決定性後檢（金額、日期、包含項目不在核准清單就降為待確認或擋下），並保留人工核准
+- 常駐：
+  - Startup\Ollama.lnk 在「登入」時啟動，不是開機前服務 → BOOT_CONFIGURED=login-autostart；BOOT_VERIFIED=未重開機驗證
+  - 以 explorer 重新啟動後 parent=explorer，與終端無關
+  - 砍掉 server 約 2 s 自動恢復；重複啟動仍只有 1 個實例；只監聽 127.0.0.1
+- 證據：evidence/09a–09d、09-infer-harness.mjs
+### 7.5 秘密與證據
+- .fuyun-secrets 與其中兩個檔案：ACL 只有 SYSTEM＋Administrator
+- 新秘密值不存在於 evidence、docs、scripts（掃描結果 0）
+- evidence 目錄沿用專案 recover ACL（含 CodexSandboxUsers 修改權）；內容已確認不含秘密值
+### 7.6 未完成
+- 正式部署：等 WebMCP 來源
+- operations worker 常駐與整合：等 GX10 IG 來源；現有 8940 版本是 file/database 雙模式＋單例鎖
+- 備份還原、IG/FB/LINE 真實鏈、四篇標題：未做
