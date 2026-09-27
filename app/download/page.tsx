@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LINE_URL } from "@/lib/site";
+import { lineProfileUrl } from "@/lib/config/line";
 
 export const metadata: Metadata = {
   title: "下載 App｜浮雲輕鬆遊",
@@ -48,7 +49,7 @@ export default function DownloadPage() {
       <div style={{ textAlign: "center", marginTop: "2rem" }}>
         <p style={{ marginBottom: "1rem" }}>安裝完成？立即詢價！</p>
         <a
-          href={LINE_URL || "https://line.me/R/ti/p/@fuyuntravel"}
+          href={LINE_URL || lineProfileUrl()}
           target="_blank"
           rel="noopener noreferrer"
           style={{

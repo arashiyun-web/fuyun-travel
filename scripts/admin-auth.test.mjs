@@ -27,19 +27,19 @@ beforeEach(() => {
   for (const key of ["ADMIN_USERNAME", "ADMIN_PASSWORD_SALT", "ADMIN_PASSWORD_HASH", "JWT_SECRET"]) delete process.env[key];
 });
 
-test("rejects every login when admin settings are missing", () => {
+test("rejects every login when admin settings are missing", async () => {
   assert.equal(auth.isAdminAuthConfigured(), false);
-  assert.equal(auth.validateAdminCredentials(USER, PASSWORD), false);
-  assert.equal(auth.validateAdminCredentials("", ""), false);
+  assert.equal(await auth.validateAdminCredentials(USER, PASSWORD), false);
+  assert.equal(await auth.validateAdminCredentials("", ""), false);
   assert.throws(() => auth.createAdminToken(), auth.AdminAuthNotConfiguredError);
 });
 
-test("accepts only the configured username and hashed password", () => {
+test("accepts only the configured username and hashed password", async () => {
   configure();
-  assert.equal(auth.validateAdminCredentials(USER, PASSWORD), true);
-  assert.equal(auth.validateAdminCredentials(USER, "wrong-password"), false);
-  assert.equal(auth.validateAdminCredentials("someone-else", PASSWORD), false);
-  assert.equal(auth.validateAdminCredentials(USER, undefined), false);
+  assert.equal(await auth.validateAdminCredentials(USER, PASSWORD), true);
+  assert.equal(await auth.validateAdminCredentials(USER, "wrong-password"), false);
+  assert.equal(await auth.validateAdminCredentials("someone-else", PASSWORD), false);
+  assert.equal(await auth.validateAdminCredentials(USER, undefined), false);
 });
 
 test("rejects a short signing secret instead of falling back", () => {
@@ -113,4 +113,15 @@ test("cookie-authenticated mutation requires same origin; bearer does not", () =
   assert.equal(auth.verifyAdminMutationRequest(req({ cookie, origin: "https://evil.example" })), null);
   assert.equal(auth.verifyAdminMutationRequest(req({ cookie })), null);
   assert.ok(auth.verifyAdminMutationRequest(req({ authorization: `Bearer ${token}` })));
+});
+
+test("sessions are revoked when any admin setting is removed (fail closed)", async () => {
+  configure();
+  const token = auth.createAdminToken();
+  assert.ok(auth.verifyAdminToken(`Bearer ${token}`));
+  delete process.env.ADMIN_PASSWORD_HASH;
+  assert.equal(auth.verifyAdminToken(`Bearer ${token}`), null);
+  configure();
+  delete process.env.ADMIN_PASSWORD_SALT;
+  assert.equal(auth.verifyAdminRequest(req({ cookie: `${COOKIE}=${token}` })), null);
 });

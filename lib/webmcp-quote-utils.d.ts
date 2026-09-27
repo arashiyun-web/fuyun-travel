@@ -10,7 +10,7 @@ export declare function validateQuote(input: {
   to?: string | null;
   date?: string | null;
   party?: string | number | null;
-}): {
+}, options?: { today?: string }): {
   ok: boolean;
   errors: string[];
   normalized: {
@@ -32,5 +32,6 @@ export declare function buildQuoteMessage(input: {
   contactPhone?: string | null;
 }): string;
 
+export declare function todayInTaipei(now?: Date): string;
 export declare function buildLineUrl(message: string | null): string;
 export declare function buildMailto(message: string | null, subject?: string): string;
