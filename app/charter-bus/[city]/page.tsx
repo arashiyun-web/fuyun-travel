@@ -4,6 +4,7 @@ import { findLocationPage, locationPages } from "@/lib/growthPages";
 import { pageMeta, organizationJsonLd } from "@/lib/site";
 import { generateFaq } from "@/lib/seo/generateFaq";
 import { faqSchema, serviceSchema } from "@/lib/seo/generateSchema";
+import WebMCPQuoteTool from "@/components/WebMCPQuoteTool";
 
 type Props = {
   params: { city: string };
@@ -55,6 +56,9 @@ export default function CharterBusLocationPage({ params }: Props) {
           <Link href="/contact/inquiry">立即報價</Link>
         </div>
       </section>
+
+      {/* WebMCP 試點（experimental, origin-trial；零金流，human-in-the-loop） */}
+      <WebMCPQuoteTool />
 
       <section>
         <h2>FAQ</h2>

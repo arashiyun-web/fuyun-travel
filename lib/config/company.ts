@@ -1,3 +1,5 @@
+import { LINE_OA_ID } from "./line";
+
 export const companyConfig = {
   siteUrl: "https://fuyuntravel.com",
   brandName: "浮雲輕鬆遊",
@@ -57,5 +59,5 @@ export const COMPANY = {
   brand: companyConfig.brandName,
   legalName: `${companyConfig.travelAgencyName}｜${companyConfig.transportCompanyName}`,
   phone: companyConfig.phone,
-  line: "@fuyuntravel",
+  line: LINE_OA_ID,
 };
