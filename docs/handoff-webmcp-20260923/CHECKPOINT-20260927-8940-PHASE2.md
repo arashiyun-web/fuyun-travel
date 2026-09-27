@@ -125,3 +125,59 @@
 - 正式部署：等 WebMCP 來源
 - operations worker 常駐與整合：等 GX10 IG 來源；現有 8940 版本是 file/database 雙模式＋單例鎖
 - 備份還原、IG/FB/LINE 真實鏈、四篇標題：未做
+
+## 8. 第四輪（2026-09-27 21:00–21:40，接收 GX10 交接）
+### 8.1 來源接收
+- SOURCE_RECEIVED=PASS
+  - fetch origin/handoff/webmcp-quote-ig-20260927 = 0e0178bab58b98ea1466cb83738debb932f07e9a（ls-remote 相同）
+  - base c0c4398d9e21200498050fb24042117f6fee6f87，rev-list 共 9 筆
+  - aaaf7b74 是 0e0178ba 的祖先，兩者差異只有 CONTINUATION.md 2 行
+- 秘密值仍在已推送歷史（例如 32d13d7 與 origin/main 的 lib/adminAuth.ts）
+  - DOC_HEAD_REDACTED=REPORTED_PASS；HISTORY_SECRET_CLEAN=NO；EXPOSED_OLD_CREDENTIALS=CONFIRMED
+  - 歷史不重寫，以輪換秘密並讓舊秘密失效處理
+### 8.2 整合（integrate/security-webmcp-ig-20260927 = b7c2628f2301c0be3f730c7e5e92c62398c14df9，已推送）
+- lib/adminAuth.ts：保留安全版本（env、scrypt、JWT≥32、無 fallback、v2），並附加 GX10 的 cookie 驗證 helper，全數經過安全版的 verifyAdminToken
+  - 整合後 build 輸出與原始碼中，舊秘密命中 0
+- components/WebMCPQuoteTool.tsx 恢復，與 GX10 版本完全相同；WebMCP 四個檔對 GX10 的 diff 為 0 行
+- generateSchema 採用 GX10 版本（輸出相同），移除重複定義
+- lib/adminQuoteAuth.ts 使用 ADMIN_ACCESS_TOKEN（無 fallback），但接受 URL query token，屬既有弱點，記錄待處理
+### 8.3 測試
+- 證據：evidence/10、11、11b、12
+- tsc EXIT=0；next build EXIT=0（BUILD_ID 2Hox_KtxbvG_B8eyPTCPv，未設任何管理 env）
+- admin-auth 11/11（新增 cookie：有效 token 接受；舊金鑰或舊格式拒絕；跨站 cookie mutation 拒絕）
+- IG 離線 4/4＋10/10；WebMCP quote 38/38；harness 23/23
+- 本機真瀏覽器（Chromium，無原生 navigator.modelContext，390px）：
+  - 7 頁 SSR 表單欄位完整
+  - 空白送出列出 4 項錯誤
+  - 合成資料送出產生 line.me/R/ti/p/@fuyuntravel，&、# 已編碼，8 項值完整保留
+  - 畫面與正式站相同（11 vs 11b）
+- 正常 Git Preview dpl_FzKru6qckUMDEtts39tYxjaHnej3（sha b7c2628，source=git）：22/22 PASS
+  - 7 頁表單、app.js 乾淨
+  - 舊密碼 401；舊金鑰 token 403；IG start 帶舊金鑰 cookie 401；IG start、revoke 未授權 401
+  - 新密碼 200
+### 8.4 部署狀態
+- PR #32 已建立，CI（Vercel）成功
+- main 分支保護要求 1 個核准 review；PR 作者即 gh 帳號，無法自我核准；不使用 --admin 繞過
+- 正式站仍為 dpl_8kgfHsWV7DPZrLob22UBZtcJkycD；PROD_SECURITY_APPLIED=FAIL（等持有人合併）
+- SAFE_ROLLBACK=NOT_AVAILABLE：目前沒有已套用安全修補的正式部署；dpl_8kgf… 只是歷史基準，不能當安全回復目標
+### 8.5 內容事實檢查（feat/ops-content-guard-20260927 = 77b99bdd2f27250184693ca0e3299f44533fe9de，已推送）
+- lib/operations/contentGuard.mjs：
+  - 事實區塊（價格、單位、時數、名額、日期、包含項目）由程式從有版本的 ApprovedFacts 產生
+  - 模型只寫描述；檢查項目：金額、每人／每車、包含項目（含否定語義）、日期、年份、時數、名額、過期或無版本資料、拒答、過長、未核准地點
+  - 不通過就回到模板並標記需人工處理
+  - approvalHash 綁定文字、圖片、平台、帳號與資料版本
+- 測試 11/11，含第 4 輪招生幻覺與 live 拒答、捏造景點的回歸案例
+- live（qwen3:4b-instruct digest 0edcdef34593eac1…，Q4_K_M）：5 題中 2 題用模型描述、3 題回到模板；沒有任何未核准事實進入最終草稿（evidence/13a、13b）
+### 8.6 常駐模型
+- 工作排程 Fuyun-Ollama-Serve：AtStartup、S4U（不儲存密碼）、RunLevel Limited、IgnoreNew
+- %USERPROFILE%\.fuyun-tools\run-ollama-serve.cmd：只監聽 loopback，內含 supervisor loop
+- 原 Startup\Ollama.lnk 移到 .fuyun-tools\disabled-startup-Ollama.lnk，避免重複實例
+- Task Scheduler 的 RestartCount 不會處理程式以非 0 結束 → 第一版砍掉 server 後 402 s 未恢復 → 改加 supervisor loop 後約 7 s 恢復
+- 重複啟動只有 1 個 supervisor、1 個 server
+- LOGIN_AUTOSTART：已由 task 取代；UNATTENDED_START_CONFIGURED=YES；UNATTENDED_START_VERIFIED=NO；BOOT_VERIFIED=NO（未重開機）
+### 8.7 備份還原
+- Documents\Codex\FuyunBackups\20260927-ops-data-phase2：tgz＋MANIFEST.sha256＋ARCHIVE.sha256
+- 已隔離還原到 20260927-ops-data-phase2-restore-check：6/6 sha OK；state.json 與來源相同；3 個 job 均為 dry_run_verified；不連接 worker
+- 兩個目錄 ACL：SYSTEM＋Administrator
+- 範圍僅限 file 模式營運資料；Neon DB 與 R2 未備份還原
+- C:\fuyun_backup 內有其他服務的每小時 DB dump，ACL 含 Authenticated Users:M，屬外部風險，未更動
