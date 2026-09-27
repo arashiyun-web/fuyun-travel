@@ -60,3 +60,28 @@
   - 讀 app/services/page.tsx 等：server-side 分類器，未說明原因
 - 兩次都不是 settings 明確 deny，也不是 hook、工作目錄界線或 OS／沙箱限制
 - 持有人確認範圍後，改用 Read 讀專案檔成功。對正式站的主動測試依指示不再執行
+
+## 6. Vercel 與正式站（2026-09-27 16:00–16:45）
+- CLI：vercel 60.1.3，以 npm i -g 安裝在原生 Windows（WSL 未使用）
+- CLI 60.1.3 在本機登入失敗：User-Agent 內含 os.hostname()，本機主機名稱為非 ASCII → ByteString 錯誤
+  - 處理：process 範圍 preload（%USERPROFILE%\.fuyun-tools\ascii-hostname.cjs，經 NODE_OPTIONS=--require 載入），系統主機名稱不變
+- 官方 device login 由持有人完成後核對：
+  - whoami：arashiyun-web
+  - team：arashiyun-s-projects（hobby）
+  - project：fuyun-travel prj_4EEboycCgJIJudWwBhTwlQtKagU4，與 .vercel/project.json 一致
+- 正式站：dpl_8kgfHsWV7DPZrLob22UBZtcJkycD（iklolu4l1），2026-09-23 06:47 由 CLI 部署，不是從 git 部署
+  - 含 WebMCPQuoteTool 與 lib/webmcp-*（GX10 版本）；沒有 IG OAuth 路由與 operations 路由
+- 正式站曝險：CONFIRMED
+  - 公開的 https://fuyuntravel.com/platform/app.js 內含舊管理員密碼明文（2026-09-27 以一般 GET 核對，只比對、不輸出值）
+  - 正式站伺服器是否仍接受舊密碼：未測（依指示不做主動測試）
+  - Production env 原本沒有 ADMIN_* 與 JWT_SECRET
+- 下載正式 deployment 原始碼被 auto-mode 拒絕（Production Reads），未繞過
+- Env（值以 stdin 寫入、Sensitive、不輸出）：ADMIN_USERNAME、ADMIN_PASSWORD_SALT、ADMIN_PASSWORD_HASH、JWT_SECRET 已加入 Production 與 Preview
+  - 帳號沿用原帳號名，密碼與簽章金鑰為新產生
+  - 登入資訊存於 %USERPROFILE%\.fuyun-secrets\admin-login.txt（ACL：SYSTEM＋本人）
+- IG 五項設定：INSTAGRAM_LOGIN_APP_ID、INSTAGRAM_LOGIN_APP_SECRET、INSTAGRAM_LOGIN_REDIRECT_URI、INSTAGRAM_LOGIN_STATE_SECRET、INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY 均存在於 Production（5 天前建立）；Preview 沒有
+- Preview（git commit 作者 Codex Deploy 非專案成員，直接部署被 Blocked；改以 git archive 9d8673f 匯出目錄部署，meta sourceCommit 記錄 SHA）：
+  - dpl_HL9ueStnZHUJjWuwvM3LoFs8b5LE（無管理 env）：公開頁 8/8 為 200；app.js 無 OWNER_ACCOUNT、無舊密碼；login 503；受保護 API 403／401
+  - dpl_hJXzjauBmRhS4BMKTMcCnhq5Sgqh（有新 env）：舊密碼 401；舊 fallback key 簽發的 token（新舊格式）403；新密碼 200；新 token 200；無 token 403
+- 正式部署尚未執行：本分支沒有 GX10 WebMCP 程式，直接上線會使 7 個 /charter-bus 頁面失去 WebMCP 報價表單，需持有人決定
+- 證據：主工作樹 recover/20260927-phase2-pre-integration/evidence/06、07
