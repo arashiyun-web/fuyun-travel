@@ -241,3 +241,24 @@
 - 四篇文章標題
 - adminQuoteAuth 的 URL token（應改為 header／cookie）
 - 開機未登入的實測
+
+## 10. 第六輪（2026-09-27 22:20–22:35）：處理 PR #32 的 Codex review
+- 審查對象：chatgpt-codex-connector[bot] 針對 b7c2628 的 10 則 inline 意見（4 P1、6 P2）
+- 已修（PR #32 HEAD 92b30fbafdbed0870e561b86a30e3d3108e07ab5）：
+  - LINE 連結不可操作：a762709 已修
+  - verifyAdminToken 未 fail closed：四項管理設定缺任一，舊 session 一律失效
+  - scryptSync 阻塞：改用 async scrypt；新增單一 instance 的登入節流（每 5 分鐘 10 次，超過回 429）
+  - 詢價接受過去日期：改以 Asia/Taipei 的今天為下限
+  - TouristTrip startDate：改為 ISO 格式
+- 延後處理（IG／WebMCP 尚未在正式站啟用，目前不會寫入錯誤資料）：
+  - IG token 存在 Vercel 唯讀檔案系統
+  - OAuth start 需要的 cookie 沒有被發出
+  - user_id 大數精度流失
+  - insta-diag 狀態回報錯誤
+  - WebMCP 需要 origin isolation
+- 以上逐項處理情形已寫在 PR 描述與 PR comment（issuecomment-5856745726）
+- 驗證：
+  - 本機：tsc 0；admin 12/12；line 3/3；IG 4/4＋10/10；WebMCP 54/54；harness 23/23
+  - 本機節流：同一 client 401×10 後回 429，其他 client 不受影響；JSON-LD startDate 為 2026-04-16
+  - Git Preview dpl_C8RRvxd87F7Em9kUXMG2uujBrZpW（sha 92b30fb）：30/30 PASS（evidence/18、19）
+- PR #32 狀態：OPEN、REVIEW_REQUIRED；正式站未變更；PROD_SECURITY_APPLIED=FAIL；SAFE_ROLLBACK=NOT_AVAILABLE
