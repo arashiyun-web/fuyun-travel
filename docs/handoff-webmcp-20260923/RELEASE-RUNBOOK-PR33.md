@@ -39,7 +39,7 @@
   - 權限 Object Read & Write；Specify bucket **只選 fuyun-ops-production**，不能選測試 bucket。
   - 保存：`powershell -File scripts\test-support\save-r2-credentials.ps1 -Target production`，寫入 production-release.env，與 Preview 分開；R2_ACCOUNT_ID、R2_BUCKET_NAME 已補入。
   - 2026-09-28 15:09Z 已建立 token「fuyun-ops-production」（id sha256 7873a5ba…）並保存到 production-release.env；`r2-precheck --target production` 全數 PASS（checkpoint §18）。
-  - 先前誤存的金鑰（c2371e1a…，範圍為測試 bucket）已不在 production-release.env，但仍是 active token；建議由持有人在 dashboard 撤銷。
+  - 先前誤存的金鑰（c2371e1a…，範圍為測試 bucket）已於 2026-09-28 撤銷（checkpoint §19）。
   - 範圍證據：與測試 token 同法，在 dashboard session 唯讀讀取 policy，比對 id sha256。
     - 存成 `%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json`（只含 id_sha256）。
 - 驗證：`node scripts/test-support/r2-precheck.mjs --target production`，以下各項都必須 PASS：

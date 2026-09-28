@@ -922,3 +922,17 @@
 - R2_OLD_WRONG_TOKEN=ACTIVE（c2371e1a…，建議撤銷）
 - 剩餘發版阻塞：reviewer approval、GX10／Hermes 呼叫端紀錄、Production env、發版當下新備份
 - PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）
+
+## 19. 第十五輪（2026-09-28 23:30）：撤銷誤建的 R2 token（持有人授權）
+- 撤銷前確認：
+  - 本機：preview-e2e.env 的金鑰 sha256＝bee3ed2c…、production-release.env＝7873a5ba…，都不是目標 c2371e1a71055f4507b3c3274751289d0d2d057917290b5f42d7f178d4a264f4。
+  - 14 個 .env*.example 範本沒有任何實際金鑰值。
+  - Vercel Preview 用的是 bee3ed2c…（§14 以 preview-e2e.env 寫入）；Production 沒有 R2 變數。
+- dashboard（8940 Brave）以完整指紋比對帳號 token 3 筆，唯一相符的是 TARGET：「R2 Account Token」，issued 2026-09-28T14:39:01Z，範圍 fuyun-ops-pr33-e2e。另兩筆標為保留（Preview、Production）。
+- UI 上 Preview 與目標 token 的名稱、bucket、日期完全相同，因此不經列表點選。改在頁面內依指紋鎖定 token id，只對這一筆送出 `DELETE /accounts/<acct>/tokens/<id>` → 200 success；id 沒有離開頁面。
+- 撤銷後唯讀確認：
+  - 帳號 token 剩 2 筆：7873a5ba fuyun-ops-production（active，fuyun-ops-production）、bee3ed2c R2 Account Token（active，fuyun-ops-pr33-e2e）；使用者 token 0 筆。
+  - `r2-precheck --target production` exit 0（D、A 含清理、E 皆 PASS）；`r2-precheck`（Preview）exit 0。
+- 未能直接驗證：舊金鑰的 secret 已在 §18 覆寫、沒有留存，所以沒有以舊金鑰實測被拒；撤銷的證據是 API 回應與清單。
+- 證據檔 r2-token-policy-production.json 已註記 revoked。
+- 狀態：R2_OLD_WRONG_TOKEN=REVOKED；其餘同 §18.6（正式發版未進行）。
