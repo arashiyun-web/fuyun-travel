@@ -52,7 +52,8 @@ async function stepNeon() {
   const prod = readEnv(path.join(SECRETS, "neon-prod.env")).DATABASE_URL;
   const prodEndpoint = endpointOf(prod);
   const asList = (x, key) => (Array.isArray(x) ? x : x[key] || []);
-  const projects = neon(["projects", "list"]);
+  // Vercel-managed Neon accounts live in an org; neonctl prompts for it unless --org-id is given.
+  const projects = neon(["projects", "list", ...(process.env.NEON_ORG_ID ? ["--org-id", process.env.NEON_ORG_ID] : [])]);
   const list = [...asList(projects, "projects"), ...(projects.shared_with_me || [])];
   // Identify the production project and branch by the endpoint host of the production DATABASE_URL.
   // The connection string output stays in memory; only the endpoint id is compared.
@@ -60,7 +61,8 @@ async function stepNeon() {
   let parent;
   for (const p of list) {
     for (const b of asList(neon(["branches", "list", "--project-id", p.id]), "branches")) {
-      const cs = spawnSync("npx", [...NEONCTL, "connection-string", b.id, "--project-id", p.id], { encoding: "utf8", shell: true });
+      // Explicit role/database avoid neonctl's interactive picker when a branch has several.
+      const cs = spawnSync("npx", [...NEONCTL, "connection-string", b.id, "--project-id", p.id, "--role-name", decodeURIComponent(new URL(prod).username), "--database-name", new URL(prod).pathname.slice(1)], { encoding: "utf8", shell: true });
       if (cs.status === 0 && cs.stdout.includes(prodEndpoint)) {
         project = p;
         parent = b;
@@ -96,7 +98,12 @@ function stepMigrate() {
   const rows = count("select (select count(*) from charter_quotes)+(select count(*) from inquiries)+(select count(*) from line_sessions)+(select count(*) from articles)");
   if (rows !== 0) throw new Error("branch holds data rows — not a schema-only branch; aborting");
   if (count("select count(*) from _prisma_migrations") === 0) run(PSQL, ["-q", "-v", "ON_ERROR_STOP=1", "-f", HISTORY_SQL], { env: pg });
-  const out = run("npx", ["prisma", "migrate", "deploy"], { env: { ...process.env, DATABASE_URL: url } });
+  // DDL runs as the branch's owner role, as it will in production; the runtime role e2e_app has no CREATE
+  // on schema public (first attempt: 42501). The owner URL is resolved on the test branch and kept in memory.
+  const prod = new URL(readEnv(path.join(SECRETS, "neon-prod.env")).DATABASE_URL);
+  const owner = run("npx", [...NEONCTL, "connection-string", env.PREVIEW_NEON_BRANCH, "--project-id", env.PREVIEW_NEON_PROJECT_ID, "--role-name", decodeURIComponent(prod.username), "--database-name", prod.pathname.slice(1)]).trim();
+  if (endpointOf(owner) !== endpointOf(url) || endpointOf(owner) === endpointOf(prod.toString())) throw new Error("owner URL is not on the test branch endpoint");
+  const out = run("npx", ["prisma", "migrate", "deploy"], { env: { ...process.env, DATABASE_URL: owner } });
   const applied = count("select count(*) from _prisma_migrations where finished_at is not null");
   console.log(`migrate: public tables before=${tables}, data rows=${rows}, history rows=${applied}; ${/202609280001/.test(out) ? "applied 202609280001_add_operations_tables" : "nothing new applied"}`);
 }
@@ -185,7 +192,16 @@ function stepStatus() {
   for (const [k, v] of Object.entries(e)) console.log(`${k}: ${/URL$|UNPOOLED$/.test(k) ? `endpoint=${endpointOf(v)} fp=${fp(v)}` : /ID$|NAME$|BRANCH$|USERNAME$/.test(k) ? v : `set fp=${fp(v)}`}`);
 }
 
-const steps = { neon: stepNeon, migrate: stepMigrate, secrets: stepSecrets, "r2-bucket": stepBucket, "vercel-env": stepVercelEnv, status: stepStatus };
+// When the bucket was created in the dashboard (wrangler's OAuth scope has no R2 access).
+function stepR2Record() {
+  const who = run("npx", [...WRANGLER, "whoami"]);
+  const account = (who.match(/\b[0-9a-f]{32}\b/) || [])[0];
+  if (!account) throw new Error("account id not found in wrangler whoami");
+  saveEnv({ R2_ACCOUNT_ID: account, R2_BUCKET_NAME: BUCKET });
+  console.log(`r2: recorded account=${account} bucket=${BUCKET}`);
+}
+
+const steps = { "r2-record": stepR2Record, neon: stepNeon, migrate: stepMigrate, secrets: stepSecrets, "r2-bucket": stepBucket, "vercel-env": stepVercelEnv, status: stepStatus };
 const step = steps[process.argv[2]];
 if (!step) {
   console.error(`usage: provision-preview-e2e.mjs ${Object.keys(steps).join("|")}`);
