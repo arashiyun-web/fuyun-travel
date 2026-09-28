@@ -24,7 +24,10 @@ try {
   $rest = @($args)
   if ($rest.Count -ge 1 -and $rest[0] -eq "--exec") {
     if ($rest.Count -lt 2) { [Console]::Error.WriteLine("usage: vercel-ascii.ps1 --exec <command> [args...]"); exit 2 }
-    $cmd = $rest[1]
+    # Native executables only: $LASTEXITCODE is not set by cmdlets/functions, so their result would be stale.
+    $native = Get-Command $rest[1] -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $native) { [Console]::Error.WriteLine("--exec needs a native executable (node, powershell, ...): $($rest[1])"); exit 2 }
+    $cmd = $native.Source
     $cmdArgs = if ($rest.Count -gt 2) { $rest[2..($rest.Count - 1)] } else { @() }
     & $cmd @cmdArgs
   } else {

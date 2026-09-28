@@ -688,3 +688,102 @@
 1. PR #33 reviewer 核准（E2E 已通過）。
 2. §13.12 第 3、4 項（標題、C:\fuyun_backup ACL／SSH）仍待決定。
 3. 8940 的 Vercel CLI：建議把電腦名改為 ASCII，或接受每次以 preload 處置（見 14.2）。
+
+## 15. 第十一輪（2026-09-28 22:00–23:10）：R2 假陽性修正、token 範圍補證、Vercel 啟動腳本、發版清單
+起點 2ac25e0（與遠端一致、無未提交）。應用程式碼自 462ec68 起未變：app／lib／components／prisma／public／middleware／next.config／package* 的 diff 為 0；本輪只改測試、工具、ops 腳本與文件。
+
+### 15.1 R2 權限測試假陽性（9608ae2、db17f12）
+- **舊問題：**
+  - ListBuckets 或寫入另一個 bucket 名稱時，任何錯誤都被判為 PASS。
+  - `fuyun-scope-check-other` 未確認存在也未獲授權。
+  - 未簽名 GET 回 400 就算「bucket 私有」。
+- **實測：** R2 對未簽名 GET 一律回 `400 InvalidArgument "Authorization"`，不存在的 bucket 名稱也是如此。
+  - 因此它只證明 S3 端點要求簽名，不能證明 bucket 私有。
+- **scripts/test-support/r2-scope-evidence.mjs：**
+  - 只有 403 AccessDenied 算拒絕；NoSuchBucket、憑證錯誤、連線錯誤與逾時都判為 inconclusive。
+  - 另含匿名 GET 分類、公開入口分類與 token policy 評估；token id 以 sha256 比對，不落地。
+- **r2-precheck.mjs：** 四項分開記錄，互不替代：
+  - A 物件讀寫（每輪唯一 key、finally 清理、清理失敗會記錄）
+  - B 匿名 S3 讀取
+  - C 公開入口（管理 API）
+  - D token policy
+  - 已移除其他 bucket 寫入探測；ListBuckets 只列 INFO。
+- **operations-preview-e2e.mjs：** 同樣分類；ListBuckets 不再計為 PASS。因此 run 由 32 項變為 31 項 PASS＋1 項 INFO。
+- **回歸測試：** node --test r2-scope-evidence.test.mjs 10/10（含 dashboard 實際的 policy 形狀）。
+
+### 15.2 token 範圍證據（D）
+- 既有 wrangler OAuth 無法讀取 token：
+  - `/accounts/<acct>/tokens`、`/user/tokens` 單筆與清單都回 403，錯誤碼 9109。
+  - 未擴大任何權限。
+- 改用持有人已登入的 Chrome（Browser 2，Windows），在 R2 → API Tokens 頁以 dashboard 自身 API 唯讀讀取：
+  - 帳號 token 1 筆、使用者 token 0 筆。
+  - 以 sha256(R2_ACCESS_KEY_ID)=bee3ed2c… 在頁面內比對 → 相符。
+  - 名稱「R2 Account Token」、status active、policy 為 allow。
+  - 權限群組只有 `Workers R2 Storage Bucket Item Write`。
+  - 唯一資源 `com.cloudflare.edge.r2.bucket.<acct>_default_fuyun-ops-pr33-e2e`，沒有萬用範圍。
+  - 頁面文字：`R2 Account Token | fuyun-ops-pr33-e2e | Object Read & Write | Active`。
+- 修正：dashboard 的「Object Read & Write」對應單一 Item Write 群組。評估器原本要求 Read＋Write 兩群組，已依實際對應修正並加測試。
+- 證據檔：%USERPROFILE%\.fuyun-tools\preview-e2e\r2-token-policy.json，只含 id_sha256 與非秘密 policy，不在 Git。
+- 帳號目前只有 1 個 R2 bucket（管理 API）→ 正式 bucket 尚未建立。
+- 結果：`r2-precheck` A 5/5、B 1/1、C 2/2、D 1/1；INFO ListBuckets＝403 AccessDenied；exit 0。
+
+### 15.3 Vercel 非 ASCII 電腦名（scripts/tools/）
+- vercel-ascii-hostname.cjs：只在 argv[1] 為 `vercel/dist/vc.js` 且電腦名非 ASCII 時，才把 os.hostname() 改為 `host-<sha256 前 8 碼>`；其他 Node 行程不受影響。
+- vercel-ascii.ps1：
+  - `vercel-ascii.ps1 <vercel 參數>`，或 `--exec <命令>` 供內部呼叫 vercel 的腳本使用。
+  - 保留既有 NODE_OPTIONS，重複巢狀時不重複加入；結束後還原；回傳原退出碼。
+  - 未改全域環境、電腦名、CLI 安裝或登入。
+- 測試 vercel-ascii.test.mjs 9/9：
+  - CJS／ESM 匯入都拿到 ASCII、非 CLI 行程維持原名、本機電腦名確為非 ASCII。
+  - 保留既有 NODE_OPTIONS、還原（有值／無值）、退出碼 7、含空白的路徑與參數、用法錯誤 exit 2。
+- 新 PowerShell 行程實測（NODE_OPTIONS 清空）：
+  - `whoami` exit 0；`env ls production` 32 列（唯讀）；不存在的部署 exit 1。
+  - 結束後 session／User／Machine 的 NODE_OPTIONS 均為空。
+  - 本輪 E2E 也經 `--exec` 取得 bypass。
+- 限制：PowerShell 5.1 呼叫原生程式時不保留參數內的雙引號，值應經 stdin 傳入。
+- **REFRESH：本輪未測到。** 目前 token 到 09-29 05:29 才過期，所有呼叫都沒有經過 refresh。refresh 只在 §14 以 scratchpad 版 preload 實際通過一次（21:29，無條件修補版），這個啟動腳本版本尚未遇到 refresh。
+
+### 15.4 雲端驗證（本輪測試腳本；應用程式碼同 462ec68）
+- Preview 9608ae2：dpl_mki8b2gE23j2pfm3gSff42qbZipA（fuyun-travel-b1wyyo3y9）→ `run` 31/31 PASS＋INFO ListBuckets 403 AccessDenied。
+- redeploy → dpl_2RL2zAg8JyUR7pns3BxXtLiGob9M（fuyun-travel-ojdq4alsx）→ `verify` 10/10。
+- 排程身份乾跑沿用 §14（462ec68／dpl_5jWtZ…）：worker 與排程腳本本輪未改，未重跑。
+- db17f12 只加 ops 腳本、文件與評估器；E2E 不使用評估器，因此 9608ae2 的結果適用。
+
+### 15.5 發版準備（未套用）
+- 發版清單：docs/handoff-webmcp-20260923/RELEASE-RUNBOOK-PR33.md。
+- scripts/ops/release-preflight-pr33.mjs（唯讀）：正式 DB 以 `default_transaction_read_only=on` 查詢，env 只看名稱。
+- scripts/ops/migrate-production-pr33.mjs：
+  - 會拒絕：非核准 SHA、工作樹不乾淨、autocrlf、CRLF migration、非 neondb_owner、非正式直連 endpoint。
+  - 預設只跑 status，`--apply` 才 deploy。
+  - 本輪只測拒絕路徑（缺 SHA、SHA 不符、工作樹不乾淨，皆 exit 3），未連正式 DB。
+- save-r2-credentials.ps1 `-Target production` → production-release.env（與 Preview 分開）。
+- 預檢結果（9608ae2 工作樹、`--bucket fuyun-ops-production` 暫名）：
+  - **PASS：**
+    - 兩個新 migration 為 LF 且與 blob 相同。
+    - 正式 10 筆 finished／0 筆 unfinished，新 migration 未套用。
+    - DB session 唯讀。
+    - 備份 d82c7db4…（23.4 h）與 SHA256SUMS 相符。
+    - 輪換值已備妥、worker Disabled、正式仍為 ceee1b5。
+  - **FAIL（發版前需完成）：**
+    - Production 缺 OPERATIONS_PERSISTENCE_MODE、OPERATIONS_CRON_TOKEN、OPERATIONS_LIVE_PUBLISH_ENABLED、R2_ACCOUNT_ID、R2_BUCKET_NAME、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY。
+    - 正式 bucket 不存在。
+    - 工作樹不乾淨（當時有未提交檔）。
+  - **UNVERIFIED：** 正式 R2 金鑰、GX10／Hermes 呼叫端。
+- 身份事實：正式 DATABASE_URL 與 UNPOOLED 都是 neondb_owner（runtime＝owner）。DDL 經守門腳本走直連；拆分 runtime 角色列為後續強化。
+
+### 15.5a 自我審查（code-reviewer，2ac25e0..db17f12）
+- CRITICAL 0、HIGH 0；確認沒有任何錯誤或缺漏會被判為 PASS、不輸出秘密、migration 守門全在 DB 呼叫之前。
+- MEDIUM 1：`--exec` 給 PowerShell cmdlet 時，退出碼會沿用前一個原生程式的值。已修正為只接受原生執行檔（cmdlet → exit 2），並加測試。
+- 修正後：vercel-ascii 9/9、r2-scope-evidence 10/10；實機 `whoami` exit 0、`--exec node` exit 5 原樣傳回。
+- 此審查不代替符合分支規則的 reviewer approval。
+
+### 15.6 狀態欄
+- HEAD：見 git log（本節文件提交）；程式測試 SHA 9608ae2；應用程式碼＝462ec68；PR 狀態見 PR #33。
+- R2_OBJECT_RW=PASS；R2_ANON_S3_READ_REFUSED=PASS（端點層級）；R2_PUBLIC_ENTRY=CLOSED（dev-url disabled、無 custom domain）；R2_TOKEN_SCOPE=VERIFIED（dashboard policy、id sha256 相符、單一 bucket、Object Read & Write）
+- VERCEL_LAUNCHER=scripts/tools/vercel-ascii.ps1（9/9＋實機唯讀）；VERCEL_REFRESH_VIA_LAUNCHER=NOT_TESTED
+- PREVIEW_E2E=31/31(+1 INFO) @9608ae2；PERSISTENCE=10/10 @9608ae2；SCHEDULED_IDENTITY=PASS @462ec68
+- PRODUCTION：未變（ceee1b5、env 32 列、migration 10/10、worker Disabled、live publish 未設＝關閉）
+- RELEASE_RUNBOOK=READY（未套用）；RELEASE_BLOCKERS＝reviewer approval、正式 bucket＋token、Production env、GX10 呼叫端確認、新備份
+
+### 15.7 另列（不在本輪）
+- 標題核准（§13.9）、C:\fuyun_backup ACL／SSH（§13.8）、手機 LINE 真實收發測試。

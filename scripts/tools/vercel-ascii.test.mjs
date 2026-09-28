@@ -98,4 +98,5 @@ test("launcher: works from a path with spaces and passes arguments with spaces i
 
 test("launcher: usage errors exit 2", { skip: !isWindows }, () => {
   assert.equal(ps(["-File", LAUNCHER, "--exec"]).status, 2);
+  assert.equal(ps(["-File", LAUNCHER, "--exec", "Get-ChildItem"]).status, 2, "cmdlets are refused (no reliable exit code)");
 });
