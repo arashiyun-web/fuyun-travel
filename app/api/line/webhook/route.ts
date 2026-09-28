@@ -591,7 +591,7 @@ export async function POST(request: Request) {
       console.error("line-webhook reply failed", { handlerVersion: HANDLER_VERSION, webhookEventId, status: response.status, errorText: errorText.slice(0, 300) });
     }
     // Keep the built reply for LINE's redelivery; the reply is resent, never rebuilt.
-    if (tracked) await track("delivery-failed", webhookEventId, (store) => markDeliveryFailed(store, webhookEventId));
+    if (tracked) await track("delivery-failed", webhookEventId, (store) => markDeliveryFailed(store, webhookEventId, replyText));
     failed += 1;
   }
 

@@ -45,7 +45,7 @@ test("a failed delivery is resent by exactly one of several parallel redeliverie
   const id = "01CLAIMTESTRESEND";
   assert.equal((await events.claimEvent(store, id)).kind, "build");
   await events.recordBuilt(store, id, "cached reply");
-  await events.markDeliveryFailed(store, id);
+  await events.markDeliveryFailed(store, id, "cached reply");
   const claims = await Promise.all(Array.from({ length: PARALLEL }, () => events.claimEvent(store, id)));
   const resends = claims.filter((c) => c.kind === "resend");
   assert.equal(resends.length, 1);
@@ -56,6 +56,23 @@ test("rows written before the delivery columns existed count as replied", async 
   await cleanup();
   await prisma.$executeRawUnsafe(`INSERT INTO "line_webhook_events" ("webhook_event_id") VALUES ('01CLAIMTESTLEGACY')`);
   assert.deepEqual(await events.claimEvent(store, "01CLAIMTESTLEGACY"), { kind: "skip", reason: "replied" });
+});
+
+test("review MEDIUM: recordBuilt failed but the reply went out → final state, no stale acknowledgement later", async () => {
+  await cleanup();
+  const delivered = "01CLAIMTESTNORECORD1";
+  assert.equal((await events.claimEvent(store, delivered)).kind, "build");
+  // recordBuilt skipped (transient DB error); delivery succeeded
+  await events.markDelivered(store, delivered);
+  const later = new Date(Date.now() + 10 * 60 * 1000); // well past the stale window
+  assert.deepEqual(await events.claimEvent(store, delivered, later), { kind: "skip", reason: "replied" });
+
+  const failed = "01CLAIMTESTNORECORD2";
+  assert.equal((await events.claimEvent(store, failed)).kind, "build");
+  // recordBuilt skipped; delivery failed → the text is still cached for redelivery
+  await events.markDeliveryFailed(store, failed, "real reply");
+  const again = await events.claimEvent(store, failed, later);
+  assert.deepEqual(again, { kind: "resend", replyText: "real reply" });
 });
 
 test("a build that threw releases the claim so a redelivery can build again", async () => {

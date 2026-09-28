@@ -66,12 +66,17 @@ export async function recordBuilt(store: WebhookEventStore, webhookEventId: stri
   await store.updateMany({ where: { webhookEventId, status: "processing" }, data: { status: "sending", replyText } });
 }
 
+// Both accept "processing" too: if recordBuilt failed transiently, the row must still reach a final
+// state instead of later looking like a stale claim (which would send an extra acknowledgement).
+const OPEN_STATES = { in: ["processing", "sending"] };
+
 export async function markDelivered(store: WebhookEventStore, webhookEventId: string) {
-  await store.updateMany({ where: { webhookEventId, status: "sending" }, data: { status: "replied", replyText: null } });
+  await store.updateMany({ where: { webhookEventId, status: OPEN_STATES }, data: { status: "replied", replyText: null } });
 }
 
-export async function markDeliveryFailed(store: WebhookEventStore, webhookEventId: string) {
-  await store.updateMany({ where: { webhookEventId, status: "sending" }, data: { status: "built" } });
+/** The reply text is written again here so a redelivery can resend it even if recordBuilt had failed. */
+export async function markDeliveryFailed(store: WebhookEventStore, webhookEventId: string, replyText: string) {
+  await store.updateMany({ where: { webhookEventId, status: OPEN_STATES }, data: { status: "built", replyText } });
 }
 
 /** Building threw: release the claim so LINE's redelivery can try again. */
