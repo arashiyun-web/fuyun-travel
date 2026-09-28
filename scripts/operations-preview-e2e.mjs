@@ -14,6 +14,7 @@ import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { S3Client, HeadObjectCommand, GetObjectCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { classifyAnonymousGet, expectRefused } from "./test-support/r2-scope-evidence.mjs";
 
 const [,, phase, rawBase] = process.argv;
 if (!["run", "sched", "verify"].includes(phase) || !/^https:\/\//.test(rawBase || "")) {
@@ -75,7 +76,9 @@ async function objectChecks(label, key, expectedSha) {
   const body = Buffer.from(await (await s3.send(new GetObjectCommand({ Bucket: cfg.R2_BUCKET_NAME, Key: key }))).Body.transformToByteArray());
   chk(`${label}: R2 object exists, metadata and bytes match sha256`, head.Metadata?.sha256 === expectedSha && sha(body) === expectedSha);
   const unsigned = await fetch(`https://${cfg.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${cfg.R2_BUCKET_NAME}/${key}`);
-  chk(`${label}: unsigned GET on the bucket is refused (private)`, [400, 401, 403].includes(unsigned.status), String(unsigned.status));
+  const anon = classifyAnonymousGet(unsigned.status, await unsigned.text());
+  // Endpoint-level only: bucket privacy (r2.dev, custom domains) and token scope are checked by r2-precheck.mjs.
+  chk(`${label}: anonymous S3 GET refused (signature required)`, anon.outcome === "refused", `${anon.status} ${anon.code}`);
   const signed = await fetch(await getSignedUrl(s3, new GetObjectCommand({ Bucket: cfg.R2_BUCKET_NAME, Key: key }), { expiresIn: 60 }));
   chk(`${label}: 60 s presigned URL returns the same bytes`, signed.status === 200 && sha(Buffer.from(await signed.arrayBuffer())) === expectedSha, String(signed.status));
 }
@@ -169,9 +172,9 @@ chk("image read back through the admin route matches sha256", ir.status === 200 
 chk("image route without auth → 401", (await f(`/api/operations/content/${id1}/images/${img.fileName}`)).status === 401);
 chk("image record: private storage keys, no public URL", !!img.storageKey && !!img.instagramStorageKey && !img.publicUrl);
 await objectChecks("intake image", img.storageKey, img.sha256);
-let scoped = false;
-try { await s3.send(new ListBucketsCommand({})); } catch { scoped = true; }
-chk("runtime R2 credential cannot list account buckets (bucket-scoped)", scoped);
+// Supporting signal only, never a scope PASS: bucket scope comes from the token policy (r2-precheck.mjs D).
+const lb = await expectRefused(() => s3.send(new ListBucketsCommand({})));
+console.log(`INFO ListBuckets with the runtime credential: ${lb.outcome}${lb.kind ? ` (${lb.kind} ${lb.name || ""} ${lb.status || ""})` : ""}`);
 
 const bad = await post(intake(`合成測試 ${run} 定價`, "每人只要 9,999 元，含住宿與早餐。", 1));
 const refuse = await approve(bad.json.content.id);
