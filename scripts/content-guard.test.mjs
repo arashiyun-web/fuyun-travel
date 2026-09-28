@@ -100,6 +100,12 @@ test("regression (live 2026-09-27): refusal, invented stops and overlong text fa
   const refusal = composeDraft({ modelText: "抱歉，我無法提供您所要求的內容。", templateText: "阿里山日出二日遊招募中。", facts: null, now: NOW, allowedPlaces: ["阿里山"] });
   assert.equal(refusal.source, "template_fallback");
   assert.ok(refusal.violations.some((v) => v.code === "MODEL_REFUSAL"));
+  // PR #33 review: "作為 AI" with whitespace must hit the refusal branch on its own (no other refusal phrase).
+  for (const modelText of ["作為 AI，我不能回答這個問題。", "作為一個 AI 語言模型，我不能回答。", "作為AI，我不能回答。"]) {
+    const r = composeDraft({ modelText, templateText: "阿里山日出二日遊招募中。", facts: null, now: NOW, allowedPlaces: ["阿里山"] });
+    assert.equal(r.source, "template_fallback", modelText);
+    assert.ok(r.violations.some((v) => v.code === "MODEL_REFUSAL"), modelText);
+  }
   const invented = "42人座大巴駛出台北車站，抵達第一站陽明山，接著前往大安森林公園，午後抵達信義，傍晚到士林夜市。";
   const d = composeDraft({ modelText: invented, templateText: "台北一日遊 42 人座大巴包車。", facts: TAIPEI_42, now: NOW, allowedPlaces: ["九份", "十分"] });
   assert.equal(d.source, "template_fallback");

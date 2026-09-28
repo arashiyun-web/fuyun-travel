@@ -24,6 +24,42 @@ function fileToDataUrl(file: File) {
   });
 }
 
+type ApprovalControlsProps = {
+  content: ContentRecord;
+  schedule: string;
+  acknowledged: boolean;
+  busy: boolean;
+  onScheduleChange: (value: string) => void;
+  onAcknowledgedChange: (value: boolean) => void;
+  onApprove: () => void;
+};
+
+/** Per-card approval: its own schedule, and an explicit acknowledgement when the fact check flagged the caption. */
+function ApprovalControls({ content, schedule, acknowledged, busy, onScheduleChange, onAcknowledgedChange, onApprove }: ApprovalControlsProps) {
+  const flagged = content.selectedPlatforms.filter((platform) => content.platforms[platform].factCheck?.ok === false);
+  const violations = flagged.flatMap((platform) => (content.platforms[platform].factCheck?.violations || []).map((v) => `${platformLabels[platform]}：${v.detail || v.code}`));
+  const needsAck = flagged.length > 0;
+  return (
+    <div className={styles.actions}>
+      <label className={styles.field}>
+        <span className={styles.label}>核准後排程（選填，台北時間）</span>
+        <input className={styles.input} type="datetime-local" value={schedule} onChange={(event) => onScheduleChange(event.target.value)} aria-label={`${content.id} 排程`} />
+      </label>
+      {needsAck ? (
+        <div className={styles.field}>
+          <span className={styles.label}>事實檢查提醒（價格、日期、名額或包含項目沒有核准來源）</span>
+          <ul className={styles.hint}>{violations.map((line) => <li key={line}>{line}</li>)}</ul>
+          <label className={styles.check}>
+            <input type="checkbox" checked={acknowledged} onChange={(event) => onAcknowledgedChange(event.target.checked)} />
+            我已核對以上內容皆為正式確認資料，確認後核准
+          </label>
+        </div>
+      ) : null}
+      <button type="button" className={styles.primary} onClick={onApprove} disabled={busy || (needsAck && !acknowledged)}>核准此版本</button>
+    </div>
+  );
+}
+
 export default function OperationsPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [contents, setContents] = useState<ContentRecord[]>([]);
@@ -33,7 +69,9 @@ export default function OperationsPage() {
   const [body, setBody] = useState("");
   const [platforms, setPlatforms] = useState<OperationsPlatform[]>(["website", "facebook_group", "instagram"]);
   const [images, setImages] = useState<{ dataUrl: string; originalName: string }[]>([]);
-  const [schedule, setSchedule] = useState("");
+  // Keyed by content id: each draft card keeps its own schedule and fact-warning acknowledgement.
+  const [schedules, setSchedules] = useState<Record<string, string>>({});
+  const [acknowledgements, setAcknowledgements] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -109,7 +147,7 @@ export default function OperationsPage() {
     try {
       await request("/api/operations/content", { method: "POST", body: JSON.stringify({ title, type, tripDate, body, selectedPlatforms: platforms, images }) });
       setMessage("草稿已保存，三個平台版本已生成；目前尚未對外發布。");
-      setTitle(""); setBody(""); setImages([]); setSchedule("");
+      setTitle(""); setBody(""); setImages([]);
       await load();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "草稿保存失敗");
@@ -119,8 +157,10 @@ export default function OperationsPage() {
   async function approve(content: ContentRecord) {
     setBusy(true); setError(""); setMessage("");
     try {
+      const schedule = schedules[content.id] || "";
       const scheduledAt = schedule ? new Date(`${schedule}:00+08:00`).toISOString() : undefined;
-      await request(`/api/operations/content/${encodeURIComponent(content.id)}/approve`, { method: "POST", body: JSON.stringify({ scheduledAt }) });
+      const acknowledgeFactWarnings = acknowledgements[content.id] === true;
+      await request(`/api/operations/content/${encodeURIComponent(content.id)}/approve`, { method: "POST", body: JSON.stringify({ scheduledAt, acknowledgeFactWarnings }) });
       setMessage(`${content.id} 已核准；每個平台都有獨立工作與去重識別碼。`);
       await load();
     } catch (approveError) {
@@ -198,7 +238,17 @@ export default function OperationsPage() {
           <article key={content.id} className={styles.record}>
             <div className={styles.recordTop}><div><h3 className={styles.recordTitle}>{content.title}</h3><span className={styles.meta}>{content.id} · {content.type} · 日期 {content.tripDate} · 圖片 {content.images.length} 張</span></div><span className={styles.badge}>{content.status}／核准：{content.approval.status}</span></div>
             <div className={styles.platformGrid}>{content.selectedPlatforms.map((platform) => { const job = content.platforms[platform]; const manual = manualResults[job.jobId] || { externalId: job.externalId || "", postUrl: job.postUrl || "" }; return <div key={platform} className={styles.platform}><div className={styles.platformName}>{platformLabels[platform]}</div><div className={styles.status}>狀態：{job.status}<br />嘗試：{job.attempts} · 驗證：{job.verification}<br />Job：{job.jobId}</div><pre className={styles.caption}>{job.caption}</pre><div className={styles.platformActions}>{content.approval.status === "approved" ? <button type="button" className={styles.smallButton} onClick={() => void dryRun(job.jobId)} disabled={busy}>乾跑此平台</button> : null}{job.lastError ? <span className={styles.status}>{job.lastError}</span> : null}</div>{platform === "facebook_group" && content.approval.status === "approved" ? <div className={styles.field}><span className={styles.label}>人工貼文回填（完成後開啟網址核對）</span><input className={styles.input} value={manual.externalId} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, externalId: event.target.value } }))} placeholder="Facebook 外部 ID" /><input className={styles.input} value={manual.postUrl} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, postUrl: event.target.value } }))} placeholder="https://www.facebook.com/..." /><button type="button" className={styles.smallButton} onClick={() => void saveManualResult(job.jobId)} disabled={busy}>保存人工回填</button>{job.postUrl ? <a className={styles.hint} href={job.postUrl} target="_blank" rel="noreferrer">開啟已回填貼文</a> : null}</div> : null}</div>; })}</div>
-            {content.approval.status !== "approved" ? <div className={styles.actions}><label className={styles.field}><span className={styles.label}>核准後排程（選填，台北時間）</span><input className={styles.input} type="datetime-local" value={schedule} onChange={(event) => setSchedule(event.target.value)} /></label><button type="button" className={styles.primary} onClick={() => void approve(content)} disabled={busy}>核准此版本</button></div> : <span className={styles.hint}>已核准版本不可原地覆寫；修改請建立新版本草稿。</span>}
+            {content.approval.status !== "approved" ? (
+              <ApprovalControls
+                content={content}
+                schedule={schedules[content.id] || ""}
+                acknowledged={acknowledgements[content.id] === true}
+                busy={busy}
+                onScheduleChange={(value) => setSchedules((current) => ({ ...current, [content.id]: value }))}
+                onAcknowledgedChange={(value) => setAcknowledgements((current) => ({ ...current, [content.id]: value }))}
+                onApprove={() => void approve(content)}
+              />
+            ) : <span className={styles.hint}>已核准版本不可原地覆寫；修改請建立新版本草稿。</span>}
           </article>
         ))}
       </section>

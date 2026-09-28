@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
@@ -90,6 +90,24 @@ export async function getObject(key: string) {
   }
   if (expected && sha256Hex(buffer) !== expected) throw new ObjectStoreError("integrity", "物件內容與雜湊不符");
   return { buffer, contentType, sha256: expected ?? sha256Hex(buffer) };
+}
+
+/**
+ * Best-effort removal of objects that never became reachable (failed or losing intake). Returns the
+ * keys that could not be deleted so the caller can log them; it never throws.
+ */
+export async function deleteObjects(keys: string[]) {
+  if (!keys.length) return [];
+  const { client: s3, bucket } = client();
+  const failed: string[] = [];
+  for (const key of keys) {
+    try {
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    } catch {
+      failed.push(key);
+    }
+  }
+  return failed;
 }
 
 export async function presignGet(key: string, seconds = PRESIGNED_URL_TTL_SECONDS) {

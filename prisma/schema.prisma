@@ -330,8 +330,12 @@ model InstagramLoginToken {
 
 /// LINE webhook events already handled (redelivery dedupe by webhookEventId).
 model LineWebhookEvent {
-  webhookEventId String   @id @map("webhook_event_id")
-  handledAt      DateTime @default(now()) @map("handled_at")
+  webhookEventId String    @id @map("webhook_event_id")
+  handledAt      DateTime  @default(now()) @map("handled_at")
+  /// processing → sending → replied; a failed delivery returns to built (reply text cached for redelivery)
+  status         String    @default("replied")
+  replyText      String?   @map("reply_text")
+  claimedAt      DateTime? @map("claimed_at")
 
   @@index([handledAt])
   @@map("line_webhook_events")

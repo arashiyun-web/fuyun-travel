@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { S3Client, HeadObjectCommand, GetObjectCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
+import { S3Client, HeadObjectCommand, GetObjectCommand, ListBucketsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { classifyAnonymousGet, expectRefused } from "./test-support/r2-scope-evidence.mjs";
 
@@ -125,6 +125,14 @@ chk("admin login on the Preview domain", L.status === 200 && !!L.token && !!L.co
 chk("session cookie is HttpOnly, Secure, SameSite=Lax", /HttpOnly/i.test(L.setCookie) && /Secure/i.test(L.setCookie) && /SameSite=Lax/i.test(L.setCookie));
 const st = await jsonOf(await f("/api/social/instagram/status", { headers: { cookie: L.cookie } }));
 chk("live publishing is off (OPERATIONS_LIVE_PUBLISH_ENABLED=false)", st.livePublishEnabled === false && st.state !== "AUTHORIZED", `${st.livePublishEnabled}/${st.state}`);
+// PR #33 review: /api/auth/me accepts the session cookie; logout clears it.
+chk("/api/auth/me with the session cookie → 200 (operations page no longer bounces)", (await f("/api/auth/me", { headers: { cookie: L.cookie } })).status === 200);
+chk("/api/auth/me without credentials → 403", (await f("/api/auth/me")).status === 403);
+const L2 = await login();
+const lo = await f("/api/auth/logout", { method: "POST", headers: { cookie: L2.cookie, origin: BASE } });
+const cleared = (lo.headers.getSetCookie?.() || []).find((c) => c.startsWith("fuyun_admin_session=")) || "";
+chk("logout → 200 and Set-Cookie clears fuyun_admin_session (Max-Age=0)", lo.status === 200 && /^fuyun_admin_session=;/.test(cleared) && /Max-Age=0/i.test(cleared), `${lo.status} ${cleared.split(";").slice(0, 3).join(";")}`);
+chk("logout from another origin → 403 (no cross-site logout)", (await f("/api/auth/logout", { method: "POST", headers: { cookie: L2.cookie, origin: "https://evil.example" } })).status === 403);
 
 const png = async (seed) => {
   const { default: sharp } = await import("sharp");
@@ -134,6 +142,8 @@ const png = async (seed) => {
 const imgs = [await png(0), await png(1), await png(2)];
 const intake = (title, body, seed = 0) => ({ title, type: "招生", tripDate: "2030-11-20", body, selectedPlatforms: ["website", "facebook_group", "instagram"], images: [{ dataUrl: imgs[seed % 3], originalName: "synthetic.png" }] });
 const run = `E2E ${Date.now().toString(36)}`;
+// R2 LastModified has second resolution; start the window a little early.
+const runStartedAt = new Date(Date.now() - 5000);
 const postCookie = (origin) => f("/api/operations/content", { method: "POST", headers: { cookie: L.cookie, "content-type": "application/json", ...(origin ? { origin } : {}) }, body: JSON.stringify(intake(`合成測試 ${run} cookie`, "合成測試內容 cookie。", 2)) });
 chk("cookie mutation from another origin → 401", (await postCookie("https://evil.example")).status === 401);
 chk("cookie mutation without Origin → 401", (await postCookie(null)).status === 401);
@@ -191,6 +201,32 @@ const jobs1 = await prisma.operationsJob.findMany({ where: { contentId: id1 } })
 chk("jobs end dry_run_verified, nothing published, locks released", jobs1.every((j) => j.status === "dry_run_verified" && !j.externalId && !j.lockOwner), jobs1.map((j) => j.status).join(","));
 await Promise.all([due(), due()]);
 chk("re-run claims nothing (no resend)", Object.values(await claims(id1)).reduce((a, b) => a + b, 0) === 3);
+chk("dry run leaves the content approved (not completed), eligible for the later live run", (await prisma.operationsContent.findUnique({ where: { id: id1 } })).status === "approved");
+
+// PR #33 review P2: images of the losing concurrent intake are deleted, none left behind.
+const listed = [];
+let token;
+do {
+  const page = await s3.send(new ListObjectsV2Command({ Bucket: cfg.R2_BUCKET_NAME, Prefix: "operations/", ContinuationToken: token }));
+  listed.push(...(page.Contents || []).filter((o) => o.LastModified >= runStartedAt));
+  token = page.NextContinuationToken;
+} while (token);
+const listedIds = [...new Set(listed.map((o) => o.Key.split("/")[1]))];
+const knownIds = new Set((await prisma.operationsContent.findMany({ where: { id: { in: listedIds } }, select: { id: true } })).map((c) => c.id));
+const orphans = listedIds.filter((id) => !knownIds.has(id));
+// This shows no orphan is left; it cannot show whether the losing request had uploaded before it lost.
+chk("no orphan objects: every operations/<id>/ written during this run belongs to a stored record", orphans.length === 0 && listedIds.includes(id1), `prefixes=${listedIds.length} orphans=${orphans.join(",") || "none"}`);
+
+// PR #33 review P1: awaiting_auth is parked; retryable_failed waits for its backoff time.
+const r = await post(intake(`合成測試 ${run} 退避`, "合成測試內容 退避。", 1));
+await approve(r.json.content.id);
+const rid = (p) => `${r.json.content.id}:${p}:v1`;
+await prisma.operationsJob.update({ where: { jobId: rid("website") }, data: { status: "awaiting_auth" } });
+await prisma.operationsJob.update({ where: { jobId: rid("facebook_group") }, data: { status: "retryable_failed", scheduledAt: new Date(Date.now() + 60 * 60 * 1000) } });
+await prisma.operationsJob.update({ where: { jobId: rid("instagram") }, data: { status: "retryable_failed", scheduledAt: new Date(Date.now() - 1000) } });
+await due();
+const rc = await claims(r.json.content.id);
+chk("process-due skips parked awaiting_auth and not-yet-due retry, claims the due retry", !rc[rid("website")] && !rc[rid("facebook_group")] && rc[rid("instagram")] === 1, JSON.stringify(rc));
 
 const t = await post(intake(`合成測試 ${run} 日月潭`, "合成測試內容二。", 0));
 await approve(t.json.content.id);

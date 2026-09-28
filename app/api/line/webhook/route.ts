@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClaim, type Claim, type WebhookEventStore } from "@/lib/line/webhookEvents";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-intent-router-v3-20260615";
+const HANDLER_VERSION = "line-intent-router-v4-20260929";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
@@ -60,28 +61,32 @@ function verifySignature(body: string, signature: string, secret: string) {
 }
 
 /**
- * LINE may redeliver an event (deliveryContext.isRedelivery) with the same webhookEventId.
- * An event is recorded only after it was handled, so a failed first attempt can still be retried,
- * while a redelivery of a handled event does not create a second quote or admin push.
+ * LINE may deliver an event more than once (concurrently, or as a redelivery with the same
+ * webhookEventId). lib/line/webhookEvents.ts claims each event atomically before any side effect and
+ * tracks delivery separately, so a duplicate never creates a second quote or admin push and a failed
+ * reply is resent from the cached text on redelivery. The dedupe store must never block an inquiry:
+ * if it is unavailable, the event is handled as before and the failure is logged.
  */
-// Dedupe must never block a customer inquiry: if the table is unavailable (e.g. migration not yet
-// applied), the event is handled as before and the failure is logged.
-async function eventAlreadyHandled(webhookEventId: string) {
-  if (!webhookEventId) return false;
+const eventStore = () => prisma.lineWebhookEvent as unknown as WebhookEventStore;
+
+function logStoreError(step: string, webhookEventId: string, error: unknown) {
+  console.error(`line-webhook dedupe ${step} failed`, { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+}
+
+async function claim(webhookEventId: string): Promise<Claim> {
   try {
-    return (await prisma.lineWebhookEvent.count({ where: { webhookEventId } })) > 0;
+    return await claimEvent(eventStore(), webhookEventId);
   } catch (error) {
-    console.error("line-webhook dedupe lookup failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
-    return false;
+    logStoreError("claim", webhookEventId, error);
+    return { kind: "untracked" };
   }
 }
 
-async function markEventHandled(webhookEventId: string) {
-  if (!webhookEventId) return;
+async function track(step: string, webhookEventId: string, work: (store: WebhookEventStore) => Promise<void>) {
   try {
-    await prisma.lineWebhookEvent.createMany({ data: [{ webhookEventId }], skipDuplicates: true });
+    await work(eventStore());
   } catch (error) {
-    console.error("line-webhook dedupe record failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+    logStoreError(step, webhookEventId, error);
   }
 }
 
@@ -530,42 +535,66 @@ export async function POST(request: Request) {
   }
   let replied = 0;
   let skippedRedelivery = 0;
+  let resent = 0;
+  let failed = 0;
 
   for (const event of payload.events || []) {
     const message = event.message as { type?: string; text?: string } | undefined;
     if (event.type !== "message" || message?.type !== "text" || !message.text || !event.replyToken) continue;
 
     const webhookEventId = clean(event.webhookEventId, 64);
-    if (await eventAlreadyHandled(webhookEventId)) {
+    const claimed = await claim(webhookEventId);
+    if (claimed.kind === "skip") {
       skippedRedelivery += 1;
       continue;
     }
+    const tracked = claimed.kind !== "untracked";
 
-    const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
-    const replyText = await buildReply(message.text, userId);
-    await markEventHandled(webhookEventId);
+    let replyText: string;
+    if (claimed.kind === "resend") {
+      replyText = claimed.replyText;
+      resent += 1;
+    } else {
+      const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
+      try {
+        replyText = await buildReply(message.text, userId);
+      } catch (error) {
+        console.error("line-webhook reply build failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+        if (tracked) await track("release", webhookEventId, (store) => releaseClaim(store, webhookEventId));
+        failed += 1;
+        continue;
+      }
+      if (tracked) await track("record", webhookEventId, (store) => recordBuilt(store, webhookEventId, replyText));
+    }
 
     // Customer text is not logged; lengths are enough to trace the flow.
     console.info("line-webhook event", {
       handlerVersion: HANDLER_VERSION,
       webhookEventId,
       redelivery: Boolean(event.deliveryContext?.isRedelivery),
+      claim: claimed.kind,
       messageLength: message.text.length,
       replyLength: replyText.length,
     });
 
-    const response = await replyToLine(String(event.replyToken), replyText, accessToken);
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      console.error("line-webhook reply failed", {
-        handlerVersion: HANDLER_VERSION,
-        webhookEventId,
-        status: response.status,
-        errorText,
-      });
+    const response = await replyToLine(String(event.replyToken), replyText, accessToken).catch((error) => {
+      console.error("line-webhook reply request failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
+      return null;
+    });
+    if (response?.ok) {
+      if (tracked) await track("delivered", webhookEventId, (store) => markDelivered(store, webhookEventId));
+      replied += 1;
+      continue;
     }
-    replied += 1;
+    if (response) {
+      const errorText = await response.text().catch(() => "");
+      console.error("line-webhook reply failed", { handlerVersion: HANDLER_VERSION, webhookEventId, status: response.status, errorText: errorText.slice(0, 300) });
+    }
+    // Keep the built reply for LINE's redelivery; the reply is resent, never rebuilt.
+    if (tracked) await track("delivery-failed", webhookEventId, (store) => markDeliveryFailed(store, webhookEventId));
+    failed += 1;
   }
 
-  return NextResponse.json({ ok: true, replied, skippedRedelivery, handlerVersion: HANDLER_VERSION });
+  // A non-2xx response lets LINE redeliver (when webhook redelivery is enabled) the events that failed.
+  return NextResponse.json({ ok: failed === 0, replied, resent, skippedRedelivery, failed, handlerVersion: HANDLER_VERSION }, { status: failed ? 500 : 200 });
 }

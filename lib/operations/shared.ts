@@ -11,9 +11,36 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
 export const JOB_LEASE_MS = 5 * 60 * 1000;
 export const DUE_BATCH_LIMIT = 20;
-export const CLAIMABLE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth", "manual_required"];
-/** manual_required waits for a person (Facebook group post, live switch off); it only re-runs when explicitly requested. */
-export const AUTO_DUE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth"];
+/** Statuses an operator may run explicitly. dry_run_verified stays runnable so a dry run never blocks the later live run. */
+export const CLAIMABLE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth", "manual_required", "dry_run_verified"];
+/**
+ * Statuses the worker picks up by itself. manual_required waits for a person; awaiting_auth is parked
+ * until the credentials change (requeueAwaitingAuth) so it cannot starve newer jobs; retryable_failed
+ * is only due again once its backoff time (scheduledAt) has passed.
+ */
+export const AUTO_DUE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed"];
+export const MAX_AUTO_ATTEMPTS = 5;
+export const RETRY_BASE_MS = 5 * 60 * 1000;
+export const RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+
+/** A dry-run-verified job becomes due again only for a live run. */
+export function dueStatusesFor(mode: RunMode): JobStatus[] {
+  return mode === "live" ? [...AUTO_DUE_STATUSES, "dry_run_verified"] : AUTO_DUE_STATUSES;
+}
+
+/**
+ * Where a job goes after a run. A retryable failure is rescheduled with exponential backoff (the due
+ * query only returns jobs whose scheduledAt has passed) and handed to a person after MAX_AUTO_ATTEMPTS.
+ * scheduledAt undefined = leave the stored value unchanged.
+ */
+export function nextAttemptPlan(result: JobResult, attempts: number, now = Date.now()): { status: JobStatus; scheduledAt?: Date | null; error?: string } {
+  if (result.status !== "retryable_failed") return { status: result.status, error: result.error };
+  if (attempts >= MAX_AUTO_ATTEMPTS) {
+    return { status: "manual_required", scheduledAt: null, error: `${result.error ?? "發布失敗"}（已自動重試 ${attempts} 次，改由人工處理）` };
+  }
+  const delay = Math.min(RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), RETRY_MAX_MS);
+  return { status: "retryable_failed", scheduledAt: new Date(now + delay), error: result.error };
+}
 
 export type RunMode = "dry-run" | "live";
 export type JobSubmission = NonNullable<PlatformDraft["submission"]>;
@@ -100,15 +127,36 @@ export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter
   return "instagram_login_v2";
 }
 
-/** Target account the approval is bound to; changing it invalidates earlier approvals. */
-export function platformAccount(platform: OperationsPlatform) {
-  if (platform === "instagram") return `instagram:${process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim() || "unset"}`;
+/** Accounts the platforms would publish to right now. Resolved once per approval/claim. */
+export type ApprovalAccounts = { instagram: string };
+
+/**
+ * The Instagram account the publisher would use: INSTAGRAM_LOGIN_ACCOUNT_ID, otherwise the account of
+ * the token stored by the OAuth flow — the same order as instagramV2Client().
+ */
+export async function resolveInstagramAccountId() {
+  const direct = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim();
+  if (direct) return direct;
+  try {
+    return (await readStoredInstagramLoginTokenFromEnvironment())?.accountId?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
+export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {
+  return { instagram: (await resolveInstagramAccountId()) || "unset" };
+}
+
+/** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */
+export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {
+  if (platform === "instagram") return `instagram:${accounts.instagram}`;
   if (platform === "facebook_group") return "facebook_group:小羽旅遊趣";
   return "website:fuyuntravel.com";
 }
 
-export function jobApprovalHash(imageSha256s: string[], job: Pick<PlatformDraft, "caption" | "platform">) {
-  return approvalHash({ text: job.caption, imageSha256s, platform: job.platform, account: platformAccount(job.platform) });
+export function jobApprovalHash(imageSha256s: string[], job: Pick<PlatformDraft, "caption" | "platform">, accounts: ApprovalAccounts) {
+  return approvalHash({ text: job.caption, imageSha256s, platform: job.platform, account: platformAccount(job.platform, accounts) });
 }
 
 /** Captions are template output from staff input; the staff-entered trip date is the only approved date. */
@@ -125,9 +173,10 @@ export function assertFactCheckApprovable(content: ContentRecord, acknowledgeFac
   return failing;
 }
 
+/** Only real publishing moves content forward; a dry run leaves it approved and eligible for the live run. */
 export function aggregateContentStatus(statuses: JobStatus[], current: ContentRecord["status"]): ContentRecord["status"] {
-  if (statuses.every((status) => status === "published" || status === "dry_run_verified")) return "completed";
-  if (statuses.some((status) => ["published", "dry_run_verified"].includes(status))) return "partial";
+  if (statuses.every((status) => status === "published")) return "completed";
+  if (statuses.some((status) => status === "published")) return "partial";
   return current;
 }
 
@@ -145,7 +194,20 @@ export function validFacebookPostUrl(value: string) {
   }
 }
 
-async function instagramV2Client() {
+export const CONTAINER_POLL_ATTEMPTS = 5;
+export const CONTAINER_POLL_DELAY_MS = 3000;
+
+/** The container exists but Instagram is still processing it; the job resumes later without recreating it. */
+export class ContainerNotReadyError extends Error {
+  constructor() {
+    super("Instagram container still processing");
+    this.name = "ContainerNotReadyError";
+  }
+}
+
+type InstagramClient = Awaited<ReturnType<typeof createInstagramLoginClientV2>>;
+
+async function instagramV2Client(): Promise<InstagramClient & { accountId: string }> {
   if (process.env.OPERATIONS_INSTAGRAM_V2_ENABLED !== "true") throw new InstagramV2Error("configuration");
   const directAccountId = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim() || "";
   const directAccessToken = process.env.INSTAGRAM_LOGIN_ACCESS_TOKEN?.trim() || "";
@@ -162,7 +224,7 @@ async function instagramV2Client() {
   const apiVersion = process.env.INSTAGRAM_LOGIN_API_VERSION?.trim() || "";
   const mediaOrigin = process.env.INSTAGRAM_LOGIN_MEDIA_ORIGIN?.trim() || "";
   if (!accountId || !accessToken || !apiVersion || !mediaOrigin) throw new InstagramV2Error("configuration");
-  return createInstagramLoginClientV2({ accountId, accessToken, apiVersion, mediaOrigins: [mediaOrigin] });
+  return Object.assign(createInstagramLoginClientV2({ accountId, accessToken, apiVersion, mediaOrigins: [mediaOrigin] }), { accountId });
 }
 
 export type ExecuteDeps = {
@@ -170,35 +232,64 @@ export type ExecuteDeps = {
   markSubmission: (patch: Partial<JobSubmission>) => Promise<void>;
   /** Resolve HTTPS image URLs Instagram can fetch (e.g. short-lived presigned URLs). */
   instagramImageUrls: () => Promise<string[]>;
+  /** Instagram account the approval was checked against at claim time; publishing to any other account is refused. */
+  approvedInstagramAccount?: string;
+  /** Test seams. */
+  instagramClient?: () => Promise<InstagramClient & { accountId: string }>;
+  sleep?: (ms: number) => Promise<void>;
 };
 
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Container that was fully created by an earlier attempt and can be resumed without recreating anything. */
+function resumableContainer(job: PlatformDraft, imageCount: number) {
+  const s = job.submission;
+  if (!s || s.phase !== "container_created" || s.publishIntentAt) return null;
+  if (imageCount > 1) return s.carouselContainerId && s.containerIds.length === imageCount ? s.carouselContainerId : null;
+  return !s.carouselContainerId && s.containerIds.length === 1 ? s.containerIds[0] : null;
+}
+
+async function waitForContainer(client: InstagramClient, containerId: string, sleep: (ms: number) => Promise<void>) {
+  for (let attempt = 1; ; attempt += 1) {
+    const { status } = await client.getContainerStatus(containerId);
+    if (status === "FINISHED" || status === "PUBLISHED") return;
+    if (status !== "IN_PROGRESS") throw new InstagramV2Error("unknown");
+    if (attempt >= CONTAINER_POLL_ATTEMPTS) throw new ContainerNotReadyError();
+    await sleep(CONTAINER_POLL_DELAY_MS);
+  }
+}
+
 async function submitInstagramV2Job(job: PlatformDraft, deps: ExecuteDeps) {
-  const client = await instagramV2Client();
+  const client = await (deps.instagramClient ?? instagramV2Client)();
+  if (deps.approvedInstagramAccount !== undefined && `${client.accountId}` !== deps.approvedInstagramAccount) {
+    // Credentials were switched to another account after the claim; the approval does not cover it.
+    throw new InstagramV2Error("configuration");
+  }
   const imageUrls = (await deps.instagramImageUrls()).filter(Boolean);
   if (!imageUrls.length || imageUrls.length > 10 || imageUrls.some((url) => !url.startsWith("https://"))) throw new InstagramV2Error("input");
   const isCarousel = imageUrls.length > 1;
 
-  await deps.markSubmission({ phase: "container_creating", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null });
-  const childContainerIds: string[] = [];
-  if (isCarousel) {
-    for (const imageUrl of imageUrls) {
-      const child = await client.createImageContainer({ imageUrl, mimeType: "image/jpeg", isCarouselItem: true });
-      childContainerIds.push(child.containerId);
-      await deps.markSubmission({ phase: "container_creating", containerIds: [...childContainerIds] });
+  let publishContainerId = resumableContainer(job, imageUrls.length);
+  if (!publishContainerId) {
+    await deps.markSubmission({ phase: "container_creating", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null });
+    const childContainerIds: string[] = [];
+    if (isCarousel) {
+      for (const imageUrl of imageUrls) {
+        const child = await client.createImageContainer({ imageUrl, mimeType: "image/jpeg", isCarouselItem: true });
+        childContainerIds.push(child.containerId);
+        await deps.markSubmission({ phase: "container_creating", containerIds: [...childContainerIds] });
+      }
+      const carousel = await client.createCarouselContainer({ caption: job.caption, children: childContainerIds });
+      publishContainerId = carousel.containerId;
+      await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds], carouselContainerId: publishContainerId });
+    } else {
+      const image = await client.createImageContainer({ caption: job.caption, imageUrl: imageUrls[0], mimeType: "image/jpeg" });
+      childContainerIds.push(image.containerId);
+      publishContainerId = image.containerId;
+      await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds] });
     }
-  } else {
-    const image = await client.createImageContainer({ caption: job.caption, imageUrl: imageUrls[0], mimeType: "image/jpeg" });
-    childContainerIds.push(image.containerId);
-    await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds] });
   }
-  let publishContainerId = childContainerIds[0];
-  if (isCarousel) {
-    const carousel = await client.createCarouselContainer({ caption: job.caption, children: childContainerIds });
-    publishContainerId = carousel.containerId;
-    await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds], carouselContainerId: publishContainerId });
-  }
-  const containerStatus = await client.getContainerStatus(publishContainerId);
-  if (!["FINISHED", "PUBLISHED"].includes(containerStatus.status)) throw new InstagramV2Error("unknown");
+  await waitForContainer(client, publishContainerId, deps.sleep ?? defaultSleep);
   await deps.markSubmission({ phase: "publish_intent", publishIntentAt: nowIso() });
   const published = await client.publishContainer(publishContainerId);
   await deps.markSubmission({ phase: "submitted_pending_verification", submittedAt: nowIso() });
@@ -210,7 +301,8 @@ async function submitInstagramV2Job(job: PlatformDraft, deps: ExecuteDeps) {
 export async function executeJob(job: PlatformDraft, mode: RunMode, deps: ExecuteDeps): Promise<JobResult> {
   const factCheck = job.factCheck as FactCheck | undefined;
   if (mode === "dry-run") {
-    return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布。` };
+    // dry_run_verified is not terminal: it stays claimable and is due again for a live run (dueStatusesFor).
+    return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布；正式發布開關啟用後會重新排入。` };
   }
   if (process.env.OPERATIONS_LIVE_PUBLISH_ENABLED !== "true") {
     return { status: "manual_required", verification: "pending", error: "正式發布總開關未啟用；已保留草稿與工作結果。" };
@@ -237,6 +329,10 @@ export async function executeJob(job: PlatformDraft, mode: RunMode, deps: Execut
     const published = await submitInstagramV2Job(job, tracked);
     return { status: "published", externalId: published.externalId, postUrl: published.postUrl, verification: "verified" };
   } catch (error) {
+    if (error instanceof ContainerNotReadyError) {
+      // Nothing was published and the container is kept; the retry resumes it (resumableContainer).
+      return { status: "retryable_failed", verification: "pending", error: "Instagram 容器仍在處理中；已保留容器，稍後自動續行，不會重建或重送。" };
+    }
     const v2Error = error instanceof InstagramV2Error ? error : null;
     if (v2Error?.kind === "authorization") await clearStoredInstagramLoginTokenFromEnvironment().catch(() => false);
     if (v2Error?.kind === "configuration" || v2Error?.kind === "authorization" || v2Error?.kind === "input") {

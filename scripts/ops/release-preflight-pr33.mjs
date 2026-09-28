@@ -15,7 +15,7 @@ const SECRETS = path.join(HOME, ".fuyun-secrets");
 const PSQL = path.join(HOME, ".fuyun-tools", "pgsql-17", "pgsql", "bin", "psql.exe");
 const BACKUPS = process.env.FUYUN_BACKUPS || path.join(HOME, "Documents", "Codex", "FuyunBackups");
 const TEST_BUCKET = "fuyun-ops-pr33-e2e";
-const NEW_MIGRATIONS = ["202609280001_add_operations_tables", "202609280002_add_line_webhook_events"];
+const NEW_MIGRATIONS = ["202609280001_add_operations_tables", "202609280002_add_line_webhook_events", "202609290001_line_webhook_event_delivery"];
 const BASELINE_MIGRATIONS = 10;
 const BACKUP_MAX_AGE_H = 24;
 const REQUIRED_PROD_ENV = ["OPERATIONS_PERSISTENCE_MODE", "OPERATIONS_CRON_TOKEN", "OPERATIONS_LIVE_PUBLISH_ENABLED", "ADMIN_ACCESS_TOKEN", "R2_ACCOUNT_ID", "R2_BUCKET_NAME", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"];
@@ -50,7 +50,7 @@ else {
   else {
     const [done, unfinished, newer] = r.stdout.trim().split("|");
     put(Number(done) === BASELINE_MIGRATIONS && Number(unfinished) === 0 ? "PASS" : "FAIL", "production has the 10 baseline migrations, none unfinished", `finished=${done} unfinished=${unfinished}`);
-    put(!newer ? "PASS" : "FAIL", "202609280001/0002 not yet applied in production", newer || "none");
+    put(!newer ? "PASS" : "FAIL", "202609280001/0002 and 202609290001 not yet applied in production", newer || "none");
   }
   const ro = q("show default_transaction_read_only");
   put(ro.stdout.trim() === "on" ? "PASS" : "FAIL", "preflight DB session was read-only");

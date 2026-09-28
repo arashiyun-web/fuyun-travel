@@ -4,7 +4,6 @@ import path from "path";
 import * as db from "./dbStore";
 import { objectStoreConfigured } from "./objectStore";
 import {
-  AUTO_DUE_STATUSES,
   CLAIMABLE_STATUSES,
   DUE_BATCH_LIMIT,
   JOB_LEASE_MS,
@@ -17,12 +16,15 @@ import {
   assertFactCheckApprovable,
   captionFactCheck,
   defaultSubmission,
+  dueStatusesFor,
   executeJob,
   getImageContentType,
   jobApprovalHash,
   makePlatformCaptions,
+  nextAttemptPlan,
   nowIso as now,
   prepareIntake,
+  resolveApprovalAccounts,
   safeFileExtension,
   sha256Hex,
   trimText,
@@ -265,6 +267,7 @@ async function fileCreateContentDraft(input: ContentIntakeInput) {
 }
 
 async function fileApproveContent(contentId: string, approvedBy: string, scheduledAt: string | null | undefined, acknowledgeFactWarnings: boolean) {
+  const accounts = await resolveApprovalAccounts();
   return serialize(async () => {
     const state = await readState();
     const content = state.contents.find((item) => item.id === contentId);
@@ -283,7 +286,7 @@ async function fileApproveContent(contentId: string, approvedBy: string, schedul
       const job = content.platforms[platform];
       job.status = schedule && schedule.getTime() > Date.now() ? "scheduled" : "queued";
       job.scheduledAt = schedule?.toISOString() || null;
-      job.approvalHash = jobApprovalHash(shas, job);
+      job.approvalHash = jobApprovalHash(shas, job, accounts);
       job.factCheck = { ...(job.factCheck as FactCheck), acknowledgedBy: failing.includes(platform) ? approver : null } as FactCheck;
       job.updatedAt = timestamp;
     }
@@ -295,6 +298,7 @@ async function fileApproveContent(contentId: string, approvedBy: string, schedul
 }
 
 async function fileClaimJob(jobId: string, statuses: JobStatus[]) {
+  const accounts = await resolveApprovalAccounts();
   return serialize(async () => {
     const state = await readState();
     const found = findJob(state, jobId);
@@ -308,7 +312,7 @@ async function fileClaimJob(jobId: string, statuses: JobStatus[]) {
     const shas = content.images.map((image) => image.sha256);
     const changed = content.selectedPlatforms
       .map((platform) => content.platforms[platform])
-      .find((sibling) => CLAIMABLE_STATUSES.includes(sibling.status) && (!sibling.approvalHash || sibling.approvalHash !== jobApprovalHash(shas, sibling)));
+      .find((sibling) => CLAIMABLE_STATUSES.includes(sibling.status) && (!sibling.approvalHash || sibling.approvalHash !== jobApprovalHash(shas, sibling, accounts)));
     if (changed) {
       for (const platform of content.selectedPlatforms) {
         const sibling = content.platforms[platform];
@@ -330,7 +334,7 @@ async function fileClaimJob(jobId: string, statuses: JobStatus[]) {
     job.updatedAt = now();
     addEvent(state, { type: "job_claimed", contentId: content.id, jobId, platform: job.platform, detail: job.idempotencyKey });
     await writeState(state);
-    return { content, job };
+    return { content, job, accounts };
   });
 }
 
@@ -373,13 +377,16 @@ async function fileRunJob(jobId: string, mode: RunMode, statuses: JobStatus[]) {
     },
     // File mode has no public object storage; Instagram publishing requires database mode.
     instagramImageUrls: async () => [],
+    approvedInstagramAccount: claimed.accounts.instagram,
   });
+  const plan = nextAttemptPlan(result, claimed.job.attempts);
   return serialize(async () => {
     const state = await readState();
     const current = findJob(state, jobId);
     if (!current) return { success: false, status: "missing", error: "工作在執行期間消失" };
-    current.job.status = result.status;
-    current.job.lastError = result.error || null;
+    current.job.status = plan.status;
+    if (plan.scheduledAt !== undefined) current.job.scheduledAt = plan.scheduledAt?.toISOString() ?? null;
+    current.job.lastError = plan.error || null;
     current.job.externalId = result.externalId || current.job.externalId;
     current.job.postUrl = result.postUrl || current.job.postUrl;
     current.job.verification = result.verification || "not_tested";
@@ -387,9 +394,9 @@ async function fileRunJob(jobId: string, mode: RunMode, statuses: JobStatus[]) {
     current.job.updatedAt = now();
     current.content.status = aggregateContentStatus(current.content.selectedPlatforms.map((platform) => current.content.platforms[platform].status), current.content.status);
     current.content.updatedAt = now();
-    addEvent(state, { type: "job_result", contentId: current.content.id, jobId, platform: current.job.platform, detail: result.error || result.status });
+    addEvent(state, { type: "job_result", contentId: current.content.id, jobId, platform: current.job.platform, detail: plan.error || plan.status });
     await writeState(state);
-    return { success: result.status === "dry_run_verified" || result.status === "published", status: result.status, job: current.job, content: current.content };
+    return { success: plan.status === "dry_run_verified" || plan.status === "published", status: plan.status, job: current.job, content: current.content };
   });
 }
 
@@ -455,14 +462,36 @@ export async function recordFacebookManualResult(jobId: string, externalId: stri
 export async function runDueJobs(mode: RunMode = process.env.OPERATIONS_LIVE_PUBLISH_ENABLED === "true" ? "live" : "dry-run") {
   if (backend() === "database") return db.runDueJobs(mode);
   await fileRecoverExpired();
+  const statuses = dueStatusesFor(mode);
   const state = await serialize(() => readState());
   const due = state.contents
     .filter((content) => content.approval.status === "approved")
     .flatMap((content) => content.selectedPlatforms.map((platform) => content.platforms[platform]))
-    .filter((job) => AUTO_DUE_STATUSES.includes(job.status) && (!job.scheduledAt || new Date(job.scheduledAt).getTime() <= Date.now()));
+    .filter((job) => statuses.includes(job.status) && (!job.scheduledAt || new Date(job.scheduledAt).getTime() <= Date.now()));
   const results = [];
-  for (const job of due.slice(0, DUE_BATCH_LIMIT)) results.push(await fileRunJob(job.jobId, mode, AUTO_DUE_STATUSES));
+  for (const job of due.slice(0, DUE_BATCH_LIMIT)) results.push(await fileRunJob(job.jobId, mode, statuses));
   return results;
+}
+
+/** New credentials were stored: parked awaiting_auth jobs for that platform become due again. */
+export async function requeueAwaitingAuth(platform: OperationsPlatform) {
+  if (backend() === "database") return db.requeueAwaitingAuth(platform);
+  return serialize(async () => {
+    const state = await readState();
+    let requeued = 0;
+    for (const content of state.contents) {
+      const job = content.platforms[platform];
+      if (!job || job.status !== "awaiting_auth") continue;
+      job.status = "queued";
+      job.scheduledAt = null;
+      job.lastError = null;
+      job.updatedAt = now();
+      addEvent(state, { type: "job_requeued_after_auth", contentId: content.id, jobId: job.jobId, platform, detail: "credentials changed" });
+      requeued += 1;
+    }
+    if (requeued) await writeState(state);
+    return requeued;
+  });
 }
 
 /** Image bytes for the authenticated admin route (object storage in database mode). */

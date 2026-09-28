@@ -3,9 +3,8 @@ import os from "os";
 import sharp from "sharp";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getObject, presignGet, putObject } from "./objectStore";
+import { deleteObjects, getObject, presignGet, putObject } from "./objectStore";
 import {
-  AUTO_DUE_STATUSES,
   CLAIMABLE_STATUSES,
   DUE_BATCH_LIMIT,
   JOB_LEASE_MS,
@@ -14,12 +13,15 @@ import {
   assertFactCheckApprovable,
   captionFactCheck,
   defaultSubmission,
+  dueStatusesFor,
   executeJob,
   getImageContentType,
   jobApprovalHash,
   makePlatformCaptions,
+  nextAttemptPlan,
   nowIso,
   prepareIntake,
+  resolveApprovalAccounts,
   safeFileExtension,
   sha256Hex,
   trimText,
@@ -115,16 +117,33 @@ export async function createContentDraft(input: ContentIntakeInput) {
   if (existing) return toRecord(existing);
 
   const id = `FUYUN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
-  const instagramSelected = platforms.includes("instagram");
+  // Every key is recorded before its upload starts, so a partly written object is cleaned up too.
+  const uploadedKeys: string[] = [];
+  let persisted = false;
+  try {
+    const images = await uploadIntakeImages(id, input, parsedImages, platforms.includes("instagram"), uploadedKeys);
+    const winner = await persistDraft(id, input, platforms, fingerprint, images);
+    persisted = !winner;
+    return winner ?? (await getContentRecord(id))!;
+  } finally {
+    if (!persisted) await discardObjects(id, uploadedKeys);
+  }
+}
+
+async function uploadIntakeImages(id: string, input: ContentIntakeInput, parsedImages: ReturnType<typeof prepareIntake>["parsedImages"], instagramSelected: boolean, uploadedKeys: string[]) {
   const images: StoredImage[] = [];
   for (let index = 0; index < parsedImages.length; index += 1) {
     const parsed = parsedImages[index];
     const fileName = `image-${index + 1}.${safeFileExtension(parsed.mimeType)}`;
-    const stored = await putObject(`operations/${id}/${fileName}`, parsed.buffer, parsed.mimeType);
+    const key = `operations/${id}/${fileName}`;
+    uploadedKeys.push(key);
+    const stored = await putObject(key, parsed.buffer, parsed.mimeType);
     let instagramStorageKey: string | undefined;
     if (instagramSelected) {
       const jpeg = await sharp(parsed.buffer).jpeg({ quality: 88 }).toBuffer();
-      instagramStorageKey = (await putObject(`operations/${id}/instagram/image-${index + 1}.jpg`, jpeg, "image/jpeg")).key;
+      instagramStorageKey = `operations/${id}/instagram/image-${index + 1}.jpg`;
+      uploadedKeys.push(instagramStorageKey);
+      await putObject(instagramStorageKey, jpeg, "image/jpeg");
     }
     images.push({
       id: randomUUID(),
@@ -137,7 +156,24 @@ export async function createContentDraft(input: ContentIntakeInput) {
       instagramStorageKey,
     });
   }
+  return images;
+}
 
+/** Objects of an intake that never became a stored record (failure, or lost the fingerprint race). */
+async function discardObjects(id: string, keys: string[]) {
+  if (!keys.length) return;
+  // A commit whose acknowledgement was lost must keep its images: delete only when the record is absent.
+  const stored = await prisma.operationsContent.count({ where: { id } }).catch(() => -1);
+  if (stored !== 0) {
+    console.error("operations intake cleanup skipped", { contentId: id, reason: stored < 0 ? "record state unknown" : "record exists", keys });
+    return;
+  }
+  const failed = await deleteObjects(keys).catch(() => keys);
+  if (failed.length) console.error("operations intake cleanup incomplete", { contentId: id, leftKeys: failed });
+}
+
+/** Returns the winning record when a concurrent identical intake stored it first, otherwise null. */
+async function persistDraft(id: string, input: ContentIntakeInput, platforms: OperationsPlatform[], fingerprint: string, images: StoredImage[]) {
   const captions = makePlatformCaptions(input, id);
   const adminImageUrls = images.map((image) => `/api/operations/content/${id}/images/${image.fileName}`);
   try {
@@ -182,7 +218,7 @@ export async function createContentDraft(input: ContentIntakeInput) {
     }
     throw error;
   }
-  return (await getContentRecord(id))!;
+  return null;
 }
 
 export async function approveContent(contentId: string, approvedBy: string, scheduledAt?: string | null, acknowledgeFactWarnings = false) {
@@ -194,6 +230,7 @@ export async function approveContent(contentId: string, approvedBy: string, sche
   if (schedule && Number.isNaN(schedule.getTime())) throw new Error("排程日期格式錯誤");
   const approver = trimText(approvedBy || "admin", 80);
   const shas = record.images.map((image) => image.sha256);
+  const accounts = await resolveApprovalAccounts();
   await prisma.$transaction(async (tx) => {
     const updated = await tx.operationsContent.updateMany({
       where: { id: contentId, approvalStatus: "pending" },
@@ -208,7 +245,7 @@ export async function approveContent(contentId: string, approvedBy: string, sche
         data: {
           status: schedule && schedule.getTime() > Date.now() ? "scheduled" : "queued",
           scheduledAt: schedule,
-          approvalHash: jobApprovalHash(shas, job),
+          approvalHash: jobApprovalHash(shas, job, accounts),
           factCheck: factCheck as unknown as Prisma.InputJsonValue,
         },
       });
@@ -241,15 +278,16 @@ async function claimJob(jobId: string, statuses: string[] = CLAIMABLE_STATUSES) 
   if (!job || job.content.approvalStatus !== "approved") return null;
   // Every not-yet-executed job of the content must still match its approval snapshot.
   const shas = imageShas(job.content);
+  const accounts = await resolveApprovalAccounts();
   const changed = job.content.jobs.find((sibling) =>
     CLAIMABLE_STATUSES.includes(sibling.status as JobStatus) &&
-    (!sibling.approvalHash || sibling.approvalHash !== jobApprovalHash(shas, { caption: sibling.caption, platform: sibling.platform as OperationsPlatform })),
+    (!sibling.approvalHash || sibling.approvalHash !== jobApprovalHash(shas, { caption: sibling.caption, platform: sibling.platform as OperationsPlatform }, accounts)),
   );
   if (changed) {
     await invalidateApproval(job.contentId, changed);
     return null;
   }
-  const expectedHash = jobApprovalHash(shas, { caption: job.caption, platform: job.platform as OperationsPlatform });
+  const expectedHash = jobApprovalHash(shas, { caption: job.caption, platform: job.platform as OperationsPlatform }, accounts);
   const now = new Date();
   const claimed = await prisma.operationsJob.updateMany({
     where: {
@@ -266,7 +304,7 @@ async function claimJob(jobId: string, statuses: string[] = CLAIMABLE_STATUSES) 
   if (claimed.count !== 1) return null;
   await addEvent(prisma, { type: "job_claimed", contentId: job.contentId, jobId, platform: job.platform, detail: `${job.idempotencyKey} owner=${LOCK_OWNER}` });
   const fresh = await prisma.operationsJob.findUnique({ where: { jobId }, include: { content: true } });
-  return fresh;
+  return fresh ? { row: fresh, accounts } : null;
 }
 
 export async function recoverExpiredProcessingJobs() {
@@ -294,8 +332,9 @@ export async function recoverExpiredProcessingJobs() {
 }
 
 export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses: string[] = CLAIMABLE_STATUSES) {
-  const claimed = await claimJob(jobId, statuses);
-  if (!claimed) return { success: false, status: "not_claimed", error: "工作不存在、未核准、尚在鎖定中或尚未到排程時間" };
+  const claim = await claimJob(jobId, statuses);
+  if (!claim) return { success: false, status: "not_claimed", error: "工作不存在、未核准、尚在鎖定中或尚未到排程時間" };
+  const claimed = claim.row;
   const draft = toDraft(claimed);
   const images = claimed.content.images as unknown as StoredImage[];
   const result = await executeJob(draft, mode, {
@@ -305,13 +344,16 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
       await prisma.operationsJob.updateMany({ where: { jobId, lockOwner: LOCK_OWNER, status: "processing" }, data: { submission: next as unknown as Prisma.InputJsonValue } });
     },
     instagramImageUrls: async () => Promise.all(images.map((image) => presignGet(image.instagramStorageKey || image.storageKey || ""))),
+    approvedInstagramAccount: claim.accounts.instagram,
   });
+  const plan = nextAttemptPlan(result, claimed.attempts);
 
   const finished = await prisma.operationsJob.updateMany({
     where: { jobId, lockOwner: LOCK_OWNER, status: "processing" },
     data: {
-      status: result.status,
-      lastError: result.error ?? null,
+      status: plan.status,
+      ...(plan.scheduledAt !== undefined ? { scheduledAt: plan.scheduledAt } : {}),
+      lastError: plan.error ?? null,
       externalId: result.externalId ?? claimed.externalId,
       postUrl: result.postUrl ?? claimed.postUrl,
       verification: result.verification ?? "not_tested",
@@ -325,16 +367,17 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
     where: { id: claimed.contentId },
     data: { status: aggregateContentStatus(siblings.map((s) => s.status as JobStatus), claimed.content.status as ContentRecord["status"]) },
   });
-  await addEvent(prisma, { type: "job_result", contentId: claimed.contentId, jobId, platform: claimed.platform, detail: result.error || result.status });
+  await addEvent(prisma, { type: "job_result", contentId: claimed.contentId, jobId, platform: claimed.platform, detail: plan.error || plan.status });
   const job = await prisma.operationsJob.findUnique({ where: { jobId } });
-  return { success: result.status === "dry_run_verified" || result.status === "published", status: result.status, job: job ? toDraft(job) : null, content: await getContentRecord(claimed.contentId) };
+  return { success: plan.status === "dry_run_verified" || plan.status === "published", status: plan.status, job: job ? toDraft(job) : null, content: await getContentRecord(claimed.contentId) };
 }
 
 export async function runDueJobs(mode: RunMode) {
   await recoverExpiredProcessingJobs();
+  const statuses = dueStatusesFor(mode);
   const due = await prisma.operationsJob.findMany({
     where: {
-      status: { in: AUTO_DUE_STATUSES },
+      status: { in: statuses },
       OR: [{ scheduledAt: null }, { scheduledAt: { lte: new Date() } }],
       content: { approvalStatus: "approved" },
     },
@@ -343,8 +386,22 @@ export async function runDueJobs(mode: RunMode) {
     select: { jobId: true },
   });
   const results = [];
-  for (const job of due) results.push(await runJob(job.jobId, mode, AUTO_DUE_STATUSES));
+  for (const job of due) results.push(await runJob(job.jobId, mode, statuses));
   return results;
+}
+
+/** New credentials were stored: parked awaiting_auth jobs for that platform become due again. */
+export async function requeueAwaitingAuth(platform: OperationsPlatform) {
+  const jobs = await prisma.operationsJob.findMany({ where: { platform, status: "awaiting_auth" }, select: { jobId: true, contentId: true } });
+  let requeued = 0;
+  for (const job of jobs) {
+    const changed = await prisma.operationsJob.updateMany({ where: { jobId: job.jobId, status: "awaiting_auth" }, data: { status: "queued", scheduledAt: null, lastError: null } });
+    if (changed.count === 1) {
+      requeued += 1;
+      await addEvent(prisma, { type: "job_requeued_after_auth", contentId: job.contentId, jobId: job.jobId, platform, detail: "credentials changed" });
+    }
+  }
+  return requeued;
 }
 
 export async function getJob(jobId: string) {

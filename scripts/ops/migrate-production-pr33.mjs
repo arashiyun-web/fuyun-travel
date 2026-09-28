@@ -8,10 +8,11 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { evaluateMigrateStatus } from "./migrate-status.mjs";
 
 const OWNER_ROLE = "neondb_owner";
 const PROD_ENDPOINT = "ep-proud-wildflower-ao4d38ll";
-const EXPECTED_NEW = ["202609280001_add_operations_tables", "202609280002_add_line_webhook_events"];
+const EXPECTED_NEW = ["202609280001_add_operations_tables", "202609280002_add_line_webhook_events", "202609290001_line_webhook_event_delivery"];
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : ""; };
 const apply = process.argv.includes("--apply");
 const approved = arg("--sha");
@@ -37,9 +38,14 @@ const prisma = (cmd) => spawnSync("npx", ["prisma", "migrate", cmd], { encoding:
 const scrub = (s) => (s || "").replace(/postgres(ql)?:\/\/\S+/g, "<url>");
 const status = prisma("status");
 console.log(scrub(status.stdout).trim().split("\n").slice(-8).join("\n"));
-const pending = EXPECTED_NEW.filter((m) => status.stdout.includes(m));
+const checked = evaluateMigrateStatus({ status: status.status, stdout: status.stdout, stderr: status.stderr }, EXPECTED_NEW);
+if (!checked.ok) {
+  console.error(`REFUSED: ${checked.reason}`);
+  console.error(scrub(status.stderr).slice(0, 600));
+  process.exit(3);
+}
 if (!apply) {
-  console.log(`guards PASS; pending listed: ${pending.join(", ") || "none"}. Re-run with --apply in the release window.`);
+  console.log(`guards PASS; ${checked.reason}: ${checked.pending.join(", ") || "none"}. Re-run with --apply in the release window.`);
   process.exit(0);
 }
 const deploy = prisma("deploy");

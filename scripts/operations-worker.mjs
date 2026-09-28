@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { mkdir, open, readFile, stat, unlink, utimes } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,32 +76,65 @@ function processAlive(pid) {
   }
 }
 
-async function acquireLock() {
-  await mkdir(path.dirname(lockPath), { recursive: true });
+/**
+ * A held lock may be taken over only when its heartbeat (file mtime, refreshed while the holder runs)
+ * has stopped for staleMs, or its process is gone. The creation time written into the file is not
+ * used: a long-running loop worker keeps an old creation time while it is alive.
+ */
+export function lockIsTakeable({ mtimeMs, pidAlive, now = Date.now(), staleMs = staleLockMs }) {
+  return now - mtimeMs > staleMs || !pidAlive;
+}
+
+/** Returns the lock token (file contents) this process owns. */
+export async function acquireLock(file = lockPath) {
+  await mkdir(path.dirname(file), { recursive: true });
+  const ownToken = `${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
   try {
-    const handle = await open(lockPath, "wx");
-    await handle.writeFile(`${process.pid}:${Date.now()}`, "utf8");
-    return handle;
+    const handle = await open(file, "wx");
+    await handle.writeFile(ownToken, "utf8");
+    await handle.close();
+    return ownToken;
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
     try {
-      const contents = await readFile(lockPath, "utf8");
-      const [pidText] = contents.split(":");
-      const lockAt = Number(contents.split(":").at(-1));
-      const lockStat = await stat(lockPath);
-      const stale = (Number.isFinite(lockAt) && Date.now() - lockAt > staleLockMs) || Date.now() - lockStat.mtimeMs > staleLockMs;
-      // A lock left by a crashed worker is taken over at once instead of blocking restarts
-      // until it goes stale (process.kill(pid, 0) only checks existence).
-      if (stale || !processAlive(Number(pidText))) {
-        await unlink(lockPath);
-        return acquireLock();
+      const contents = await readFile(file, "utf8");
+      const lockStat = await stat(file);
+      if (lockIsTakeable({ mtimeMs: lockStat.mtimeMs, pidAlive: processAlive(Number(contents.split(":")[0])) })) {
+        await unlink(file);
+        return acquireLock(file);
       }
     } catch (readError) {
-      if (readError?.code === "ENOENT") return acquireLock();
+      if (readError?.code === "ENOENT") return acquireLock(file);
       throw readError;
     }
     throw new Error("另一個 operations worker 已在執行");
   }
+}
+
+/** Touch or delete the lock only while it still carries this process's token. */
+async function ownsLock(file, ownToken) {
+  try {
+    return (await readFile(file, "utf8")) === ownToken;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+export async function refreshLock(file, ownToken) {
+  try {
+    if (!(await ownsLock(file, ownToken))) return false;
+    const timestamp = new Date();
+    await utimes(file, timestamp, timestamp);
+    return true;
+  } catch (error) {
+    if (error?.code !== "ENOENT") console.error("operations worker lock refresh failed");
+    return false;
+  }
+}
+
+export async function releaseLock(file, ownToken) {
+  if (await ownsLock(file, ownToken)) await unlink(file).catch(() => undefined);
 }
 
 async function runOnce() {
@@ -128,28 +162,23 @@ async function runOnce() {
   }
 }
 
-async function refreshLock() {
-  try {
-    const timestamp = new Date();
-    await utimes(lockPath, timestamp, timestamp);
-  } catch (error) {
-    if (error?.code !== "ENOENT") console.error("operations worker lock refresh failed");
+async function main() {
+  if (!token) {
+    console.error("OPERATIONS_CRON_TOKEN is required");
+    process.exitCode = 2;
+    return;
   }
-}
-
-if (!token) {
-  console.error("OPERATIONS_CRON_TOKEN is required");
-  process.exitCode = 2;
-} else {
-  let lockHandle;
+  let ownToken;
   try {
-    lockHandle = await acquireLock();
-    lockHeartbeat = setInterval(() => { void refreshLock(); }, Math.min(60_000, Math.floor(staleLockMs / 3)));
+    ownToken = await acquireLock();
+    lockHeartbeat = setInterval(() => { void refreshLock(lockPath, ownToken); }, Math.min(60_000, Math.floor(staleLockMs / 3)));
     lockHeartbeat.unref?.();
     process.on("SIGINT", () => { stopping = true; });
     process.on("SIGTERM", () => { stopping = true; });
     do {
-      await runOnce();
+      const ok = await runOnce();
+      // One-shot runs (scheduled task) report failure through the exit code; loop mode keeps retrying.
+      if (!loopMode && !ok) process.exitCode = 1;
       if (loopMode && !stopping) await sleep(intervalMs);
     } while (loopMode && !stopping);
   } catch (error) {
@@ -157,9 +186,20 @@ if (!token) {
     process.exitCode = 1;
   } finally {
     if (lockHeartbeat) clearInterval(lockHeartbeat);
-    if (lockHandle) {
-      await lockHandle.close();
-      await unlink(lockPath).catch(() => undefined);
-    }
+    if (ownToken) await releaseLock(lockPath, ownToken);
   }
 }
+
+// Run only when executed directly (tests import the lock helpers). Real paths, because Windows may
+// hand over an 8.3 short name in argv while import.meta.url carries the long one.
+function isEntryPoint() {
+  if (!process.argv[1]) return false;
+  const norm = (p) => (process.platform === "win32" ? realpathSync(p).toLowerCase() : realpathSync(p));
+  try {
+    return norm(path.resolve(process.argv[1])) === norm(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) await main();
