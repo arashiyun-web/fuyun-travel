@@ -936,3 +936,79 @@
 - 未能直接驗證：舊金鑰的 secret 已在 §18 覆寫、沒有留存，所以沒有以舊金鑰實測被拒；撤銷的證據是 API 回應與清單。
 - 證據檔 r2-token-policy-production.json 已註記 revoked。
 - 狀態：R2_OLD_WRONG_TOKEN=REVOKED；其餘同 §18.6（正式發版未進行）。
+
+## 20. 第十六輪（2026-09-29）：審查修正、GX10 紀錄、runbook 校正
+起點 dcc1161（與遠端一致）。程式提交：468bffe（15 則審查修正）、f59a01f（自我審查 MEDIUM）。Production env、正式 migration、憑證輪換、合併部署、worker 啟用、真實發布都未執行；沒有使用管理員繞過。
+
+### 20.1 GX10 admin-token-callers.json：未取得（阻擋仍在）
+- 查過的既有管道：
+  - GitHub：沒有新的 handoff 分支或含此檔的提交。
+  - SSH：8940 的 id_ed25519 以 `administrator@gx10-f6b2`／`100.85.105.46` 登入，BatchMode 回 `Permission denied (publickey,password)`；沒有猜測其他帳號。
+  - Claude 工作階段：沒有其他可聯絡的工作階段。
+- 沒有依聊天摘要代填；BLOCKING 狀態不變。
+- 版本校正註記另存 `%USERPROFILE%\.fuyun-tools\release\admin-token-callers.version-notes.md`（不修改原始紀錄）：
+  - `?admin_token=` 的 8 處 URL 用法屬 main ceee1b5（analytics 29／41、quotes/[id] 27／37／55／74、quotes 19／52，另有伺服器端 lib/adminQuoteAuth.ts:8），PR #33 已移除。
+  - Vercel env 變更只在新部署生效。
+
+### 20.2 審查 15 則（9 P1、6 P2）：全部成立並修正，逐則回覆，未標記 resolved
+| # | 優先 | 主題 | 修正 | 證據 |
+|---|---|---|---|---|
+| 1 | P1 | IG 核准綁定帳號 | 綁定實際發布帳號（env 或 OAuth 儲存）＋發布時再比對 | shared 單元測試（檔案 token store A→B） |
+| 2 | P1 | 登出未清 cookie | logout 呼叫 /api/auth/logout | 真瀏覽器、E2E |
+| 3 | P1 | 乾跑終態 | dry_run_verified 可再執行，live 模式到期 | 單元、E2E |
+| 4 | P1 | 事實確認 UI | 違規清單＋確認勾選才能核准 | 真瀏覽器 |
+| 5 | P1 | LINE 並行 | 原子 claim（ON CONFLICT）＋migration 202609290001 | claim 測試 10 並行＝1（舊邏輯對照＞1） |
+| 6 | P2 | LINE 回覆恢復 | 失敗回 500、快取回覆重送不重建 | offline 測試（舊 route 3 項 FAIL） |
+| 7 | P1 | worker 鎖 | 只看心跳 mtime／程序存活；只動自己的鎖 | worker 測試（舊版接管活鎖） |
+| 8 | P2 | one-shot 退出碼 | 失敗 exit 1 | worker 子程序測試（舊版 401 exit 0） |
+| 9 | P1 | 授權／重試退避 | awaiting_auth 停放、OAuth 後重排；retry 指數退避、5 次轉人工 | 單元、E2E |
+| 10 | P1 | IG IN_PROGRESS | 輪詢＋保留容器續行 | fake client 單元 |
+| 11 | P2 | R2 清理 | 失敗／敗方刪除上傳物件 | 本機 cleanup 測試（舊版 FAIL）、E2E 無孤兒 |
+| 12 | P1 | /me 讀 cookie | verifyAdminRequest | E2E、真瀏覽器 |
+| 13 | P2 | 排程共用 state | 以內容 ID 分開 | 真瀏覽器 |
+| 14 | P2 | migration 守門 | evaluateMigrateStatus | 單元＋真實 prisma 輸出 |
+| 15 | P2 | 拒答 regex | `\s*` | content-guard（舊 regex 漏 2／3） |
+- 限制：
+  - 登出後，若有人複製了舊 cookie 值，在 12 小時到期前仍然有效（無狀態 JWT）；伺服器端撤銷不在本輪範圍。
+  - LINE 重送使用重送事件的 reply token；若 LINE 已讓它過期，事件停在 built 並記錄錯誤。
+  - route 層並行測試在舊 route 也通過，不列為回歸證據；以 claim 測試為準。
+- 自我審查（code-reviewer，dcc1161..468bffe）：CRITICAL 0、HIGH 0；MEDIUM 1。
+  - 內容：快取回覆的寫入失敗時，事件狀態不會結束，之後可能多送一則中性訊息。
+  - 已於 f59a01f 修正並加測試。
+
+### 20.3 驗證（程式 f59a01f）
+- 本機：
+  - tsc 0、next build 0（126 頁）。
+  - 無 DB 測試 88 pass＋1 需 DB（IG DB store，以本機 PG 另跑 7/7）。
+  - 本機 PG：LINE claim 6/6、LINE offline 15/15、intake cleanup 3/3。
+  - 暫時 PG（55441）已停止並刪除。
+- Migration：
+  - 升級演練：正式 schema-only（pristine.sql）＋10 筆歷史 → 只套用 202609280001／0002／290001，13/13 finished；既有物件 `pg_dump -s` 差異 0。
+    - 首次嘗試因缺 role `rehearsal` 載入中斷，判為無效並重做。
+  - 新表／欄位與 schema.prisma 無漂移（其餘為 §13.3 既有漂移）。
+  - 測試分支 pr33-ops-e2e（ep-steep-star）以 owner 套用 202609290001；套用前 status 只列這一筆，套用後 up to date。
+- 雲端（isolated Neon／R2 Preview）：
+  - `run` @468bffe dpl_BHDNkj7G6YQ1u2Ssm1iD1GbDC3BJ：38/38＋INFO。
+  - `run` @f59a01f dpl_8vEShAN16ri1JQE52cLKkMHY6g6Y：38/38＋INFO（新增：/me cookie、登出清 cookie、跨站登出 403、乾跑後仍 approved、無孤兒物件、停放與退避）。
+  - `sched` @f59a01f：PASS（S4U／Limited exit 0、3 jobs 各 claim 一次、dry-run）；臨時排程已移除，Fuyun-Operations-Worker 仍 Disabled。
+  - 真瀏覽器（playwright-core 1.63＋本機 Chromium 1228，headless）@f59a01f dpl_8vEShAN16…：14/14。
+    - 涵蓋：UI 登入 cookie 屬性、cookie-only 可留在營運頁、事實警示與勾選、兩卡排程互不干擾且各自寫入、UI 登出後 cookie 消失、/me 403、營運頁導回 /admin。
+    - 截圖：%USERPROFILE%\.fuyun-tools\preview-e2e\browser-2026-09-28T22-28-18-219Z。
+  - 重新部署 → dpl_9UhWVjz6BAkpfXdkotWUEiUPbtPN：`verify` 10/10。
+  - 正式 R2（§18）與 Preview R2 範圍證據沿用（本輪未改 R2 設定或憑證）。
+
+### 20.4 runbook 校正
+- §2：migration 改為三個、驗收 13 筆。
+- §4：輪換須以 apply 之後建置的新部署驗收（createdAt 晚於 env 更新、網域指向新部署、verify、舊部署網址需 Vercel 驗證）。
+- §6：七頁詢價表單（/charter-bus/{taipei, new-taipei, taoyuan, hsinchu, taichung, tainan, kaohsiung} 的 WebMCPQuoteTool）依程式實際行為，只產生 LINE oaMessage 深連結，不寫入 DB。
+  - 會寫入 DB 的是 /contact/inquiry → /api/inquiry，另列驗收（需已核准的測試收件者）。
+- §8：不使用 Instant Rollback／Promote 回到 ceee1b5 的既有部署，因為那會帶回舊 token，而且 ceee1b5 仍接受 query 傳 token。
+  - 回復方式改為以目前 env 新建置：前滾修正，或走 PR 的 `git revert -m 1`、部分回退。
+  - 回復後驗收新部署 ID 與 rotate verify。
+
+### 20.5 狀態欄
+- 最新 HEAD：見 git log（本節文件提交）；程式測試 SHA f59a01f；PR #33 Ready for review、review REQUIRED
+- REVIEW_THREADS=15 成立、15 已修正、15 已回覆、0 resolved（留給 reviewer）
+- ADMIN_TOKEN_CALLERS=NOT_RECEIVED（BLOCKING）；VERSION_NOTES=SAVED（與原始紀錄分開）
+- 剩餘發版條件：reviewer approval、GX10／Hermes 原始紀錄與 validator PASS、Production env、發版當下新備份、預檢全 PASS
+- PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）
