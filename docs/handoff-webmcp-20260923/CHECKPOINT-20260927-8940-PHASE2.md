@@ -787,3 +787,58 @@
 
 ### 15.7 另列（不在本輪）
 - 標題核准（§13.9）、C:\fuyun_backup ACL／SSH（§13.8）、手機 LINE 真實收發測試。
+
+## 16. 第十二輪（2026-09-28 23:10 起）：正式 R2 憑證核對、呼叫端阻擋
+起點 27a5426。應用程式碼仍＝462ec68（本輪只改 ops／test-support 腳本與文件）。Production env、正式 migration、合併部署、worker 與真實發布都未動。
+
+### 16.1 production-release.env
+- 路徑：訊息中的 `C:\Users\Administrator.fuyun-secrets` 不存在；實際檔案在 `C:\Users\Administrator\.fuyun-secrets\production-release.env`（22:39 寫入）。
+- ACL：只有 Administrator、SYSTEM FullControl（繼承目錄 ACL，目錄不繼承）。
+- 格式：R2_ACCESS_KEY_ID 32 位 hex、R2_SECRET_ACCESS_KEY 64 位 hex；與 Preview 金鑰和 secret 都不同。
+- 已補入非秘密設定：R2_ACCOUNT_ID=797a01a1…（金鑰在此帳號有效）、R2_BUCKET_NAME=fuyun-ops-production。
+
+### 16.2 token policy 與 bucket（未通過）
+- 在 dashboard session 唯讀讀取帳號 token 清單（Chrome Browser 2），共 2 筆、使用者 token 0 筆。
+  - id sha256 c2371e1a… 對應這把正式金鑰：「R2 Account Token」，issued 2026-09-28T14:39:01Z，active，allow，Item Write（Object Read & Write）。
+  - **唯一資源是 fuyun-ops-pr33-e2e（測試 bucket），不是 fuyun-ops-production。**
+- 帳號 bucket 清單（管理 API 與 dashboard 都一樣）只有 fuyun-ops-pr33-e2e → **fuyun-ops-production 不存在。**
+- `r2-precheck --target production`：
+  - D FAIL（資源不符）。
+  - C FAIL（wrangler：bucket does not exist [code: 10006]）。
+  - A/B SKIPPED：policy 未通過，未寫入任何物件，因此沒有需要清理的測試物件。
+  - E FAIL：正式金鑰可以列出測試 bucket（allowed）。
+  - INFO ListBuckets 403 AccessDenied。
+- 結論：這把金鑰不可用於正式。需先建立 fuyun-ops-production，再建立只限該 bucket 的新 token 並覆寫。建議撤銷這把，因為它能讀寫測試 bucket。
+- 證據：%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json（只含 id_sha256 與非秘密 policy；目錄 ACL 與 .fuyun-secrets 相同）。
+
+### 16.3 腳本
+- **r2-precheck.mjs `--target production`：**
+  - 先檢查 D；未通過就不寫入任何物件。
+  - 通過後依序：C → A／B（唯一 key、finally 清理）→ E（正式金鑰列出測試 bucket 必須是 403 AccessDenied；用 ListObjectsV2，因為 HEAD 的 403 沒有錯誤碼）。
+  - Preview 目標回歸：D／C／A／B 全數 PASS，exit 0。
+- **admin-token-callers.mjs（新增）：** gx10、hermes 兩筆都必須完整。
+  - 必要欄位：checked=true、checkedBy、checkedAt、method、usesAdminAccessToken（布林）、usesQueryParam=false；有使用 token 時 readyForNewValue=true。
+  - 缺少紀錄、檔案毀損或欄位不完整都判不通過。測試 4/4。
+- **rotate-admin-access-token.mjs apply：** 呼叫端紀錄不完整時拒絕（實測 exit 3，未呼叫 Vercel）。
+- **release-preflight-pr33.mjs：**
+  - R2 改為呼叫 `r2-precheck --target production` 並納入其結果。
+  - GX10／Hermes 改為「FAIL BLOCKING」，沒有可略過項目。
+- **runbook：** 預檢必須全數 PASS；GX10／Hermes 未確認時阻擋輪換與合併，並寫明代理不得代填紀錄；更新 R2 現況與重建步驟。
+- 測試合計 23/23（callers 4、r2-scope-evidence 10、vercel-ascii 9）。
+
+### 16.4 預檢結果（27a5426＋本輪未提交變更，唯讀）
+- **PASS：**
+  - migration LF 與 blob 相同；正式 10／0，新 migration 未套用；DB session 唯讀。
+  - 備份 23.8 h、SHA256SUMS 相符（發版時仍需新備份）。
+  - bucket 名稱≠測試 bucket；金鑰≠Preview 金鑰。
+  - 輪換值已備妥；worker Disabled；正式仍為 ceee1b5。
+- **FAIL：**
+  - Production env 缺 7 個名稱。
+  - r2 D、C、A/B、E（見 16.2）。
+  - BLOCKING GX10／Hermes 呼叫端（無紀錄）。
+  - 工作樹不乾淨（當時有未提交檔）。
+
+### 16.5 狀態欄
+- R2_PROD_KEY_FORMAT=OK；R2_PROD_BUCKET_EXISTS=NO；R2_PROD_TOKEN_SCOPE=WRONG（fuyun-ops-pr33-e2e）；R2_PROD_PUBLIC_ENTRY=N/A（bucket 不存在）；R2_PROD_OBJECT_RW=NOT_RUN（policy 未通過，刻意不寫）
+- ADMIN_TOKEN_CALLERS=UNCONFIRMED（BLOCKING）；ROTATION_APPLIED=NO
+- PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled）

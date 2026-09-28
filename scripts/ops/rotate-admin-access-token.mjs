@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { readCallers } from "./admin-token-callers.mjs";
 
 const FILE = path.join(process.env.USERPROFILE, ".fuyun-secrets", "admin-access-token.env");
 const SCOPE = ["--scope", "arashiyun-s-projects", "--project", "fuyun-travel"];
@@ -32,6 +33,12 @@ if (cmd === "prepare") {
   }
 } else if (cmd === "apply") {
   if (!state.NEXT) throw new Error("run prepare first");
+  // Blocking: GX10/Hermes callers must be confirmed by whoever checked them (see admin-token-callers.mjs).
+  const callers = readCallers();
+  if (!callers.ok) {
+    console.error(`REFUSED: ADMIN_ACCESS_TOKEN callers not confirmed — ${callers.problems.join("; ")}`);
+    process.exit(3);
+  }
   vercel(["env", "rm", "ADMIN_ACCESS_TOKEN", "production", "--yes"]);
   const r = vercel(["env", "add", "ADMIN_ACCESS_TOKEN", "production"], state.NEXT);
   if (r.status !== 0) throw new Error("vercel env add failed: " + (r.stderr || "").slice(0, 200));

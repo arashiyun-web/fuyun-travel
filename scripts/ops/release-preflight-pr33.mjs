@@ -1,13 +1,14 @@
 // Read-only preflight for the PR #33 production release (runbook: docs/handoff-webmcp-20260923/
 // RELEASE-RUNBOOK-PR33.md). Changes nothing: the production DB is read in a read-only transaction,
 // Vercel env is listed by name only, R2 through the management API. Prints no secrets.
-//   powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --bucket <production bucket>
-// Exit 0 only when every check is PASS; UNVERIFIED marks what needs an owner step or another machine.
+//   powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs [--bucket fuyun-ops-production]
+// Exit 0 only when every check is PASS. Nothing is skippable: unconfirmed GX10/Hermes callers, an R2 key
+// not scoped to the production bucket, or missing Production env names are FAILs that block the release.
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { evaluateTokenPolicy } from "../test-support/r2-scope-evidence.mjs";
+import { readCallers } from "./admin-token-callers.mjs";
 
 const HOME = process.env.USERPROFILE;
 const SECRETS = path.join(HOME, ".fuyun-secrets");
@@ -84,37 +85,27 @@ else {
   put(missing.length === 0 ? "PASS" : "FAIL", "Production env has the operations/R2/admin names", missing.length ? `missing: ${missing.join(", ")}` : `${REQUIRED_PROD_ENV.length} present`);
 }
 
-// 5. Production R2: its own bucket and its own bucket-scoped key.
+// 5. Production R2: own bucket, own key scoped to it (policy first), public entry off, synthetic
+//    object round trip, and no reach into the Preview test bucket — delegated to r2-precheck.mjs.
 const preview = readEnv(path.join(SECRETS, "preview-e2e.env"));
 const release = readEnv(path.join(SECRETS, "production-release.env"));
-if (!PROD_BUCKET) put("UNVERIFIED", "production R2 bucket", "pass --bucket <name>");
+if (!release.R2_ACCESS_KEY_ID || !release.R2_BUCKET_NAME) put("FAIL", "production R2 settings saved in production-release.env", "run save-r2-credentials.ps1 -Target production; add R2_ACCOUNT_ID/R2_BUCKET_NAME");
 else {
-  put(PROD_BUCKET !== TEST_BUCKET ? "PASS" : "FAIL", "production bucket is not the test bucket", PROD_BUCKET);
-  sh("npx", ["-y", "wrangler@4.142.0", "whoami"]); // refreshes the OAuth token if needed
-  const toml = readFileSync(path.join(process.env.APPDATA, "xdg.config", ".wrangler", "config", "default.toml"), "utf8");
-  const token = (toml.match(/^oauth_token\s*=\s*"([^"]+)"/m) || [])[1];
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${preview.R2_ACCOUNT_ID}/r2/buckets`, { headers: { authorization: `Bearer ${token}` } }).then((x) => x.json()).catch(() => ({}));
-  const names = (r.result?.buckets || []).map((b) => b.name);
-  put(names.includes(PROD_BUCKET) ? "PASS" : "FAIL", "production bucket exists", r.success ? `account buckets: ${names.length}` : "management API unreadable");
-  for (const [a, label] of [[["dev-url", "get"], /r2\.dev URL is disabled/], [["domain", "list"], /no custom domains connected/]]) {
-    const o = sh("npx", ["-y", "wrangler@4.142.0", "r2", "bucket", ...a, PROD_BUCKET]);
-    put(o.status === 0 && label.test(o.stdout) ? "PASS" : "FAIL", `production bucket ${a[0]}: public entry off`);
+  if (PROD_BUCKET && PROD_BUCKET !== release.R2_BUCKET_NAME) put("FAIL", "--bucket matches production-release.env R2_BUCKET_NAME", `${PROD_BUCKET} ≠ ${release.R2_BUCKET_NAME}`);
+  put(release.R2_BUCKET_NAME !== TEST_BUCKET ? "PASS" : "FAIL", "production bucket is not the test bucket", release.R2_BUCKET_NAME);
+  put(release.R2_ACCESS_KEY_ID !== preview.R2_ACCESS_KEY_ID ? "PASS" : "FAIL", "production key differs from the Preview test key");
+  const pc = sh(process.execPath, [path.join("scripts", "test-support", "r2-precheck.mjs"), "--target", "production"]);
+  for (const line of pc.stdout.split(/\r?\n/).filter((l) => /^(PASS|FAIL|UNVERIFIED|SKIPPED) /.test(l))) {
+    const [status, ...rest] = line.split(" ");
+    put(status === "PASS" ? "PASS" : "FAIL", `r2 ${rest.join(" ")}`);
   }
-  if (!release.R2_ACCESS_KEY_ID) put("UNVERIFIED", "production R2 key saved (save-r2-credentials.ps1 -Target production)");
-  else {
-    put(release.R2_ACCESS_KEY_ID !== preview.R2_ACCESS_KEY_ID ? "PASS" : "FAIL", "production key differs from the Preview test key");
-    const evFile = path.join(HOME, ".fuyun-tools", "release", "r2-token-policy-production.json");
-    if (!existsSync(evFile)) put("UNVERIFIED", "production token policy evidence", "read the token policy as for the test key");
-    else {
-      const t = evaluateTokenPolicy(JSON.parse(readFileSync(evFile, "utf8")).token, { accessKeyId: release.R2_ACCESS_KEY_ID, accountId: preview.R2_ACCOUNT_ID, bucket: PROD_BUCKET });
-      put(t.scoped ? "PASS" : "FAIL", "production token: Object Read & Write on the production bucket only", t.problems.join("; "));
-    }
-  }
+  if (pc.status !== 0 && !/^(FAIL|UNVERIFIED|SKIPPED) /m.test(pc.stdout)) put("FAIL", "r2-precheck --target production ran", (pc.stderr || "").slice(0, 200));
 }
 
-// 6. ADMIN_ACCESS_TOKEN rotation and callers.
+// 6. ADMIN_ACCESS_TOKEN rotation and callers. Unconfirmed GX10/Hermes callers block the release.
 put(readEnv(path.join(SECRETS, "admin-access-token.env")).NEXT ? "PASS" : "FAIL", "rotation value prepared (admin-access-token.env NEXT)");
-put("UNVERIFIED", "GX10/Hermes callers of ADMIN_ACCESS_TOKEN confirmed", "needs the GX10 side; not readable from 8940");
+const callers = readCallers();
+put(callers.ok ? "PASS" : "FAIL", "BLOCKING: GX10/Hermes callers of ADMIN_ACCESS_TOKEN confirmed", callers.ok ? "record complete" : callers.problems.join("; "));
 
 // 7. State that must stay unchanged until after the release.
 const task = sh("powershell", ["-NoProfile", "-Command", "(Get-ScheduledTask -TaskName 'Fuyun-Operations-Worker' -ErrorAction SilentlyContinue).State"]).stdout.trim();

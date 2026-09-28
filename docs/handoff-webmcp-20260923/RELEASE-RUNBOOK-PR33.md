@@ -7,8 +7,9 @@
 - PR #33 取得符合分支規則的 reviewer approval。不使用管理員例外、不改分支保護、不 force-push。
 - 核准的完整 SHA 記為 `APPROVED_SHA`。之後若有新提交，本清單從頭重跑。
 - 唯讀預檢：
-  `powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --bucket <正式 bucket>`
-  - 除了「正式仍在 ceee1b5」與「GX10 呼叫端」兩項，其餘必須 PASS 才進入第 5 步。
+  `powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --bucket fuyun-ops-production`
+  - **全部項目 PASS 才可進入第 4 步（輪換）與第 5 步（合併），沒有可略過的項目。**
+  - 「GX10／Hermes 呼叫端已確認」是阻擋項（BLOCKING）；未確認時 `rotate-admin-access-token.mjs apply` 也會拒絕（exit 3）。
 - 發版窗口內不啟用 worker，真實發布維持關閉。
 
 ## 1. 正式 DB 備份（可恢復證據）
@@ -31,11 +32,23 @@
 - 驗收：`_prisma_migrations` 12 筆 finished、0 筆 unfinished；`pg_dump -s` 與演練結果比對，既有物件不變。
 
 ## 3. 正式 R2 與 Production env
-- 正式 bucket（名稱由持有人決定，例如 fuyun-ops-production）：私有、Public Development URL Disabled、Custom Domains 無。
-  - 目前帳號只有測試 bucket（2026-09-28 管理 API：1 個）→ 需由持有人在 R2 控制台建立。wrangler OAuth 沒有 R2 寫入範圍。
-- 正式憑證：R2 → Manage API tokens，Object Read & Write，Specify bucket 只選正式 bucket。
-  - 保存：`powershell -File scripts\test-support\save-r2-credentials.ps1 -Target production`，寫入 production-release.env，與 Preview 分開。
-  - 範圍證據：與測試 token 同法讀取 policy，存成 `%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json`（只含 id_sha256），由預檢評估。
+- 正式 bucket：fuyun-ops-production，私有、Public Development URL Disabled、Custom Domains 無。
+  - 由持有人在 R2 控制台建立；wrangler OAuth 沒有 R2 寫入範圍。
+  - 2026-09-28 狀態：**尚未建立**（管理 API 只列出 fuyun-ops-pr33-e2e）。
+- 正式憑證：R2 → API Tokens → Create Account API token。
+  - 權限 Object Read & Write；Specify bucket **只選 fuyun-ops-production**，不能選測試 bucket。
+  - 保存：`powershell -File scripts\test-support\save-r2-credentials.ps1 -Target production`，寫入 production-release.env，與 Preview 分開；R2_ACCOUNT_ID、R2_BUCKET_NAME 已補入。
+  - 2026-09-28 已保存的那把金鑰，policy 只限 **fuyun-ops-pr33-e2e（測試 bucket）**，而且能列出測試 bucket → **不可用於正式**。
+    - 需在建立正式 bucket 後重新建立 token，再用上述腳本覆寫。
+    - 舊 token 建議在 dashboard 撤銷；它能存取測試 bucket。
+  - 範圍證據：與測試 token 同法，在 dashboard session 唯讀讀取 policy，比對 id sha256。
+    - 存成 `%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json`（只含 id_sha256）。
+- 驗證：`node scripts/test-support/r2-precheck.mjs --target production`，以下各項都必須 PASS：
+  - D：policy 只限正式 bucket，最先檢查；未通過就不寫入任何物件。
+  - C：r2.dev Disabled、無 Custom Domains。
+  - A：唯一合成物件寫入、讀回雜湊、簽名網址，最後在 finally 刪除。
+  - B：匿名 S3 讀取被拒。
+  - E：正式金鑰不能列出測試 bucket，必須是 403 AccessDenied。
 - Production env 只新增下列名稱：
   - OPERATIONS_PERSISTENCE_MODE=database
   - OPERATIONS_LIVE_PUBLISH_ENABLED=false
@@ -51,13 +64,20 @@
 
 ## 4. ADMIN_ACCESS_TOKEN 輪換
 - 呼叫端：repo 內只有 lib/adminQuoteAuth.ts；8940 只有未部署的舊專案（§13.6）。
-- **GX10／Hermes 是否依賴：未清點。** 8940 無法讀取 GX10，這是發版依賴，需分身民在 GX10 上查 `ADMIN_ACCESS_TOKEN`／`admin_token` 的使用處。
-  - 若有依賴：先把呼叫端改為 header，並準備好新值的注入方式，再切換。
+- **GX10／Hermes 是否依賴：未清點，這是阻擋條件，不能略過。**
+  - 8940 無法讀取 GX10，需由實際查過的人（分身民）在 GX10 上查 `ADMIN_ACCESS_TOKEN`／`admin_token` 的使用處，並寫入紀錄 `%USERPROFILE%\.fuyun-tools\release\admin-token-callers.json`（格式見 scripts/ops/admin-token-callers.mjs）。
+    - gx10 與 hermes 各一筆：checked、checkedBy、checkedAt、method、usesAdminAccessToken、usesQueryParam=false、readyForNewValue。
+  - 紀錄不完整時：
+    - 預檢 FAIL（BLOCKING）。
+    - `rotate-admin-access-token.mjs apply` 拒絕（exit 3）。
+    - 第 5 步不得進行。
+  - 若有依賴：先把呼叫端改為 header，並準備好新值的注入方式（readyForNewValue=true），再切換。
+  - 代理不得代填此紀錄。
 - 新值已由 `rotate-admin-access-token.mjs prepare` 產生，只在 admin-access-token.env（fp d3c45fa759）。
 - 順序：呼叫端確認 → `apply`（與第 3 步同一窗口；單值替換，不雙收）→ 第 5 步部署 → `verify https://<正式網域>`（新值 header 404、query 401）→ 通知呼叫端更新。
 
 ## 5. 合併與部署
-- 第 1–4 步完成、預檢除上述兩項外全數 PASS 後，才在 GitHub 正常合併到 main，由 Git integration 部署 Production。
+- 第 1–4 步完成、預檢全數 PASS（含 GX10／Hermes 呼叫端）後，才在 GitHub 正常合併到 main，由 Git integration 部署 Production。
 - 不先合併觸發部署再補環境；env 變更只在下一次部署生效。
 
 ## 6. 正式驗證
