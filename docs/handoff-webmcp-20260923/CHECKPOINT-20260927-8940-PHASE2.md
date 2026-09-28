@@ -868,3 +868,57 @@
 ### 17.4 狀態欄
 - R2_PROD_BUCKET_EXISTS=NO；R2_PROD_TOKEN=UNCHANGED（c2371e1a…，scope fuyun-ops-pr33-e2e）；R2_PROD_OBJECT_RW=NOT_RUN
 - ADMIN_TOKEN_CALLERS=UNCONFIRMED（BLOCKING）；Production、worker、真實發布未變
+
+## 18. 第十四輪（2026-09-28 23:00–23:20）：代為建立正式 R2 bucket 與 token（持有人授權）
+授權範圍：只使用 8940 已登入的 Cloudflare 瀏覽器，核對帳號、建立 fuyun-ops-production 與同名 token、安全保存、驗證。Production env、migration、合併部署、worker 與真實發布都未動。
+
+### 18.1 瀏覽器
+- 擴充功能重連後兩個瀏覽器的顯示名稱對調，本工作階段一度改用 Linux 那台（未登入）。
+  - 那台只開過 Cloudflare 登入頁，沒有輸入任何資料；後來擴充功能斷線，該分頁無法關閉。
+- 改回持有人原先選的 deviceId 73edfe6b（8940 的 Brave，session 1）後，恢復為已登入狀態。
+- 帳號核對：797a01a17dd54adb268b2a3aaa5423c8，「Arashiyun@gmail.com's Account」。
+- 重複建立檢查：第一次開表單時分頁群組消失，當時沒有送出。重新登入後查帳號 token 仍是 2 筆舊的，確認未建立過，才開始建立。
+
+### 18.2 bucket
+- 在 dashboard 表單建立 fuyun-ops-production：Location 為 Automatic（未選 jurisdiction）、Standard、預設私有；建立時間 2026-09-28T15:03:56Z。
+- wrangler：`Public access via the r2.dev URL is disabled.`、`There are no custom domains connected to this bucket.`
+
+### 18.3 token
+- 表單設定：名稱 fuyun-ops-production、Object Read & Write、Apply to specific buckets only＝fuyun-ops-production（只此一個）、TTL Forever、無 IP 篩選。送出前以頁面 script 核對過。
+- 金鑰交接（未經對話、未截圖、未讀取結果頁文字）：
+  - 事前以非秘密亂數實測：8940 的 Brave 與本機共用剪貼簿；script 無法直接寫入剪貼簿，必須由真實點擊觸發。
+  - 結果頁由 script 找出唯一的 32 位 hex（排除帳號 ID）與唯一的 64 位 hex，只回傳數量與 sha256 前 8 碼（7873a5ba／b844feba）。
+  - 每個值都由注入按鈕的真實點擊寫入剪貼簿；本機 script 讀取、驗證格式與 sha 前綴後寫入 production-release.env，並立即清空剪貼簿。
+  - 完成後刪除頁面上的暫存變數與按鈕，離開結果頁。
+- production-release.env：R2_ACCOUNT_ID、R2_BUCKET_NAME、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY；ACL 只有 Administrator、SYSTEM。
+- policy（dashboard session 唯讀讀取）：
+  - 帳號 token 3 筆、使用者 token 0 筆；新 token id sha256 7873a5ba… 與保存的金鑰相符。
+  - active、issued 2026-09-28T15:09:58Z、未設到期、無 IP 條件；allow、Item Write（Object Read & Write）。
+  - 唯一資源 `…_default_fuyun-ops-production`。
+- 證據：%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json（只含 id_sha256 與非秘密 policy）。
+- Preview bucket 與既有 2 筆 token 保持不動。c2371e1a…（範圍為測試 bucket）仍是 active，建議由持有人撤銷。
+
+### 18.4 r2-precheck --target production（exit 0）
+- D PASS：這把金鑰、Object Read & Write、只限 fuyun-ops-production。
+- C PASS：r2.dev disabled、無 custom domain。
+- A PASS：bucket 可連線、唯一合成物件寫入、讀回 sha256 相符、60 秒簽名 URL 內容相同、物件已刪除；之後列出 bucket 為 0 個物件。
+- B PASS：匿名 S3 GET 回 400 InvalidArgument（端點層級）。
+- E PASS：正式金鑰列出測試 bucket 被拒（403 AccessDenied）。
+- INFO：ListBuckets 403 AccessDenied。
+
+### 18.5 預檢（ddeabbc，唯讀）
+- PASS：
+  - 工作樹乾淨；migration LF 與 blob 相同；正式 10／0，新 migration 未套用；DB session 唯讀。
+  - 備份 SHA256SUMS 相符。
+  - 正式 R2 全部項目（名稱、金鑰與 Preview 不同、D／C／A／B／E）。
+  - 輪換值已備妥；worker Disabled；正式仍為 ceee1b5。
+- FAIL（剩餘阻塞）：
+  - 備份已超過 24 h（24.2 h）→ 發版當下需重新產生。
+  - Production env 缺 7 個名稱。
+  - BLOCKING：GX10／Hermes 呼叫端沒有確認紀錄。
+
+### 18.6 狀態欄
+- R2_PROD_BUCKET=CREATED（private、dev-url disabled、no custom domain）；R2_PROD_TOKEN=CREATED（7873a5ba…，Object Read & Write，只限 fuyun-ops-production）；R2_PROD_PRECHECK=PASS（D/C/A/B/E）
+- R2_OLD_WRONG_TOKEN=ACTIVE（c2371e1a…，建議撤銷）
+- 剩餘發版阻塞：reviewer approval、GX10／Hermes 呼叫端紀錄、Production env、發版當下新備份
+- PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）
