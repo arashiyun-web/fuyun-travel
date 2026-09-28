@@ -636,3 +636,55 @@
 3. **標題：** 核准 13.9 的三個建議，並說明「辛巴區」、「心惡齋」、「带輨陣」的原意。
 4. **C:\fuyun_backup：** 是否套用 ACL_CHANGESET（可獨立進行）；SSH 改造需請分身民提供 GX10 上傳腳本的內容。
 5. **E2E 通過後，PR #33 需要 reviewer 核准。**
+
+## 14. 第十輪（2026-09-28 21:00–21:45）：憑證核對、R2、分支 Preview env、隔離 E2E、排程乾跑、持久化
+分支 feat/ops-worker-integration-20260927（PR #33，Draft）；程式 HEAD 462ec68（test-support 腳本）。正式環境、Production env 與真實發布均未動。
+
+### 14.1 權限與工作階段
+- 本機唯讀檢查未出現 auto mode classifier 錯誤；本輪無權限拒絕。
+- neonctl、wrangler（OAuth，account read）均已登入；沿用既有 Neon 分支 pr33-ops-e2e（plain-tooth-27002511）與 bucket fuyun-ops-pr33-e2e，未重建。
+
+### 14.2 Vercel CLI 失效根因（非權限問題）
+- 錯誤原文：`TypeError: Cannot convert argument to a ByteString because the character at index 0 has a value of 38642 which is greater than 255.`
+- 根因：vercel 60.1.3 的 OAuth 模組以 `${os.hostname()} @ …` 作為 User-Agent；電腦名「雲阿民」非 ASCII。§13 時 access token 尚有效，不需 refresh；token 於 09-28 10:04 到期後，每次呼叫都走 refresh 而失敗。
+- 處置：只作用於單一行程的 preload（NODE_OPTIONS `--require`，把 os.hostname() 改回 ASCII 並 syncBuiltinESMExports），未改 CLI 安裝、電腦名或憑證。檔案在工作階段 scratchpad，不入 Git。之後在 8940 使用 vercel CLI 需同樣處置，或改電腦名為 ASCII。
+
+### 14.3 憑證 ACL／格式
+- .fuyun-secrets 目錄：不繼承，只有 Administrator、SYSTEM FullControl；preview-e2e.env 繼承相同 ACL。
+- R2_ACCESS_KEY_ID 32 位 hex、R2_SECRET_ACCESS_KEY 64 位 hex、無空白；其他值長度正常、無空白。`r2-record` 補寫 R2_ACCOUNT_ID／R2_BUCKET_NAME。
+
+### 14.4 R2
+- 公開設定（Cloudflare 管理 API，wrangler 4.142.0，非以 S3 匿名讀取推論）：
+  - `r2 bucket dev-url get` → `Public access via the r2.dev URL is disabled.`
+  - `r2 bucket domain list` → `There are no custom domains connected to this bucket.`
+- r2-precheck 8/8 PASS：寫入、讀回 SHA-256、未簽名 GET 拒絕、60 秒簽名 URL、不能列出帳號 bucket、寫入其他 bucket 被拒、合成物件已刪除。
+
+### 14.5 Neon 分支（唯讀核對）
+- endpoint ep-steep-star-aomjm8tv ≠ 正式 ep-proud-wildflower-ao4d38ll；連線身份 e2e_app；客戶資料列 0。
+- _prisma_migrations 12/13 finished：多出的一列是首次以 e2e_app 執行失敗（42501）的 202609280001，已標記 rolled_back，僅存在測試分支；正式以 owner 角色執行，不會出現。
+- operations_contents／events／jobs、line_webhook_events 由 neondb_owner 擁有，e2e_app 有 S/I/U/D。
+
+### 14.6 分支 Preview env
+- rm 的比對以 API 篩選 {target: preview, gitBranch}，不會命中共用的 Production/Preview/Development 變數（已讀 CLI 原始碼確認），首次執行時 rm 全部 not-found、無變更。
+- 寫入 29 個 branch-scoped Preview 變數（16 個 DB 名稱＋13 個營運／管理／R2）。
+- Production env 前後 32 列，名稱／環境／建立時間比對差異 0。
+
+### 14.7 雲端驗證
+- Preview（Git push 462ec68）：dpl_5jWtZbhfs9dUsja15rgvYe4YuYnA（fuyun-travel-53g7nqkz1）。
+- `operations-preview-e2e run`：32/32 PASS（cookie 屬性、同源／跨來源、報價 header 授權、並行收件去重、R2 hash 與私有性、事實檢查、三路 process-due 各 claim 一次、核准後改動失效、lease 逾時、manual_required 不被 claim、live publish 關閉）。
+- `sched`：臨時 S4U／Limited 排程 lastResult=0、worker 完成 3 jobs、3 次 claim、全部 dry_run_verified、無 externalId；臨時排程與 env 檔已移除；Fuyun-Operations-Worker 仍為 Disabled。
+- 重新部署：`vercel redeploy` → dpl_3hah94PEf9RLD6SddA8qJZ7J3B5n（fuyun-travel-34sq85pdt）；`verify` 10/10 PASS（新部署可讀內容、圖片 hash、R2 物件與私有性）。
+
+### 14.8 狀態欄
+- PR33_HEAD=462ec68（之後僅文件提交）；DRAFT_STATUS=draft；正式部署仍為 ceee1b5
+- CLOUDFLARE_AUTH=GRANTED（OAuth）；R2_TEST_BUCKET=fuyun-ops-pr33-e2e；R2_PUBLIC_DEV_URL=DISABLED；R2_CUSTOM_DOMAINS=NONE；R2_S3_ACCESS_VERIFIED=YES（bucket-scoped）
+- NEON_PROJECT=plain-tooth-27002511；TEST_BRANCH=pr33-ops-e2e；PROD_ENDPOINT_DIFFERENT=YES；CUSTOMER_ROWS=0
+- ENV_SCOPE=29 個 branch-scoped Preview；PRODUCTION_ENV_CHANGED=NO
+- PREVIEW_E2E=PASS(32/32)；SCHEDULED_IDENTITY_TO_PREVIEW=PASS；PERSISTENCE_AFTER_REDEPLOY=PASS(10/10)
+- WORKER_ENABLED=NO；ROTATION_APPLIED=NO；LIVE_PUBLISH=OFF
+- OVERALL=PREVIEW_VERIFIED；待 reviewer 核准後依 §13.7 正式升級
+
+### 14.9 OWNER_ACTION
+1. PR #33 reviewer 核准（E2E 已通過）。
+2. §13.12 第 3、4 項（標題、C:\fuyun_backup ACL／SSH）仍待決定。
+3. 8940 的 Vercel CLI：建議把電腦名改為 ASCII，或接受每次以 preload 處置（見 14.2）。
