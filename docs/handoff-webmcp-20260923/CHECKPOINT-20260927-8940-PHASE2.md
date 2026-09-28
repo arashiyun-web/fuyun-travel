@@ -842,3 +842,29 @@
 - R2_PROD_KEY_FORMAT=OK；R2_PROD_BUCKET_EXISTS=NO；R2_PROD_TOKEN_SCOPE=WRONG（fuyun-ops-pr33-e2e）；R2_PROD_PUBLIC_ENTRY=N/A（bucket 不存在）；R2_PROD_OBJECT_RW=NOT_RUN（policy 未通過，刻意不寫）
 - ADMIN_TOKEN_CALLERS=UNCONFIRMED（BLOCKING）；ROTATION_APPLIED=NO
 - PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled）
+
+## 17. 第十三輪（2026-09-28 23:00）：正式 R2 重新核對（仍未通過）
+起點 52d7c40。本輪只做唯讀核對與文件更新，應用程式碼仍＝462ec68。
+
+### 17.1 檔案
+- 實際路徑仍為 `C:\Users\Administrator\.fuyun-secrets\production-release.env`（`C:\Users\Administrator.fuyun-secrets` 不存在）。
+- 22:53 重新寫入；ACL 只有 Administrator、SYSTEM；key 32 位 hex、secret 64 位 hex、帳號同 797a01a1…、R2_BUCKET_NAME=fuyun-ops-production。
+- **Access Key ID 的 sha256 仍為 c2371e1a…，與 §16 同一把**，不是新 token；與 Preview 金鑰不同。
+
+### 17.2 dashboard（唯讀，Chrome Browser 2）
+- 帳號 token 仍只有 2 筆，使用者 token 0 筆。
+- c2371e1a… 的 token：`modified_on` 仍等於 `issued_on`（2026-09-28T14:39:01Z），代表沒有編輯過；資源仍是 fuyun-ops-pr33-e2e。
+- bucket：default 只有 fuyun-ops-pr33-e2e；EU jurisdiction 0 個；FedRAMP 回 403（10003，帳號未啟用該 jurisdiction）。
+- 結論：**fuyun-ops-production 不存在**，也沒有新建或修改任何 token。
+
+### 17.3 r2-precheck --target production
+- D FAIL（資源為測試 bucket）。
+- C FAIL（bucket does not exist [code: 10006]）。
+- A/B SKIPPED：未寫入任何物件，因此沒有需要清理的測試物件。
+- E FAIL：這把金鑰可以列出測試 bucket。
+- INFO：ListBuckets 403 AccessDenied。
+- Preview E2E 與持久化沿用 §15 證據（9608ae2），本輪沒有影響它們的變更。
+
+### 17.4 狀態欄
+- R2_PROD_BUCKET_EXISTS=NO；R2_PROD_TOKEN=UNCHANGED（c2371e1a…，scope fuyun-ops-pr33-e2e）；R2_PROD_OBJECT_RW=NOT_RUN
+- ADMIN_TOKEN_CALLERS=UNCONFIRMED（BLOCKING）；Production、worker、真實發布未變
