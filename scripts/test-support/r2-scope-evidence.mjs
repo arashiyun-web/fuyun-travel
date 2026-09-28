@@ -83,7 +83,9 @@ export function evaluateTokenPolicy(token, { accessKeyId, accountId, bucket }) {
   }
   const unexpected = [...perms].filter((n) => n !== READ && n !== WRITE);
   if (unexpected.length) problems.push(`unexpected permissions: ${unexpected.join(", ")}`);
-  if (!perms.has(READ) || !perms.has(WRITE)) problems.push("not Object Read & Write");
+  // The dashboard's "Object Read & Write" is the single Item Write group (verified 2026-09-28 against the
+  // dashboard label for this token); Item Read alongside it is harmless, Item Read alone is read-only.
+  if (!perms.has(WRITE)) problems.push("not Object Read & Write");
   const expected = `com.cloudflare.edge.r2.bucket.${accountId}_default_${bucket}`;
   if (resources.size !== 1 || !resources.has(expected)) problems.push(`resources ${[...resources].join(", ") || "(none)"} ≠ ${expected}`);
   if ([...resources].some((r) => r.includes("*") || /^com\.cloudflare\.api\.account\./.test(r))) problems.push("account-wide or wildcard resource");

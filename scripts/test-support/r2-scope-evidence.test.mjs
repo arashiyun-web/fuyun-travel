@@ -80,6 +80,9 @@ test("token policy: Object Read & Write on exactly this bucket is scoped", () =>
   const { id, ...rest } = token();
   assert.equal(evaluateTokenPolicy({ ...rest, id_sha256: sha256Hex(id) }, want).scoped, true, "hashed id evidence");
   assert.equal(evaluateTokenPolicy({ ...rest, id_sha256: sha256Hex("x") }, want).scoped, false, "hashed id mismatch");
+  // Shape the dashboard actually issues for "Object Read & Write": the Item Write group alone.
+  const dashboardShape = token({ policies: [{ ...token().policies[0], permission_groups: [{ name: "Workers R2 Storage Bucket Item Write" }] }] });
+  assert.equal(evaluateTokenPolicy(dashboardShape, want).scoped, true, "Item Write alone");
 });
 
 test("token policy: all-buckets, account-wide, other bucket, extra permission, wrong id, inactive are not scoped", () => {

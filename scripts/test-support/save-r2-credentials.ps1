@@ -3,8 +3,11 @@
 # echoed, not put on a command line and not written to PowerShell history.
 # Run in your own PowerShell window on 8940:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-support\save-r2-credentials.ps1
+# For the production release token (separate bucket, separate key) add -Target production; it goes to
+# %USERPROFILE%\.fuyun-secrets\production-release.env and never into the Preview file.
+param([ValidateSet("preview", "production")][string]$Target = "preview")
 $ErrorActionPreference = "Stop"
-$envFile = Join-Path $env:USERPROFILE ".fuyun-secrets\preview-e2e.env"
+$envFile = Join-Path $env:USERPROFILE (".fuyun-secrets\" + $(if ($Target -eq "production") { "production-release.env" } else { "preview-e2e.env" }))
 
 function Read-Hidden([string]$prompt) {
   $secure = Read-Host -Prompt $prompt -AsSecureString
