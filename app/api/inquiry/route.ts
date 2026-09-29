@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { SITE } from "@/lib/site";
 import { pushLineText } from "@/lib/lineApi";
+import { unauthorized, verifyAdminMutation, verifyAdminRequest } from "@/lib/adminQuoteAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -253,7 +254,10 @@ async function notifyInquiryFallback(inquiry: InquiryRecord) {
   }
 }
 
+// Admin only: returns customer contact details (unmasked phone). Same auth as the quote admin API:
+// session cookie / admin JWT bearer, or ADMIN_ACCESS_TOKEN in the Authorization header.
 export async function GET(request: Request) {
+  if (!verifyAdminRequest(request)) return unauthorized();
   addAudit(request, "READ_INQUIRIES", "");
   const inquiries = await prisma.inquiry.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
 
@@ -355,7 +359,9 @@ export async function POST(request: Request) {
   }
 }
 
+// Admin only; cookie sessions must be same-origin.
 export async function PATCH(request: Request) {
+  if (!verifyAdminMutation(request)) return unauthorized();
   try {
     const body = await request.json();
     const id = clean(body.id, 80);
