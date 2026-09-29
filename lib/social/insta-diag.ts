@@ -21,6 +21,8 @@ import {
   publicHttpsRedirect,
   decodeKey,
   InstagramOAuthError,
+  inspectInstagramLoginToken,
+  resolveTokenStore,
 } from "./instagram-oauth.ts";
 
 export type InstaDiagStatus = "MISSING" | "INVALID" | "PASS" | "UNEXPECTED_EXCEPTION";
@@ -118,17 +120,27 @@ export function diagnoseInstaLoginConfig(
   fields.push(classifyKey("INSTAGRAM_LOGIN_STATE_SECRET", cleaned(env, "INSTAGRAM_LOGIN_STATE_SECRET"), 32));
   fields.push(classifyKey("INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY", cleaned(env, "INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY"), 32));
 
-  // Optional: absence is allowed (defaults to data/operations/...enc.json).
-  // It can never make the configuration fail, so it is always PASS.
-  const tokenStore = cleaned(env, "INSTAGRAM_LOGIN_TOKEN_STORE");
-  fields.push({
-    field: "INSTAGRAM_LOGIN_TOKEN_STORE",
-    status: "PASS",
-    note: tokenStore === null ? "optional; default path applies" : "custom path",
-  });
+  // Token store: validated with the runtime's own resolver. Unset means the durable
+  // database store (needs DATABASE_URL); a present-but-malformed value, a missing database,
+  // or a file store on Vercel is INVALID — it would make the OAuth routes fail at runtime.
+  const tokenStoreRaw = env.INSTAGRAM_LOGIN_TOKEN_STORE;
+  try {
+    const store = resolveTokenStore(env);
+    fields.push({
+      field: "INSTAGRAM_LOGIN_TOKEN_STORE",
+      status: "PASS",
+      note: store.kind === "database" ? (tokenStoreRaw === undefined ? "default: database" : "database") : "file (local tests only)",
+    });
+  } catch (e) {
+    fields.push({
+      field: "INSTAGRAM_LOGIN_TOKEN_STORE",
+      status: e instanceof InstagramOAuthError ? "INVALID" : "UNEXPECTED_EXCEPTION",
+      note: tokenStoreRaw === undefined ? "database store needs DATABASE_URL" : "present but invalid (use \"database\" or file:<path> off Vercel)",
+    });
+  }
 
   const unexpected = fields.some((f) => f.status === "UNEXPECTED_EXCEPTION");
-  const requiredOk = REQUIRED_FIELDS.every((name) =>
+  const requiredOk = [...REQUIRED_FIELDS, "INSTAGRAM_LOGIN_TOKEN_STORE"].every((name) =>
     fields.find((f) => f.field === name)?.status === "PASS",
   );
 
@@ -171,4 +183,31 @@ export function logInstaDiagnostic(
   // Fixed event name + machine-safe single line. No secret material.
   console.log(`[insta-diag] ${line}`);
   return line;
+}
+
+export type InstaAuthorizationState =
+  | "CONFIG_INCOMPLETE" // one or more settings MISSING/INVALID (see fields)
+  | "STORAGE_UNAVAILABLE" // settings pass but the token store cannot be read
+  | "NOT_AUTHORIZED" // store reachable, no token saved yet → owner must complete OAuth once
+  | "EXPIRED" // a token was saved but is past its expiry → re-authorize
+  | "AUTHORIZED"; // decryptable, unexpired token present (not a publish permission check)
+
+/**
+ * Runtime authorization state. Never returns token material; the account id is
+ * reported only as "present" so logs and responses stay non-identifying.
+ */
+export async function diagnoseInstagramAuthorization(
+  env: Record<string, string | undefined> = process.env,
+): Promise<{ state: InstaAuthorizationState; config: InstaDiagResult; expiresAt?: string }> {
+  const config = diagnoseInstaLoginConfig(env);
+  if (config.blocked) return { state: "CONFIG_INCOMPLETE", config };
+  try {
+    const key = decodeKey(env.INSTAGRAM_LOGIN_TOKEN_ENCRYPTION_KEY!.trim(), 32);
+    const inspected = await inspectInstagramLoginToken({ tokenEncryptionKey: key, tokenStore: resolveTokenStore(env) });
+    if (inspected.status === "valid") return { state: "AUTHORIZED", config, expiresAt: inspected.expiresAt };
+    if (inspected.status === "expired") return { state: "EXPIRED", config, expiresAt: inspected.expiresAt };
+    return { state: "NOT_AUTHORIZED", config };
+  } catch {
+    return { state: "STORAGE_UNAVAILABLE", config };
+  }
 }

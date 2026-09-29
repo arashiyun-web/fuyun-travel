@@ -73,11 +73,16 @@ export default function AdminPage() {
     }
   }
 
-  function logout() {
+  async function logout() {
+    // The HttpOnly session cookie can only be cleared by the server; the bearer token is local.
+    const cleared = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" })
+      .then((response) => response.ok)
+      .catch(() => false);
     localStorage.removeItem("admin_token");
     setToken("");
     setOrders([]);
     setSummary(initialSummary);
+    if (!cleared) setLoginError("登出時無法清除伺服器登入狀態，請關閉瀏覽器或稍後再按一次登出。");
   }
 
   function openPlatformAdmin() {
@@ -148,7 +153,7 @@ export default function AdminPage() {
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4 gap-3">
             <h2 className="text-base font-medium text-slate-200">全線訂單營運控制台</h2>
-            <button type="button" onClick={logout} className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:border-red-500/60 hover:text-red-300 transition-all">登出</button>
+            <button type="button" onClick={() => void logout()} className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:border-red-500/60 hover:text-red-300 transition-all">登出</button>
           </div>
           {loadError ? <div className="mb-4 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{loadError}</div> : null}
           {orders.length ? orders.map((order) => (

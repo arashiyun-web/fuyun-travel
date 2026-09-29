@@ -246,3 +246,97 @@ model FeaturedSpot {
   @@index([status])
   @@map("featured_spots")
 }
+
+// ── Operations backend (multi-image intake → approval → per-platform jobs) ──
+// Durable, multi-instance storage used when OPERATIONS_PERSISTENCE_MODE=database.
+
+model OperationsContent {
+  id                  String    @id
+  contentFingerprint  String    @unique @map("content_fingerprint")
+  version             Int       @default(1)
+  title               String
+  type                String
+  tripDate            String    @map("trip_date")
+  body                String
+  images              Json
+  selectedPlatforms   String[]  @map("selected_platforms")
+  status              String
+  approvalStatus      String    @default("pending") @map("approval_status")
+  approvedAt          DateTime? @map("approved_at")
+  approvedBy          String?   @map("approved_by")
+  generationMode      String    @default("deterministic_template") @map("generation_mode")
+  source              String    @default("mobile")
+  revisionOf          String?   @map("revision_of")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  jobs                OperationsJob[]
+
+  @@index([createdAt])
+  @@map("operations_contents")
+}
+
+model OperationsJob {
+  jobId          String            @id @map("job_id")
+  contentId      String            @map("content_id")
+  content        OperationsContent @relation(fields: [contentId], references: [id], onDelete: Restrict)
+  platform       String
+  caption        String
+  imageUrl       String?           @map("image_url")
+  imageUrls      String[]          @map("image_urls")
+  status         String
+  idempotencyKey String            @unique @map("idempotency_key")
+  attempts       Int               @default(0)
+  scheduledAt    DateTime?         @map("scheduled_at")
+  lockedUntil    DateTime?         @map("locked_until")
+  lockOwner      String?           @map("lock_owner")
+  approvalHash   String?           @map("approval_hash")
+  factCheck      Json?             @map("fact_check")
+  externalId     String?           @map("external_id")
+  postUrl        String?           @map("post_url")
+  lastError      String?           @map("last_error")
+  verification   String            @default("not_tested")
+  adapter        String
+  submission     Json?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@unique([contentId, platform])
+  @@index([status, scheduledAt])
+  @@map("operations_jobs")
+}
+
+model OperationsEvent {
+  id        String   @id
+  at        DateTime @default(now())
+  type      String
+  contentId String   @map("content_id")
+  jobId     String?  @map("job_id")
+  platform  String?
+  detail    String?
+
+  @@index([contentId, at])
+  @@map("operations_events")
+}
+
+model InstagramLoginToken {
+  slot          String   @id
+  encrypted     String
+  accountId     String   @map("account_id")
+  expiresAt     DateTime? @map("expires_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("instagram_login_tokens")
+}
+
+/// LINE webhook events already handled (redelivery dedupe by webhookEventId).
+model LineWebhookEvent {
+  webhookEventId String    @id @map("webhook_event_id")
+  handledAt      DateTime  @default(now()) @map("handled_at")
+  /// processing → sending → replied; a failed delivery returns to built (reply text cached for redelivery)
+  status         String    @default("replied")
+  replyText      String?   @map("reply_text")
+  claimedAt      DateTime? @map("claimed_at")
+
+  @@index([handledAt])
+  @@map("line_webhook_events")
+}

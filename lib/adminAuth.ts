@@ -132,8 +132,19 @@ export function verifyAdminRequest(request: Request) {
   return verifyAdminToken(bearer || `Bearer ${cookieToken(request.headers.get("cookie"))}`);
 }
 
-function sameOriginMutation(request: Request) {
-  const expectedOrigin = new URL(request.url).origin;
+/**
+ * Origin the client actually addressed. Next.js may rebuild request.url with an internal host
+ * (e.g. localhost), so prefer the proxy/host headers (set by Vercel; not settable by other pages).
+ */
+export function requestOrigin(request: Request) {
+  const url = new URL(request.url);
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || url.protocol.replace(/:$/, "");
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host") || url.host;
+  return `${proto}://${host}`;
+}
+
+export function isSameOriginRequest(request: Request) {
+  const expectedOrigin = requestOrigin(request);
   const origin = request.headers.get("origin");
   if (origin) return origin === expectedOrigin;
   const referer = request.headers.get("referer");
@@ -154,14 +165,17 @@ export function verifyAdminMutationRequest(request: Request) {
   const user = verifyAdminRequest(request);
   if (!user) return null;
   if (request.headers.get("authorization")?.startsWith("Bearer ")) return user;
-  return sameOriginMutation(request) ? user : null;
+  return isSameOriginRequest(request) ? user : null;
 }
 
-export function adminCookieOptions() {
+/** Secure follows the actual request scheme (x-forwarded-proto behind Vercel's proxy). */
+export function adminCookieOptions(request?: Request) {
+  const forwarded = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const https = request ? forwarded === "https" || new URL(request.url).protocol === "https:" : process.env.NEXT_PUBLIC_SITE_URL?.startsWith("https://") === true;
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_SITE_URL?.startsWith("https://") === true,
+    secure: https,
     path: "/",
     maxAge: Math.floor(TOKEN_TTL_MS / 1000),
   };

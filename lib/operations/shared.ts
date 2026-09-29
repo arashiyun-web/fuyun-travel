@@ -1,0 +1,346 @@
+import { createHash } from "crypto";
+import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";
+import { clearStoredInstagramLoginTokenFromEnvironment, readStoredInstagramLoginTokenFromEnvironment } from "@/lib/social/instagram-oauth";
+import { approvalHash, validateGenerated } from "./contentGuard";
+import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft } from "./types";
+
+/** Logic shared by the local file store and the database store. */
+
+export const MAX_IMAGES = 6;
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
+export const JOB_LEASE_MS = 5 * 60 * 1000;
+export const DUE_BATCH_LIMIT = 20;
+/** Statuses an operator may run explicitly. dry_run_verified stays runnable so a dry run never blocks the later live run. */
+export const CLAIMABLE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth", "manual_required", "dry_run_verified"];
+/**
+ * Statuses the worker picks up by itself. manual_required waits for a person; awaiting_auth is parked
+ * until the credentials change (requeueAwaitingAuth) so it cannot starve newer jobs; retryable_failed
+ * is only due again once its backoff time (scheduledAt) has passed.
+ */
+export const AUTO_DUE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed"];
+export const MAX_AUTO_ATTEMPTS = 5;
+export const RETRY_BASE_MS = 5 * 60 * 1000;
+export const RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+
+/** A dry-run-verified job becomes due again only for a live run. */
+export function dueStatusesFor(mode: RunMode): JobStatus[] {
+  return mode === "live" ? [...AUTO_DUE_STATUSES, "dry_run_verified"] : AUTO_DUE_STATUSES;
+}
+
+/**
+ * Where a job goes after a run. A retryable failure is rescheduled with exponential backoff (the due
+ * query only returns jobs whose scheduledAt has passed) and handed to a person after MAX_AUTO_ATTEMPTS.
+ * scheduledAt undefined = leave the stored value unchanged.
+ */
+export function nextAttemptPlan(result: JobResult, attempts: number, now = Date.now()): { status: JobStatus; scheduledAt?: Date | null; error?: string } {
+  if (result.status !== "retryable_failed") return { status: result.status, error: result.error };
+  if (attempts >= MAX_AUTO_ATTEMPTS) {
+    return { status: "manual_required", scheduledAt: null, error: `${result.error ?? "發布失敗"}（已自動重試 ${attempts} 次，改由人工處理）` };
+  }
+  const delay = Math.min(RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), RETRY_MAX_MS);
+  return { status: "retryable_failed", scheduledAt: new Date(now + delay), error: result.error };
+}
+
+export type RunMode = "dry-run" | "live";
+export type JobSubmission = NonNullable<PlatformDraft["submission"]>;
+export type JobResult = { status: JobStatus; error?: string; externalId?: string; postUrl?: string; verification?: PlatformDraft["verification"] };
+export type FactCheck = NonNullable<PlatformDraft["factCheck"]> & { acknowledgedBy?: string | null };
+
+export class OperationsStorageUnavailableError extends Error {
+  constructor(public readonly diagnostic: Record<string, boolean | string>) {
+    super("營運資料的正式持久化尚未配置完成，已拒絕寫入以避免資料遺失");
+    this.name = "OperationsStorageUnavailableError";
+  }
+}
+
+export function nowIso() {
+  return new Date().toISOString();
+}
+
+export function trimText(value: string, max: number) {
+  return value.trim().slice(0, max);
+}
+
+export function safeFileExtension(mimeType: string) {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+}
+
+export function getImageContentType(fileName: string) {
+  if (fileName.endsWith(".png")) return "image/png";
+  if (fileName.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
+}
+
+export function parseImage(dataUrl: string) {
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(dataUrl.trim());
+  if (!match) throw new Error("圖片格式只接受 JPEG、PNG 或 WebP");
+  const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
+  if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw new Error("單張圖片不可超過 8 MB");
+  return { mimeType: match[1], buffer };
+}
+
+export function sha256Hex(buffer: Buffer | string) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+/** Validate intake and return parsed images plus the dedupe fingerprint. */
+export function prepareIntake(input: ContentIntakeInput) {
+  if (!input.title.trim() || !input.body.trim() || !input.tripDate.trim()) throw new Error("標題、日期與行程文字必填");
+  if (!input.images.length || input.images.length > MAX_IMAGES) throw new Error(`圖片數量需介於 1 到 ${MAX_IMAGES} 張`);
+  const platforms = Array.from(new Set(input.selectedPlatforms));
+  if (!platforms.length) throw new Error("至少選擇一個發布平台");
+  const parsedImages = input.images.map((image) => parseImage(image.dataUrl));
+  const totalBytes = parsedImages.reduce((total, image) => total + image.buffer.length, 0);
+  if (totalBytes > MAX_TOTAL_IMAGE_BYTES) throw new Error("全部圖片不可超過 20 MB");
+  const fingerprint = sha256Hex(JSON.stringify({
+    title: trimText(input.title, 120),
+    type: input.type,
+    tripDate: trimText(input.tripDate, 40),
+    body: trimText(input.body, 12000),
+    selectedPlatforms: platforms.slice().sort(),
+    images: parsedImages.map((image, index) => ({ sha256: sha256Hex(image.buffer), originalName: trimText(input.images[index].originalName || "", 120) })),
+  }));
+  return { platforms, parsedImages, fingerprint };
+}
+
+function topicTag(title: string) {
+  const tag = title.replace(/[^一-鿿A-Za-z0-9]/g, "").slice(0, 16);
+  return tag || "台灣旅遊";
+}
+
+export function makePlatformCaptions(input: ContentIntakeInput, contentId: string) {
+  const dateLine = `出遊／預定出發日期：${input.tripDate}`;
+  const inquiryLine = `詢價請提供內容編號：${contentId}`;
+  const website = [`# ${input.title}`, "", input.body, "", dateLine, inquiryLine].join("\n");
+  const facebook = [`【${input.title}】`, input.type === "回顧" ? "這次實際走過的行程分享：" : "行程招生資訊：", input.body, "", dateLine, inquiryLine].join("\n");
+  const instagramBase = [input.title, input.body, dateLine].join("\n\n");
+  const instagram = `${instagramBase}\n\n#浮雲輕鬆遊 #台灣包車 #團體旅遊 #${topicTag(input.title)}`.slice(0, 2100);
+  return { website, facebook_group: facebook, instagram } satisfies Record<OperationsPlatform, string>;
+}
+
+export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter"] {
+  if (platform === "website") return "website_preview";
+  if (platform === "facebook_group") return "facebook_group_manual";
+  return "instagram_login_v2";
+}
+
+/** Accounts the platforms would publish to right now. Resolved once per approval/claim. */
+export type ApprovalAccounts = { instagram: string };
+
+/**
+ * The Instagram account the publisher would use: INSTAGRAM_LOGIN_ACCOUNT_ID, otherwise the account of
+ * the token stored by the OAuth flow — the same order as instagramV2Client().
+ */
+export async function resolveInstagramAccountId() {
+  const direct = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim();
+  if (direct) return direct;
+  try {
+    return (await readStoredInstagramLoginTokenFromEnvironment())?.accountId?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
+export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {
+  return { instagram: (await resolveInstagramAccountId()) || "unset" };
+}
+
+/** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */
+export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {
+  if (platform === "instagram") return `instagram:${accounts.instagram}`;
+  if (platform === "facebook_group") return "facebook_group:小羽旅遊趣";
+  return "website:fuyuntravel.com";
+}
+
+export function jobApprovalHash(imageSha256s: string[], job: Pick<PlatformDraft, "caption" | "platform">, accounts: ApprovalAccounts) {
+  return approvalHash({ text: job.caption, imageSha256s, platform: job.platform, account: platformAccount(job.platform, accounts) });
+}
+
+/** Captions are template output from staff input; the staff-entered trip date is the only approved date. */
+export function captionFactCheck(caption: string, tripDate: string): FactCheck {
+  return validateGenerated(caption, { version: "intake", dates: [tripDate.trim()], includes: [], excludes: [] });
+}
+
+/** Approval is refused while any selected platform has unacknowledged fact-check violations. */
+export function assertFactCheckApprovable(content: ContentRecord, acknowledgeFactWarnings: boolean) {
+  const failing = content.selectedPlatforms.filter((platform) => content.platforms[platform].factCheck?.ok === false);
+  if (failing.length && !acknowledgeFactWarnings) {
+    throw new Error(`內容事實檢查未通過（${failing.join("、")}）：價格、日期、名額或包含項目需有核准來源；請修改內容，或由核准人明確確認後再核准`);
+  }
+  return failing;
+}
+
+/** Only real publishing moves content forward; a dry run leaves it approved and eligible for the live run. */
+export function aggregateContentStatus(statuses: JobStatus[], current: ContentRecord["status"]): ContentRecord["status"] {
+  if (statuses.every((status) => status === "published")) return "completed";
+  if (statuses.some((status) => status === "published")) return "partial";
+  return current;
+}
+
+export function defaultSubmission(): JobSubmission {
+  return { phase: "not_started", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null };
+}
+
+export function validFacebookPostUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ["facebook.com", "www.facebook.com", "m.facebook.com"].includes(url.hostname.toLowerCase()) &&
+      Boolean(url.pathname) && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+export const CONTAINER_POLL_ATTEMPTS = 5;
+export const CONTAINER_POLL_DELAY_MS = 3000;
+
+/** The container exists but Instagram is still processing it; the job resumes later without recreating it. */
+export class ContainerNotReadyError extends Error {
+  constructor() {
+    super("Instagram container still processing");
+    this.name = "ContainerNotReadyError";
+  }
+}
+
+type InstagramClient = Awaited<ReturnType<typeof createInstagramLoginClientV2>>;
+
+async function instagramV2Client(): Promise<InstagramClient & { accountId: string }> {
+  if (process.env.OPERATIONS_INSTAGRAM_V2_ENABLED !== "true") throw new InstagramV2Error("configuration");
+  const directAccountId = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim() || "";
+  const directAccessToken = process.env.INSTAGRAM_LOGIN_ACCESS_TOKEN?.trim() || "";
+  let storedToken = null;
+  if (!directAccessToken) {
+    try {
+      storedToken = await readStoredInstagramLoginTokenFromEnvironment();
+    } catch {
+      throw new InstagramV2Error("configuration");
+    }
+  }
+  const accountId = directAccountId || storedToken?.accountId || "";
+  const accessToken = directAccessToken || storedToken?.accessToken || "";
+  const apiVersion = process.env.INSTAGRAM_LOGIN_API_VERSION?.trim() || "";
+  const mediaOrigin = process.env.INSTAGRAM_LOGIN_MEDIA_ORIGIN?.trim() || "";
+  if (!accountId || !accessToken || !apiVersion || !mediaOrigin) throw new InstagramV2Error("configuration");
+  return Object.assign(createInstagramLoginClientV2({ accountId, accessToken, apiVersion, mediaOrigins: [mediaOrigin] }), { accountId });
+}
+
+export type ExecuteDeps = {
+  /** Persist a submission phase before each external step so a crash never causes a blind resend. */
+  markSubmission: (patch: Partial<JobSubmission>) => Promise<void>;
+  /** Resolve HTTPS image URLs Instagram can fetch (e.g. short-lived presigned URLs). */
+  instagramImageUrls: () => Promise<string[]>;
+  /** Instagram account the approval was checked against at claim time; publishing to any other account is refused. */
+  approvedInstagramAccount?: string;
+  /** Test seams. */
+  instagramClient?: () => Promise<InstagramClient & { accountId: string }>;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Container that was fully created by an earlier attempt and can be resumed without recreating anything. */
+function resumableContainer(job: PlatformDraft, imageCount: number) {
+  const s = job.submission;
+  if (!s || s.phase !== "container_created" || s.publishIntentAt) return null;
+  if (imageCount > 1) return s.carouselContainerId && s.containerIds.length === imageCount ? s.carouselContainerId : null;
+  return !s.carouselContainerId && s.containerIds.length === 1 ? s.containerIds[0] : null;
+}
+
+async function waitForContainer(client: InstagramClient, containerId: string, sleep: (ms: number) => Promise<void>) {
+  for (let attempt = 1; ; attempt += 1) {
+    const { status } = await client.getContainerStatus(containerId);
+    if (status === "FINISHED" || status === "PUBLISHED") return;
+    if (status !== "IN_PROGRESS") throw new InstagramV2Error("unknown");
+    if (attempt >= CONTAINER_POLL_ATTEMPTS) throw new ContainerNotReadyError();
+    await sleep(CONTAINER_POLL_DELAY_MS);
+  }
+}
+
+async function submitInstagramV2Job(job: PlatformDraft, deps: ExecuteDeps) {
+  const client = await (deps.instagramClient ?? instagramV2Client)();
+  if (deps.approvedInstagramAccount !== undefined && `${client.accountId}` !== deps.approvedInstagramAccount) {
+    // Credentials were switched to another account after the claim; the approval does not cover it.
+    throw new InstagramV2Error("configuration");
+  }
+  const imageUrls = (await deps.instagramImageUrls()).filter(Boolean);
+  if (!imageUrls.length || imageUrls.length > 10 || imageUrls.some((url) => !url.startsWith("https://"))) throw new InstagramV2Error("input");
+  const isCarousel = imageUrls.length > 1;
+
+  let publishContainerId = resumableContainer(job, imageUrls.length);
+  if (!publishContainerId) {
+    await deps.markSubmission({ phase: "container_creating", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null });
+    const childContainerIds: string[] = [];
+    if (isCarousel) {
+      for (const imageUrl of imageUrls) {
+        const child = await client.createImageContainer({ imageUrl, mimeType: "image/jpeg", isCarouselItem: true });
+        childContainerIds.push(child.containerId);
+        await deps.markSubmission({ phase: "container_creating", containerIds: [...childContainerIds] });
+      }
+      const carousel = await client.createCarouselContainer({ caption: job.caption, children: childContainerIds });
+      publishContainerId = carousel.containerId;
+      await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds], carouselContainerId: publishContainerId });
+    } else {
+      const image = await client.createImageContainer({ caption: job.caption, imageUrl: imageUrls[0], mimeType: "image/jpeg" });
+      childContainerIds.push(image.containerId);
+      publishContainerId = image.containerId;
+      await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds] });
+    }
+  }
+  await waitForContainer(client, publishContainerId, deps.sleep ?? defaultSleep);
+  await deps.markSubmission({ phase: "publish_intent", publishIntentAt: nowIso() });
+  const published = await client.publishContainer(publishContainerId);
+  await deps.markSubmission({ phase: "submitted_pending_verification", submittedAt: nowIso() });
+  const verified = await client.verifyPublishedMedia(published.mediaId, job.caption, isCarousel ? "CAROUSEL" : "IMAGE");
+  return { externalId: published.mediaId, postUrl: verified.postUrl };
+}
+
+/** Decide and (in live mode) perform the external action for one already-claimed job. */
+export async function executeJob(job: PlatformDraft, mode: RunMode, deps: ExecuteDeps): Promise<JobResult> {
+  const factCheck = job.factCheck as FactCheck | undefined;
+  if (mode === "dry-run") {
+    // dry_run_verified is not terminal: it stays claimable and is due again for a live run (dueStatusesFor).
+    return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布；正式發布開關啟用後會重新排入。` };
+  }
+  if (process.env.OPERATIONS_LIVE_PUBLISH_ENABLED !== "true") {
+    return { status: "manual_required", verification: "pending", error: "正式發布總開關未啟用；已保留草稿與工作結果。" };
+  }
+  if (factCheck && factCheck.ok === false && !factCheck.acknowledgedBy) {
+    return { status: "manual_required", verification: "pending", error: "內容事實檢查未通過且未經核准人確認；未對外發布。" };
+  }
+  if (job.platform === "facebook_group") {
+    return { status: "manual_required", verification: "pending", error: "Facebook 社團不使用粉專 API；需老闆在核對社團身份後於正常介面送出。" };
+  }
+  if (job.platform === "website") {
+    return { status: "manual_required", verification: "pending", error: "官網正式頁面尚未提供可逆 CMS 發布接口；本次只完成預覽與可交接草稿。" };
+  }
+  // Keep the in-memory submission in step with what was persisted, so the error path below
+  // sees created containers and never classifies a possibly-sent job as retryable.
+  const tracked: ExecuteDeps = {
+    ...deps,
+    markSubmission: async (patch) => {
+      job.submission = { ...(job.submission || defaultSubmission()), ...patch };
+      await deps.markSubmission(patch);
+    },
+  };
+  try {
+    const published = await submitInstagramV2Job(job, tracked);
+    return { status: "published", externalId: published.externalId, postUrl: published.postUrl, verification: "verified" };
+  } catch (error) {
+    if (error instanceof ContainerNotReadyError) {
+      // Nothing was published and the container is kept; the retry resumes it (resumableContainer).
+      return { status: "retryable_failed", verification: "pending", error: "Instagram 容器仍在處理中；已保留容器，稍後自動續行，不會重建或重送。" };
+    }
+    const v2Error = error instanceof InstagramV2Error ? error : null;
+    if (v2Error?.kind === "authorization") await clearStoredInstagramLoginTokenFromEnvironment().catch(() => false);
+    if (v2Error?.kind === "configuration" || v2Error?.kind === "authorization" || v2Error?.kind === "input") {
+      return { status: "awaiting_auth", verification: "pending", error: "Instagram V2 尚未具備可用授權、公開 JPEG 圖片或正式設定；未對外重送。" };
+    }
+    if (v2Error?.mayHaveSucceeded || v2Error?.kind === "unknown" || job.submission?.containerIds.length || job.submission?.carouselContainerId) {
+      return { status: "submitted_pending_verification", verification: "pending", error: "Instagram 回應結果不明或容器已建立；已保留提交狀態，未自動重送。" };
+    }
+    return { status: "retryable_failed", verification: "failed", error: "Instagram V2 拒絕此次發布；未將其標記為成功。" };
+  }
+}

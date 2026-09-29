@@ -13,6 +13,11 @@ export async function POST(request: Request) {
   if (!authResult) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  // Writing into public/ is only durable on a local dev server. On Vercel the function filesystem
+  // is read-only/ephemeral, so refuse clearly instead of failing or losing the upload.
+  if (process.env.VERCEL) {
+    return NextResponse.json({ error: "圖片上傳需要正式物件儲存；目前未配置，已拒絕以免資料遺失" }, { status: 503 });
+  }
 
   let formData: FormData;
   try {

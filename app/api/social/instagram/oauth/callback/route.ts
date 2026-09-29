@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { INSTAGRAM_OAUTH_STATE_COOKIE, InstagramOAuthError, exchangeInstagramAuthorizationCode, readInstagramOAuthConfig, saveInstagramLoginToken, verifyInstagramOAuthState } from "@/lib/social/instagram-oauth";
 import { logInstaDiagnostic } from "@/lib/social/insta-diag";
+import { requeueAwaitingAuth } from "@/lib/operations/store";
 
 export const runtime = "nodejs";
 
@@ -51,12 +52,19 @@ export async function GET(request: Request) {
   try {
     const token = await exchangeInstagramAuthorizationCode(config, code);
     await saveInstagramLoginToken(config, token);
+    // Jobs parked for missing/revoked authorization become due again; the approval hash still binds
+    // them to their approved account, so a different account invalidates them at claim time.
+    const requeued = await requeueAwaitingAuth("instagram").catch((error) => {
+      console.error("instagram oauth: requeue of awaiting_auth jobs failed", { error: String(error).slice(0, 200) });
+      return 0;
+    });
     return result(request, {
       success: true,
       status: "authorized_token_stored",
       accountId: token.accountId,
       expiresAt: token.expiresAt,
       scopes: token.scopes,
+      requeuedJobs: requeued,
       note: "Token 已加密保存；未回傳 token。",
     }, 200);
   } catch (error) {
