@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
+import { cleanSourceUrl, mergePhotoUrls } from "@/lib/content-sync/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     title: string;
     description: string;
     photoUrl?: string;
+    photoUrls?: string[];
     sourceUrl?: string;
     sourceItemId?: string;
     postedAt?: string;
@@ -53,13 +55,20 @@ export async function POST(request: Request) {
     if (!Number.isNaN(parsed.getTime())) postedAt = parsed;
   }
 
+  // Keep every photo: the chosen cover first, then any given photos, then the rest of the source post's
+  // photos, so a single-photo form never drops the others. The source link falls back to the post URL.
+  const sourceItemId = body.sourceItemId?.trim() || null;
+  const sourceItem = sourceItemId ? await prisma.contentSyncItem.findUnique({ where: { id: sourceItemId } }) : null;
+  const photoUrls = mergePhotoUrls(body.photoUrl, Array.isArray(body.photoUrls) ? body.photoUrls : [], sourceItem?.rawPayload ?? null);
+
   const spot = await prisma.featuredSpot.create({
     data: {
       title: body.title.trim(),
       description: body.description.trim(),
-      photoUrl: body.photoUrl?.trim() || null,
-      sourceUrl: body.sourceUrl?.trim() || null,
-      sourceItemId: body.sourceItemId?.trim() || null,
+      photoUrl: photoUrls[0] ?? null,
+      photoUrls,
+      sourceUrl: cleanSourceUrl(body.sourceUrl) ?? cleanSourceUrl(sourceItem?.postUrl),
+      sourceItemId,
       postedAt,
       status: "published",
     },
