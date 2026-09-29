@@ -18,6 +18,8 @@ export const JOB_STATUSES = [
   "manual_required",
   "blocked_platform",
   "dry_run_verified",
+  /** Published website article taken down by an admin; never picked up again. */
+  "withdrawn",
 ] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
@@ -52,7 +54,7 @@ export interface PlatformDraft {
   postUrl: string | null;
   lastError: string | null;
   verification: "not_tested" | "pending" | "verified" | "failed";
-  adapter: "website_preview" | "facebook_group_manual" | "instagram_graph" | "instagram_login_v2";
+  adapter: "website_article" | "website_preview" | "facebook_group_manual" | "instagram_graph" | "instagram_login_v2";
   /** sha256 over the exact caption, image hashes, platform and target account at approval time. */
   approvalHash?: string | null;
   /** Deterministic fact check of the caption (lib/operations/contentGuard.mjs). */

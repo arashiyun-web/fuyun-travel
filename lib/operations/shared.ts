@@ -3,6 +3,7 @@ import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/ins
 import { clearStoredInstagramLoginTokenFromEnvironment, readStoredInstagramLoginTokenFromEnvironment } from "@/lib/social/instagram-oauth";
 import { approvalHash, validateGenerated } from "./contentGuard";
 import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft } from "./types";
+import type { WebsitePublishResult } from "./websitePublisher";
 
 /** Logic shared by the local file store and the database store. */
 
@@ -122,10 +123,17 @@ export function makePlatformCaptions(input: ContentIntakeInput, contentId: strin
 }
 
 export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter"] {
-  if (platform === "website") return "website_preview";
+  if (platform === "website") return "website_article";
   if (platform === "facebook_group") return "facebook_group_manual";
   return "instagram_login_v2";
 }
+
+/**
+ * Facebook group the manual path targets: companyConfig.facebookUrl (share link /share/g/1NPbXN8THD/)
+ * resolves to this group id. There is no publishing API for groups (removed with Graph API v19, 2024-04-22).
+ */
+export const FACEBOOK_GROUP_ID = "2875144269218828";
+export const FACEBOOK_GROUP_URL = `https://www.facebook.com/groups/${FACEBOOK_GROUP_ID}/`;
 
 /** Accounts the platforms would publish to right now. Resolved once per approval/claim. */
 export type ApprovalAccounts = { instagram: string };
@@ -151,7 +159,7 @@ export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {
 /** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */
 export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {
   if (platform === "instagram") return `instagram:${accounts.instagram}`;
-  if (platform === "facebook_group") return "facebook_group:小羽旅遊趣";
+  if (platform === "facebook_group") return `facebook_group:${FACEBOOK_GROUP_ID}`;
   return "website:fuyuntravel.com";
 }
 
@@ -234,6 +242,8 @@ export type ExecuteDeps = {
   instagramImageUrls: () => Promise<string[]>;
   /** Instagram account the approval was checked against at claim time; publishing to any other account is refused. */
   approvedInstagramAccount?: string;
+  /** Publish the approved website version as a public /travel article and read it back (database store only). */
+  publishWebsite?: () => Promise<WebsitePublishResult>;
   /** Test seams. */
   instagramClient?: () => Promise<InstagramClient & { accountId: string }>;
   sleep?: (ms: number) => Promise<void>;
@@ -314,7 +324,11 @@ export async function executeJob(job: PlatformDraft, mode: RunMode, deps: Execut
     return { status: "manual_required", verification: "pending", error: "Facebook 社團不使用粉專 API；需老闆在核對社團身份後於正常介面送出。" };
   }
   if (job.platform === "website") {
-    return { status: "manual_required", verification: "pending", error: "官網正式頁面尚未提供可逆 CMS 發布接口；本次只完成預覽與可交接草稿。" };
+    if (!deps.publishWebsite) return { status: "manual_required", verification: "pending", error: "此儲存模式沒有官網發布接口；未對外發布。" };
+    // Idempotent by slug: a retry updates the same article, never a second one.
+    const website = await deps.publishWebsite().catch((error: unknown) => ({ ok: false as const, reason: error instanceof Error ? error.message : "官網發布失敗" }));
+    if (!website.ok) return { status: "retryable_failed", verification: "failed", error: `官網：${website.reason}；稍後自動重試同一篇文章。` };
+    return { status: "published", externalId: website.articleId, postUrl: website.url, verification: "verified" };
   }
   // Keep the in-memory submission in step with what was persisted, so the error path below
   // sees created containers and never classifies a possibly-sent job as retryable.

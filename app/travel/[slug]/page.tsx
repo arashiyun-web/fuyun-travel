@@ -79,9 +79,21 @@ export default async function TravelDetailPage({ params }: TravelDetailPageProps
         {article.sections.map((section) => (
           <section key={section.heading}>
             <h2>{section.heading}</h2>
-            <p>{section.body}</p>
+            <p style={{ whiteSpace: "pre-line" }}>{section.body}</p>
           </section>
         ))}
+
+        {article.gallery?.length ? (
+          <section aria-label="行程照片">
+            <h2>行程照片</h2>
+            <div className="card-grid">
+              {article.gallery.map((photo) => (
+                // eslint-disable-next-line @next/next/no-img-element -- served by /travel-media, not next/image
+                <img key={photo.src} src={photo.src} alt={photo.alt} loading="lazy" style={{ width: "100%", height: "auto", borderRadius: 8 }} />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="card-grid">
           <div className="card">

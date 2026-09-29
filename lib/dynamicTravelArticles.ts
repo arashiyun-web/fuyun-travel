@@ -1,10 +1,12 @@
 import type { Article } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { travelArticles, type TravelArticle, type TravelCategory } from "@/lib/travelContent";
+import { publicImagePath } from "@/lib/operations/websitePublisher";
 
 type StoredSeo = {
   description?: string;
   faq?: Array<{ question: string; answer: string }>;
+  operations?: { images?: Array<{ alt?: string }> };
 };
 
 function category(value: string): TravelCategory {
@@ -17,6 +19,10 @@ function category(value: string): TravelCategory {
 
 export function storedArticleToTravelArticle(article: Article): TravelArticle {
   const seo = (article.seoJson || {}) as StoredSeo;
+  const gallery = (Array.isArray(seo.operations?.images) ? seo.operations.images : []).map((image, index) => ({
+    src: publicImagePath(article.slug, index),
+    alt: image.alt || article.title,
+  }));
   return {
     slug: article.slug,
     title: article.title,
@@ -25,7 +31,8 @@ export function storedArticleToTravelArticle(article: Article): TravelArticle {
     category: category(article.category),
     tags: article.tags,
     location: article.location || "台灣",
-    image: "/hero-bus-sunny.png",
+    image: gallery[0]?.src || "/hero-bus-sunny.png",
+    gallery,
     sections: [{ heading: "旅遊內容", body: article.content }],
     faq: Array.isArray(seo.faq) ? seo.faq : [],
   };
