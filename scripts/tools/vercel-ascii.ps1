@@ -28,7 +28,9 @@ try {
     $native = Get-Command $rest[1] -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $native) { [Console]::Error.WriteLine("--exec needs a native executable (node, powershell, ...): $($rest[1])"); exit 2 }
     $cmd = $native.Source
-    $cmdArgs = if ($rest.Count -gt 2) { $rest[2..($rest.Count - 1)] } else { @() }
+    # Always an array: assigning an if-expression unrolls a one-element array to a bare string,
+    # which is then splatted character by character (a single script path became its first letter).
+    $cmdArgs = @($rest | Select-Object -Skip 2)
     & $cmd @cmdArgs
   } else {
     $cli = $env:VERCEL_CLI_JS
