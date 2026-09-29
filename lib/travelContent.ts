@@ -20,6 +20,8 @@ export type TravelArticle = {
   tags: string[];
   location: string;
   image: string;
+  /** Photos of an article published from operations (permanent /travel-media URLs). */
+  gallery?: Array<{ src: string; alt: string }>;
   sections: Array<{ heading: string; body: string }>;
   faq: Array<{ question: string; answer: string }>;
   geo?: { latitude: number; longitude: number };

@@ -5,7 +5,7 @@ import styles from "./Operations.module.css";
 import type { ContentRecord, OperationsPlatform } from "@/lib/operations/types";
 
 const platformLabels: Record<OperationsPlatform, string> = {
-  website: "官網預覽",
+  website: "官網文章",
   facebook_group: "Facebook 社團",
   instagram: "Instagram",
 };
@@ -22,6 +22,38 @@ function fileToDataUrl(file: File) {
     reader.onerror = () => reject(reader.error || new Error("讀取圖片失敗"));
     reader.readAsDataURL(file);
   });
+}
+
+type OperationsStatus = {
+  mode: "live" | "dry-run";
+  website: { automatic: boolean; target: string };
+  instagram: { automatic: boolean; authState: string; expiresAt: string | null; accountId: string | null; apiVersionSet: boolean; mediaOriginSet: boolean };
+  facebookGroup: { automatic: boolean; target: string; reason: string };
+};
+
+const instagramStateLabels: Record<string, string> = {
+  AUTHORIZED: "已授權",
+  NOT_AUTHORIZED: "尚未授權（需老闆登入 Instagram 一次）",
+  EXPIRED: "授權已過期（需重新登入）",
+  CONFIG_INCOMPLETE: "設定不完整",
+};
+
+/** What approved, due jobs will actually do on this deployment. */
+function ModeBanner({ status }: { status: OperationsStatus | null }) {
+  if (!status) return <p className={styles.notice}>正在讀取目前發布模式…</p>;
+  const live = status.mode === "live";
+  const ig = status.instagram;
+  const igReady = ig.automatic && ig.authState === "AUTHORIZED" && ig.apiVersionSet && ig.mediaOriginSet;
+  return (
+    <div className={styles.notice} role="status">
+      <strong>{live ? "目前為正式發布模式：已核准且到排程時間的工作會由排程自動對外發布。" : "目前為乾跑模式：排程只驗證流程，不會對外發布。"}</strong>
+      <ul className={styles.hint}>
+        <li>官網：{live ? "自動發布" : "乾跑"} → {status.website.target}（公開頁與照片讀回確認後才標記完成）</li>
+        <li>Instagram：{ig.automatic ? "自動發布已啟用" : "自動發布未啟用"}；授權 {instagramStateLabels[ig.authState] || ig.authState}{ig.accountId ? `；帳號 ID ${ig.accountId}` : ""}{igReady ? "" : "；目前不會發出"}{ig.authState !== "AUTHORIZED" ? <> · <a href="/api/social/instagram/oauth/start">登入 Instagram 授權</a></> : null}</li>
+        <li>Facebook 社團：人工發布 → <a href={status.facebookGroup.target} target="_blank" rel="noopener noreferrer">{status.facebookGroup.target}</a>（{status.facebookGroup.reason}）</li>
+      </ul>
+    </div>
+  );
 }
 
 type ApprovalControlsProps = {
@@ -76,6 +108,7 @@ export default function OperationsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [manualResults, setManualResults] = useState<Record<string, { externalId: string; postUrl: string }>>({});
+  const [status, setStatus] = useState<OperationsStatus | null>(null);
 
   async function request(path: string, init: RequestInit = {}) {
     const response = await fetch(path, {
@@ -94,6 +127,7 @@ export default function OperationsPage() {
     try {
       const data = await request("/api/operations/content", { headers: {} });
       setContents(data.contents || []);
+      setStatus((await request("/api/operations/status", { headers: {} })) as unknown as OperationsStatus);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "讀取營運草稿失敗");
     }
@@ -183,10 +217,22 @@ export default function OperationsPage() {
     setBusy(true); setError(""); setMessage("");
     try {
       await request("/api/operations/process-due", { method: "POST", body: "{}" });
-      setMessage("已處理到期工作；預設為乾跑，不會向公開平台發送內容。");
+      setMessage(status?.mode === "live" ? "已處理到期工作（正式模式）：已核准且到期的工作已執行，結果見各平台狀態。" : "已處理到期工作（乾跑模式）：未對外發布。");
       await load();
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "排程處理失敗");
+    } finally { setBusy(false); }
+  }
+
+  async function withdraw(jobId: string) {
+    if (!window.confirm("確定下架這篇官網文章？公開頁與照片網址會停止提供。")) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await request(`/api/operations/jobs/${encodeURIComponent(jobId)}/withdraw`, { method: "POST", body: "{}" });
+      setMessage("官網文章已下架。");
+      await load();
+    } catch (withdrawError) {
+      setError(withdrawError instanceof Error ? withdrawError.message : "官網下架失敗");
     } finally { setBusy(false); }
   }
 
@@ -216,7 +262,7 @@ export default function OperationsPage() {
 
       <section className={styles.panel} aria-label="行程發布收件">
         <h2 className={styles.panelTitle}>行程發布收件</h2>
-        <p className={styles.notice}>價格、名額、集合時間與服務承諾只會照你輸入的內容帶出；系統不自行猜測。Facebook 這裡鎖定「社團」手動核對路徑，不套用粉專 API。</p>
+        <p className={styles.notice}>價格、名額、集合時間與服務承諾只會照你輸入的內容帶出；系統不自行猜測。Facebook 社團沒有官方發文 API，這裡是人工發布後回填網址，不套用粉專 API。</p>
         <div className={styles.grid}>
           <label className={styles.field}><span className={styles.label}>標題</span><input className={styles.input} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：阿里山日出包車行程" /></label>
           <label className={styles.field}><span className={styles.label}>內容類型</span><select className={styles.select} value={type} onChange={(event) => setType(event.target.value as "招生" | "回顧")}><option value="招生">行程招生</option><option value="回顧">出遊回顧</option></select></label>
@@ -233,11 +279,11 @@ export default function OperationsPage() {
 
       <section className={styles.panel} aria-label="草稿與發布結果">
         <h2 className={styles.panelTitle}>草稿、核准與逐平台結果</h2>
-        <p className={styles.notice}>「乾跑」只驗證本機流程，不代表公開平台已發布。正式官網、Facebook 社團與 Instagram 的對外驗證會分開顯示。</p>
+        <ModeBanner status={status} />
         {!contents.length ? <p className={styles.empty}>尚無營運草稿。</p> : contents.map((content) => (
           <article key={content.id} className={styles.record}>
             <div className={styles.recordTop}><div><h3 className={styles.recordTitle}>{content.title}</h3><span className={styles.meta}>{content.id} · {content.type} · 日期 {content.tripDate} · 圖片 {content.images.length} 張</span></div><span className={styles.badge}>{content.status}／核准：{content.approval.status}</span></div>
-            <div className={styles.platformGrid}>{content.selectedPlatforms.map((platform) => { const job = content.platforms[platform]; const manual = manualResults[job.jobId] || { externalId: job.externalId || "", postUrl: job.postUrl || "" }; return <div key={platform} className={styles.platform}><div className={styles.platformName}>{platformLabels[platform]}</div><div className={styles.status}>狀態：{job.status}<br />嘗試：{job.attempts} · 驗證：{job.verification}<br />Job：{job.jobId}</div><pre className={styles.caption}>{job.caption}</pre><div className={styles.platformActions}>{content.approval.status === "approved" ? <button type="button" className={styles.smallButton} onClick={() => void dryRun(job.jobId)} disabled={busy}>乾跑此平台</button> : null}{job.lastError ? <span className={styles.status}>{job.lastError}</span> : null}</div>{platform === "facebook_group" && content.approval.status === "approved" ? <div className={styles.field}><span className={styles.label}>人工貼文回填（完成後開啟網址核對）</span><input className={styles.input} value={manual.externalId} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, externalId: event.target.value } }))} placeholder="Facebook 外部 ID" /><input className={styles.input} value={manual.postUrl} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, postUrl: event.target.value } }))} placeholder="https://www.facebook.com/..." /><button type="button" className={styles.smallButton} onClick={() => void saveManualResult(job.jobId)} disabled={busy}>保存人工回填</button>{job.postUrl ? <a className={styles.hint} href={job.postUrl} target="_blank" rel="noreferrer">開啟已回填貼文</a> : null}</div> : null}</div>; })}</div>
+            <div className={styles.platformGrid}>{content.selectedPlatforms.map((platform) => { const job = content.platforms[platform]; const manual = manualResults[job.jobId] || { externalId: job.externalId || "", postUrl: job.postUrl || "" }; return <div key={platform} className={styles.platform}><div className={styles.platformName}>{platformLabels[platform]}</div><div className={styles.status}>狀態：{job.status}<br />嘗試：{job.attempts} · 驗證：{job.verification}<br />Job：{job.jobId}</div><pre className={styles.caption}>{job.caption}</pre><div className={styles.platformActions}>{content.approval.status === "approved" ? <button type="button" className={styles.smallButton} onClick={() => void dryRun(job.jobId)} disabled={busy}>乾跑此平台</button> : null}{job.lastError ? <span className={styles.status}>{job.lastError}</span> : null}{job.postUrl && platform !== "facebook_group" ? <a className={styles.hint} href={job.postUrl} target="_blank" rel="noopener noreferrer">開啟{job.status === "published" ? "已發布" : ""}貼文</a> : null}{platform === "website" && job.status === "published" ? <button type="button" className={styles.smallButton} onClick={() => void withdraw(job.jobId)} disabled={busy}>下架官網文章</button> : null}</div>{platform === "facebook_group" && content.approval.status === "approved" ? <div className={styles.field}><span className={styles.label}>人工貼文回填（完成後開啟網址核對）</span><input className={styles.input} value={manual.externalId} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, externalId: event.target.value } }))} placeholder="Facebook 外部 ID" /><input className={styles.input} value={manual.postUrl} onChange={(event) => setManualResults((current) => ({ ...current, [job.jobId]: { ...manual, postUrl: event.target.value } }))} placeholder="https://www.facebook.com/..." /><button type="button" className={styles.smallButton} onClick={() => void saveManualResult(job.jobId)} disabled={busy}>保存人工回填</button>{job.postUrl ? <a className={styles.hint} href={job.postUrl} target="_blank" rel="noreferrer">開啟已回填貼文</a> : null}</div> : null}</div>; })}</div>
             {content.approval.status !== "approved" ? (
               <ApprovalControls
                 content={content}

@@ -4,6 +4,8 @@ import sharp from "sharp";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deleteObjects, getObject, presignGet, putObject } from "./objectStore";
+import { publishWebsiteArticle } from "./websitePublisher";
+import { unpublishOperationsArticle, websitePublishDeps } from "./websiteStore";
 import {
   CLAIMABLE_STATUSES,
   DUE_BATCH_LIMIT,
@@ -345,6 +347,16 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
     },
     instagramImageUrls: async () => Promise.all(images.map((image) => presignGet(image.instagramStorageKey || image.storageKey || ""))),
     approvedInstagramAccount: claim.accounts.instagram,
+    publishWebsite: () => publishWebsiteArticle({
+      contentId: claimed.contentId,
+      jobId,
+      title: claimed.content.title,
+      type: claimed.content.type,
+      tripDate: claimed.content.tripDate,
+      caption: claimed.caption,
+      approvalHash: claimed.approvalHash || "",
+      images: images.map((image) => ({ key: image.storageKey || "", sha256: image.sha256, contentType: image.mimeType, alt: image.originalName })),
+    }, websitePublishDeps()),
   });
   const plan = nextAttemptPlan(result, claimed.attempts);
 
@@ -424,6 +436,20 @@ export async function recordFacebookManualResult(jobId: string, externalId: stri
     data: { externalId: safeExternalId, postUrl: safePostUrl, status: "manual_required", verification: "pending", lockedUntil: null, lockOwner: null, lastError: "已回填 Facebook 社團貼文連結；請人工開啟網址核對內容、照片與社團身份。" },
   });
   await addEvent(prisma, { type: "manual_result_recorded", contentId: job.contentId, jobId, platform: "facebook_group", detail: "external URL recorded; manual verification pending" });
+  return getJob(jobId);
+}
+
+/** Take a published website article down again; the job ends as withdrawn and is never re-run. */
+export async function withdrawWebsiteJob(jobId: string, by: string) {
+  const job = await prisma.operationsJob.findUnique({ where: { jobId } });
+  if (!job || job.platform !== "website") throw new Error("找不到官網工作");
+  if (job.status !== "published" || !job.externalId) throw new Error("只有已發布的官網文章可以下架");
+  const { slug } = await unpublishOperationsArticle(job.externalId, job.contentId);
+  const changed = await prisma.operationsJob.updateMany({
+    where: { jobId, status: "published" },
+    data: { status: "withdrawn", lastError: `官網文章已由 ${trimText(by || "admin", 80)} 下架（/travel/${slug} 不再公開）。` },
+  });
+  if (changed.count === 1) await addEvent(prisma, { type: "website_withdrawn", contentId: job.contentId, jobId, platform: "website", detail: `slug=${slug}` });
   return getJob(jobId);
 }
 

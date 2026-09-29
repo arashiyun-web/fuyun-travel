@@ -459,6 +459,12 @@ export async function recordFacebookManualResult(jobId: string, externalId: stri
   });
 }
 
+/** Website takedown exists only in database mode, where published articles are created. */
+export async function withdrawWebsiteJob(jobId: string, by: string) {
+  if (backend() !== "database") throw new Error("此儲存模式沒有官網文章可下架");
+  return db.withdrawWebsiteJob(jobId, by);
+}
+
 export async function runDueJobs(mode: RunMode = process.env.OPERATIONS_LIVE_PUBLISH_ENABLED === "true" ? "live" : "dry-run") {
   if (backend() === "database") return db.runDueJobs(mode);
   await fileRecoverExpired();
