@@ -37,7 +37,8 @@ export async function fetchRecentPagePosts(sinceDays = 7): Promise<FacebookGraph
   }
 
   const since = Math.floor(Date.now() / 1000) - sinceDays * 24 * 60 * 60;
-  const fields = "id,message,permalink_url,created_time,full_picture";
+  // attachments carry every photo of an album post; full_picture is only the cover.
+  const fields = "id,message,permalink_url,created_time,full_picture,attachments{media,subattachments{media}}";
   const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/posts?fields=${fields}&since=${since}&access_token=${token}`;
 
   try {

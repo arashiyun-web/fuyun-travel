@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
+import { cleanPhotoUrls, cleanSourceUrl } from "@/lib/content-sync/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
     sourcePostId?: string;
     postedAt?: string;
     photoUrl?: string;
+    /** Every photo of the post (first = cover); photoUrl alone is kept for older callers. */
+    photoUrls?: string[];
   };
   try {
     body = await request.json();
@@ -70,7 +73,8 @@ export async function POST(request: Request) {
     }
   }
 
-  const photoUrl = body.photoUrl?.trim() || undefined;
+  const images = cleanPhotoUrls([body.photoUrl, ...(Array.isArray(body.photoUrls) ? body.photoUrls : [])]);
+  const photoUrl = images[0];
 
   const item = await prisma.contentSyncItem.create({
     data: {
@@ -78,12 +82,13 @@ export async function POST(request: Request) {
       sourceType: body.sourceType,
       authorName: body.authorName?.trim() || null,
       summary: body.summary.trim(),
-      postUrl: body.postUrl?.trim() || null,
+      postUrl: cleanSourceUrl(body.postUrl),
       postedAt,
       batchLabel: currentBatchLabel(),
       // full_picture 沿用 weekly-pull（Facebook Graph API）既有的欄位命名，
       // 讓 /api/content-sync/select 產生草稿時的封面圖邏輯兩邊共用同一個key。
-      rawPayload: { message: body.summary.trim(), manualSubmit: true, ...(photoUrl ? { full_picture: photoUrl } : {}) },
+      // images keeps every photo so /highlights can show all of them.
+      rawPayload: { message: body.summary.trim(), manualSubmit: true, ...(photoUrl ? { full_picture: photoUrl, images } : {}) },
       status: "pending",
     },
   });

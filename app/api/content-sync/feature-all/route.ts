@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { deriveTitleFromSummary } from "@/lib/content-sync/deriveTitle";
+import { cleanSourceUrl, collectPhotoUrls } from "@/lib/content-sync/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -21,20 +22,18 @@ export async function POST(request: Request) {
   });
   const alreadyFeatured = new Set(existing.map((s) => s.sourceItemId));
 
-  const eligible = items.filter((item) => {
-    const photo = (item.rawPayload as { full_picture?: string } | null)?.full_picture;
-    return !!photo && !alreadyFeatured.has(item.id);
-  });
+  const eligible = items.filter((item) => collectPhotoUrls(item.rawPayload).length > 0 && !alreadyFeatured.has(item.id));
 
   const created = [];
   for (const item of eligible) {
-    const photo = (item.rawPayload as { full_picture?: string } | null)?.full_picture || null;
+    const photoUrls = collectPhotoUrls(item.rawPayload);
     const spot = await prisma.featuredSpot.create({
       data: {
         title: deriveTitleFromSummary(item.summary),
         description: item.summary,
-        photoUrl: photo,
-        sourceUrl: item.postUrl,
+        photoUrl: photoUrls[0] ?? null,
+        photoUrls,
+        sourceUrl: cleanSourceUrl(item.postUrl),
         sourceItemId: item.id,
         postedAt: item.postedAt,
         status: "published",
