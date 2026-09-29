@@ -70,7 +70,7 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
               ))}
             </div>
           ) : (
-            <img src="/hero-bus-sunny.png" alt={`${SITE.name} ${vehicle.title}`} className="h-72 w-full object-cover" />
+            <div className="flex h-56 w-full items-center justify-center gap-4 bg-[#34433c] text-[#f4ead6] sm:h-72"><Icon size={42} aria-hidden="true" /><span className="text-lg font-semibold">{vehicle.title} · 車型介紹</span></div>
           )}
           <div className="p-8">
             <Icon className="text-[#b89b5e]" size={42} />
