@@ -1233,3 +1233,80 @@ runbook 改為固定的第 1–8 步，回復改列為第 9 節：
 4. main 的 required approving reviews 仍為 0，屬持有人先前決定；其他分支保護規則未在本輪調整。
 
 以上是網站已上線後的收尾事項。任何清理、環境變更或重新部署，都須再核對正式網域、提交 SHA、部署 ID、未登入詢價 401 與 worker 的 dry-run 狀態。
+
+## 25. 第二十一輪（2026-09-29）：舊 Preview 盤點與清理、Development 隔離
+只記錄 ID、時間、端點識別碼與計數；不含密碼、金鑰、連線字串或客戶資料。
+
+### 25.1 起點核對
+- Vercel：帳號 arashiyun-web，team `team_Lplb6SCIdKhtRkWZ0deYYUox`，project fuyun-travel（`prj_4EEboycCgJIJudWwBhTwlQtKagU4`）。
+- 正式部署 `dpl_ANc7Q55KjAgVUJcgvFmHuGvN2WCo`（SHA 2660549）。fuyuntravel.com、yunsun.com.tw、fuyun-travel.vercel.app 三個網域都指向它。
+- 三個網域未登入的 GET /api/inquiry 都回 401。worker 為 Running，每個週期 0 job；OPERATIONS_LIVE_PUBLISH_ENABLED（Production）自 05:47Z 以來沒有變更。
+
+### 25.2 部署盤點（Vercel API，全部 61 個）
+- 共 14 個 Production、47 個 Preview。
+- 保護設定：ssoProtection = all_except_custom_domains（除了兩個自訂網域，所有 URL 都需要 Vercel 登入）；沒有密碼保護，也沒有 trusted IPs。
+- 另有 2 組 automation-bypass，建立於 2026-08-19，沒有 shareable-link。未讀取或變更它們的值；本輪只在記憶體中用來做刪除前後的探測。
+- Preview 資料庫隔離時間：
+  - 全分支：2026-09-29T09:13:16Z，隔離 `DATABASE_URL` 建立；共用的 16 個 DB 變數在此前幾分鐘移除 preview target。
+  - PR #33 分支專屬設定：2026-09-28T13:30:46Z–13:31:51Z，16 個變數全部覆寫。
+- 在這兩個時間點之前建置的 Preview，視為可能持有正式 DB 連線。
+- 盤點工具先前曾因 Windows cmd 把 URL 中的 `&` 當成指令分隔，導致分頁不斷重複第一頁；已停止重跑，改為加引號並偵測重複頁。
+
+### 25.3 刪除結果（23 個）
+刪除條件（必須全部符合）：
+- READY 狀態；
+- 在隔離之前建置；
+- 部署的提交已包含在 main；
+- 不是 Production、不是任一網域的目前指向、也不是 open PR 最新的 Preview。
+
+已刪除（依分支）：
+- docs/pr33-release-record-20260929：`dpl_EthE9qvNCZqQKm6LddC5T1dgRFca`
+- fix/inquiry-admin-auth-20260929：`dpl_tkqVwPXVzmKdrigrAhv7YwWwbnjc`
+- feat/ops-worker-integration-20260927（隔離前的 13 個）：`dpl_AF6PofYkhiXsL2uxMdTppsdDvBfQ`、`dpl_3rsVitgswx1Sin3K17DBEqnZxAJM`、`dpl_5RuG4EdEruvB57WTyuaG1tCt6oVe`、`dpl_9tNaHdnLu9R39Xpm5NttxbaQ9HFU`、`dpl_2s3cdb9o4G96BKzZFkyqjmDPJF5M`、`dpl_FvgXc2eYY6YmofGjh2UNH8co9bdM`、`dpl_AQqzrD38X6ZJAKh352iVVPM94uun`、`dpl_A3iaZ7gwrxtTkqYj7f1orcmFBPDn`、`dpl_FwqKuCYxVqRfQw8SM4jnbT5nCg35`、`dpl_HtD8VX47xtBZVWHby9wm878tMPmu`、`dpl_Ajy2ubFw2ZeAZpL1KyjiLiF3FqQZ`、`dpl_eTCQgwpYNBkq1QhwpL8P6916A3kr`、`dpl_JYmbkTPM3ztU5wc3WArUUrFU3EAW`
+- integrate/security-webmcp-ig-20260927：`dpl_C8RRvxd87F7Em9kUXMG2uujBrZpW`、`dpl_3JBgREus6Y1n2R5XFKoqacFAYYGc`、`dpl_FzKru6qckUMDEtts39tYxjaHnej3`
+- feat/ops-content-guard-20260927：`dpl_FkJjoK2DfpPaV9ZS2mpYWQc7XiSo`、`dpl_6q5zGCDZmeKRSa5gYLoYdnjjAgog`
+- handoff/webmcp-quote-ig-20260927：`dpl_E4uPi3DC3XnrnkxNQFn22P9Vc8mT`
+- fix/admin-auth-hardening-20260927：`dpl_2VLuXb1SW98ctYEPtwAfV2krb4gG`、`dpl_AsZKPVqhcuLY4CqwyH9ipJue2Xa4`
+
+驗證（不以未登入的 302 判定）：
+- 刪除前，帶 automation bypass 的 `/api/auth/me` 都回應用程式本身的 403（證明當時仍在提供服務）。
+- 刪除後以部署 ID 查 API，23 個都回 404。
+- 剛刪除時，有 10 個 URL 仍由邊緣節點回應應用程式，沒有算作完成。稍後重測 29 個 host（23 個部署網址加上它們的分支 alias），全部是 404 DEPLOYMENT_NOT_FOUND，沒有任何一個仍在提供應用程式。
+
+### 25.4 保留與待查
+- **保留：**
+  - 14 個 Production（含目前的 `dpl_ANc7Q55KjAgVUJcgvFmHuGvN2WCo`）。
+  - 17 個 PR #33 分支在其隔離設定之後建置的 Preview，以及 1 個 PR #36 Preview（`dpl_4ueDmsCvfo3wp38K228HDSG9SVG5`，全分支隔離之後建置）。
+  - 2 個 ERROR 建置 `dpl_BHTgVaXMxxHRboPucfQ7mTPazDc5`、`dpl_CNQbmu1oBUXpve5cwk6TuN47GL3F`：建置失敗，不提供服務，不在本輪範圍。
+- **待查（未刪）：**
+  - `dpl_FHvWicbCyc7C5ETLc5WmgkPTnaHf`：open PR #4（chore/remove-fb-manifest）最新的 Preview，2026-07-02 建置，可能持有正式 DB。PR 仍開啟，不能確認已停用。
+  - `dpl_hJXzjauBmRhS4BMKTMcCnhq5Sgqh`、`dpl_HL9ueStnZHUJjWuwvM3LoFs8b5LE`：2026-09-27 08:37–08:41 由 arashiyun-web 以 CLI 上傳，READY。metadata 記錄 fix/admin-auth-hardening-20260927 @ 9d8673f，但 CLI 上傳的是本機目錄內容，無法以 git 證明實際程式，可能持有正式 DB。
+  - `dpl_FJdzDhkpTBUaid7t81r4xrwy8BEA`：同一批 CLI 上傳，狀態 BLOCKED，不提供服務。
+- **因此「舊 Preview 仍可連正式 DB」尚未完全解決：** 上述 3 個 READY 部署（1 個 PR #4 Preview、2 個 CLI 上傳）只受 Vercel 登入保護。要徹底處理，需要持有人決定是否刪除它們，或另外規劃輪換正式 DB 憑證並重建正式部署（本輪依指示不輪換）。
+
+### 25.5 Development 隔離
+- 新 Neon branch `dev-isolated`（`br-flat-sea-aoo0xmkc`）。
+  - 以 `--schema-only` 從正式 branch main 建立，不複製資料。
+  - 專用角色 `dev_app`，endpoint `ep-late-smoke-aog71l5h`，與正式（ep-proud-wildflower）及 Preview（ep-steep-star）都不同。
+- 資料範圍：以 dev_app 連線，public 下 15 張表的資料列合計 0。
+- migration 歷史：只在 dev endpoint 執行 `prisma migrate resolve --applied`，記錄 13 筆歷史（不執行 DDL），之後 `migrate status` 為 up to date。
+- Vercel Development 的 16 個 DB 變數一起切換：
+  - 原本共用的條目改為只給 Production（逐一比對值的指紋，全部未變）。
+  - 另外新增只給 Development 的條目（encrypted）。
+  - 解密核對：16 個變數都指向 ep-late-smoke-aog71l5h、使用者 dev_app、資料庫 neondb、專案 plain-tooth-27002511。
+  - Production 只剩 16/16 個 DB 條目；Preview 條目的 id 與更新時間前後一致，沒有更動。
+- 連線資訊存於 `.fuyun-secrets\dev-db.env`，ACL 只限 Administrator 與 SYSTEM。
+- 過程中沒有對正式 DB 執行任何開發測試，本輪也沒有寫入正式 DB。
+
+### 25.6 pr33-ops-e2e 的未完成 migration（只保留證據，沒有變更）
+- 唯讀擷取 `_prisma_migrations`，存於 `.fuyun-tools\release\pr33-ops-e2e-unfinished-migration.json`：共 14 列。
+- finished_at 為空的只有一列：202609280001_add_operations_tables，started_at 2026-09-27T23:16:56Z，**rolled_back_at 2026-09-27T23:17:44Z**，applied_steps_count 0。
+  - log 首行是 Prisma 的「A migration failed to apply…」。
+  - 同一個 migration 另有一列已經 finished。
+- 唯讀執行 `prisma migrate status`：13 migrations，Database schema is up to date。
+- 結論：這是已標記 rolled back 的失敗嘗試，Prisma 視為已處理。§20／§24 所說的「13/1」是把這列算進 unfinished 的計數方式所致。本輪沒有重設或刪除這列。
+
+### 25.7 剩餘風險
+1. 3 個 READY 待查部署仍可能持有正式 DB 連線（見 25.4），只受 Vercel 登入保護。
+2. 2 組 automation-bypass 可以繞過 Vercel 登入。未輪換；持有者就是本專案的 CLI 登入。
+3. main 的必須核准數仍為 0。
