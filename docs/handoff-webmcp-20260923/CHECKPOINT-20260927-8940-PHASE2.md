@@ -1209,3 +1209,27 @@ runbook 改為固定的第 1–8 步，回復改列為第 9 節：
 - **管理員密碼外洩於本次工作階段輸出：** 檢查 admin-login.txt 格式時，指令把帳號與密碼印出。需要輪換：provision-admin-credentials，更新 Production 的 ADMIN_PASSWORD_HASH／SALT，再以新建置部署生效。
 - vercel-ascii.ps1：`--exec` 後只有一個參數時，只會傳入第一個字元。已在本 PR 修正，launcher 測試 10/10。
 - 合成資料的注意事項：dry-run 之後 job 仍可被 claim。之後若啟用 live，殘留的合成內容會被發布，所以驗收必須清理（本次已清理）。
+
+## 24. 第二十輪（2026-09-29）：詢價權限修補、管理憑證輪換與 Preview 隔離
+
+本節依 8940 發版作業的回報記錄。只記部署 ID、提交 SHA、驗收結果與尚待處理的範圍；不存放密碼、金鑰、連線字串或詢價內容。
+
+### 24.1 修補與目前正式部署
+- PR #34 已合併：merge commit `d9158b859e74be1fd84b925b240c5fd5d68e43fe`。GET /api/inquiry 要求管理員驗證；PATCH /api/inquiry 要求管理員驗證並檢查 cookie mutation 來源；公開 POST 保持可用。
+- PR #35 已正常合併：merge commit `2660549e853d7ea48113524e17530fe8866509c2`，只變更發版紀錄、runbook 與 Vercel launcher 腳本。
+- 目前正式部署 `dpl_ANc7Q55KjAgVUJcgvFmHuGvN2WCo`，來源 SHA 為 `2660549e853d7ea48113524e17530fe8866509c2`。09:19:03Z 建立、09:20:21Z Ready；最後一次管理憑證設定更新為 09:18:34Z。此前同一 SHA 的部署為 `dpl_Dn3pNcymg2FQX8VNE8RyycZ3Dy73`，之後另以 Vercel API 建立目前部署，未 Promote 或 Instant Rollback。該 API 不接受 no-cache 選項；本輪以實際登入與 session 驗證新設定已生效。
+- GitHub 上該提交的 Vercel 狀態為 success。2026-09-29 另以未登入、只取 HTTP 狀態碼的請求核對：fuyuntravel.com、yunsun.com.tw、fuyun-travel.vercel.app 的 GET /api/inquiry 均回 401；未讀取任何客戶資料。
+
+### 24.2 管理憑證、資料庫範圍與驗收
+- 使用 `scripts/provision-admin-credentials.mjs` 產生新的正式管理密碼、salt、hash 與 JWT_SECRET；管理員帳號名及 ADMIN_ACCESS_TOKEN 未變。Production 的三個管理驗證設定已更新，登入資訊檔 ACL 只限 Administrator 與 SYSTEM，沒有輸出秘密值。all-branches Preview 另產生獨立憑證；PR #33 分支專屬的 Preview 憑證未變。
+- Preview 全分支的新部署改用隔離 Neon branch `pr33-ops-e2e`（無客戶資料）；原本共用的 16 個資料庫變數只留給 Production 與 Development，值未改。既有 Preview 部署不因 env 更新而改變，見 24.3。
+- 兩個正式網域的管理憑證、session 與詢價 API 驗收共 20/20 PASS：新密碼登入、錯誤密碼 401、以不同簽章金鑰產生的 session 403、新金鑰 session 200、管理員 GET /api/inquiry 200（不列印資料列）、未登入 GET/PATCH 401、登出清 cookie、/contact/inquiry 200。舊 session 的測試是不同金鑰簽章的間接驗證，沒有保留輪換前的真實 session。
+- 公開表單送出一筆合成詢價回 200、確認寫入後刪除。驗收腳本早期因 heredoc 的 regex 逸出遺失而讀不到登入檔，送出空白帳密，造成兩次假失敗；修正腳本後上述驗收通過。worker 仍以 dry-run 每週期 0 job 運行，真實發布維持關閉。
+
+### 24.3 待處理的部署及開發環境風險
+1. 輪換之前建立的 Preview 部署仍可能持有舊的正式資料庫連線設定及舊 Preview 管理憑證。已抽查的舊 Preview URL 對未登入者要求 Vercel 登入；仍須在完整盤點、核對不含目前正式部署後，移除那些舊 Preview 部署，或採另行規劃的資料庫憑證輪換與正式重建。移除前不得把 Vercel 保護關閉。
+2. Development 的資料庫設定仍指向正式 DB；`vercel env pull` 與 `vercel dev` 的使用者須先確認連線目標。應改為隔離開發分支，並核對所有相關變數一起切換。
+3. Preview 隔離 branch `pr33-ops-e2e` 的 migration 紀錄留有一筆未完成項；未釐清前不要在該分支執行 migration。
+4. main 的 required approving reviews 仍為 0，屬持有人先前決定；其他分支保護規則未在本輪調整。
+
+以上是網站已上線後的收尾事項。任何清理、環境變更或重新部署，都須再核對正式網域、提交 SHA、部署 ID、未登入詢價 401 與 worker 的 dry-run 狀態。
