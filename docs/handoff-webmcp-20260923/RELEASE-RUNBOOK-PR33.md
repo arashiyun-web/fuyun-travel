@@ -63,7 +63,11 @@
 
 ## 4. ADMIN_ACCESS_TOKEN 輪換
 - 呼叫端：repo 內只有 lib/adminQuoteAuth.ts；8940 只有未部署的舊專案（§13.6）。
-- **GX10／Hermes 是否依賴：未清點，這是阻擋條件，不能略過。**
+- **GX10／Hermes 呼叫端：這是阻擋條件，不能略過。** 2026-09-29 已取得分身民產出的原始紀錄：
+  - 來源：`arashiyun@gx10-f6b2:/home/arashiyun/hermes-fenshenmin/.fuyun-tools/release/admin-token-callers.json`，SHA-256 來源端與本機一致（7c8c27c3…5765a7cb）。
+  - validator 通過；兩端皆 usesAdminAccessToken=false、usesQueryParam=false。
+  - 已原樣保存；版本校正另存 version-notes.md。
+  - 發版當下預檢仍會重新驗證；若 GX10／Hermes 在此之後有變更，需重新取得紀錄。
   - 8940 無法讀取 GX10，需由實際查過的人（分身民）在 GX10 上查 `ADMIN_ACCESS_TOKEN`／`admin_token` 的使用處，並寫入紀錄 `%USERPROFILE%\.fuyun-tools\release\admin-token-callers.json`（格式見 scripts/ops/admin-token-callers.mjs）。
     - gx10 與 hermes 各一筆：checked、checkedBy、checkedAt、method、usesAdminAccessToken、usesQueryParam=false、readyForNewValue。
   - 紀錄不完整時：
@@ -105,17 +109,36 @@
 - 真實對外發布需要內容核准，以及各平台以測試帳號實測，另案進行。
 
 ## 8. 回復
-- 程式回復基準：ceee1b5（部署 dpl_Fvr7b…）。
-- **不使用 Instant Rollback／Promote 回到 ceee1b5 的既有部署**：部署保留建置當時的 env，回到那個部署等於把舊的 ADMIN_ACCESS_TOKEN（§8.1 已確認曾外洩於 Git 歷史）重新啟用。
-  - ceee1b5 的程式也仍接受 `?admin_token=`（8 處用法屬 main ceee1b5；PR #33 已移除），回退後以 query 傳值的風險同時回來。
-- 不恢復舊憑證的回復方式（擇一，以新建置部署完成）：
-  1. 首選：修正後前滾（新的修正提交，走一般 PR 與部署）。
-  2. 需要回到舊程式時：在 main 以 `git revert -m 1 <PR #33 合併提交>` 建立回退提交，走一般 PR 合併，由 Git integration 以「目前的」Production env 建置新部署。
-     - 新增的 OPERATIONS_*／R2_* 名稱舊程式不讀取，可保留；ADMIN_ACCESS_TOKEN 維持新值。
-     - 回退後以 `rotate-admin-access-token.mjs verify` 確認新值 header 可用；呼叫端只以 header 傳值，不以 query 傳值。
-  3. 若回退的是整個 PR 而需要保留管理端安全修正（移除 `?admin_token=`），改為只回退營運相關檔案的部分回退提交，同樣走 PR 與新建置。
-- 回復後驗收：正式網域的 deployment id 為新建置部署、其 sha 為回退提交；rotate verify 通過；舊值 header 回 401。
-- 程式回復不會回復資料庫：三個新表／欄位（202609280001、202609280002、202609290001）保留，舊版不使用、不受影響。
-- 程式回復不會移除新增的 Production env 名稱；若要移除需另行操作，並同樣只在下一次新建置部署生效。
+- 程式基準 ceee1b5（部署 dpl_Fvr7b…）**不是**可用的回復目標：
+  - 該部署保留建置當時的 env，會重新啟用舊的 ADMIN_ACCESS_TOKEN（§8.1 已確認舊值曾外洩於 Git 歷史）。
+  - 它的程式接受 `?admin_token=`（8 處 URL 用法屬 main ceee1b5；PR #33 已移除）。
+- 禁止事項：
+  - 對任何發版前的部署做 Instant Rollback／Promote。
+  - 整包回退 PR #33（例如 `git revert -m 1 <合併提交>`）：會一併撤掉拒絕 query token、session cookie 與登入登出的安全修正。
+- **每個回復候選都必須同時滿足：**
+  1. 保留安全修正，以下檔案維持 PR #33 版本：
+     - lib/adminAuth.ts、lib/adminQuoteAuth.ts
+     - app/api/auth/{login,logout,me}、app/admin/page.tsx
+     - app/admin/{quotes,quotes/[id],analytics}/page.tsx、app/api/admin/quotes/[id]/{route,send/route}.ts
+     - app/api/social/instagram/oauth/{callback,revoke}、app/api/social/instagram/status
+  2. 與已套用的三個 additive migrations（202609280001、202609280002、202609290001）相容：不寫 down migration、不刪表或欄位；程式可以不使用新表，但不得假設它們不存在。
+  3. 以當時有效的 Production env 產生新建置的部署：有新提交時由 Git integration 部署；沒有新提交（候選 B）時用 Vercel Redeploy，並取消 Use existing Build Cache。不 Promote 或 Instant Rollback 既有部署，是否生效以下面的驗收為準。
+  4. 回復前先停用 worker（Disable-ScheduledTask）；回復驗收通過且重新評估後才可再啟用。
+- 回復候選（依序採用）：
+  - **A. 前滾修正**：新的修正提交，走一般 PR、審查與部署。
+  - **B. 營運功能關閉**（不改程式）：
+    - 移除 Production 的 OPERATIONS_PERSISTENCE_MODE（OPERATIONS_LIVE_PUBLISH_ENABLED 維持 false），再對目前的正式部署做 Redeploy（不使用 build cache），產生新建置。
+    - 營運 API 會 fail closed（503），安全修正與 LINE／報價功能照常。
+    - 適用於營運後台或 R2 的問題。
+  - **C. 部分回退提交**：只回退出問題的非安全檔案（例如 LINE webhook 或營運模組），走 PR 審查。
+    - PR 內附上一段的條件 1–4 核對結果。
+    - `git diff <PR #33 合併提交> <回退提交> -- <條件 1 的檔案>` 必須為空。
+- 回復後驗收（全部成立才算完成）：
+  - 正式網域的 deployment id 為本次新建置；它的 createdAt 晚於回復決定；sha 為回復用的提交。
+  - `rotate-admin-access-token.mjs verify`：新值 header 404、query 401、舊值 header 401。
+  - `/api/auth/me`：帶 session cookie 200、不帶憑證 403；登出後 cookie 清除。
+  - 報價 API 帶 `?admin_token=` 回 401。
+  - `prisma migrate status` 為 up to date（13 筆），沒有失敗的 migration。
+  - 候選 B：營運 API 回 503、公開頁與詢價正常。
+- 程式回復不會回復資料庫；新增的 Production env 名稱也不會自動移除，移除同樣只在下一次新建置部署生效。
 - 資料回復只在確認資料錯誤時進行：以第 1 步 dump 還原到新 Neon 分支比對，不直接覆蓋正式。
-- worker 先停用（Disable-ScheduledTask），再回復程式。

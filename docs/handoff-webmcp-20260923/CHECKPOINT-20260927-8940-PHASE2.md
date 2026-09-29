@@ -1012,3 +1012,68 @@
 - ADMIN_TOKEN_CALLERS=NOT_RECEIVED（BLOCKING）；VERSION_NOTES=SAVED（與原始紀錄分開）
 - 剩餘發版條件：reviewer approval、GX10／Hermes 原始紀錄與 validator PASS、Production env、發版當下新備份、預檢全 PASS
 - PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）
+
+## 21. 第十七輪（2026-09-29）：取得 GX10 原始呼叫端紀錄、回復清單校正、收尾證據
+起點 084f6a4（與遠端一致，之後無新提交）。本輪只改文件，沒有改程式；Production env、正式 migration、憑證輪換、合併部署、worker 啟用、真實發布都未執行。
+
+### 21.1 GX10 連線
+- known_hosts 核對：
+  - gx10-f6b2 與 100.85.105.46 為同一把 ED25519 host key（SHA256:xH7TgpVT8AcDeVgYllhEGER4dL+jNT2ee3OcMTGBiGc）。
+  - 歷史 IP 192.168.100.10 不在 known_hosts、22 埠不可達，未使用。
+- 以既有 id_ed25519 連線 `arashiyun@gx10-f6b2`（BatchMode、ConnectTimeout 10、StrictHostKeyChecking=yes）成功：hostname=gx10-f6b2、user=arashiyun。
+- 未改 SSH 設定、authorized_keys 或主機金鑰驗證。
+- 更正 §20.1：當時以 administrator 登入被拒，是帳號用錯，並非 GX10 不可連線。
+
+### 21.2 原始紀錄交接
+- 唯讀搜尋（檔名＋內容），腳本經 stdin 傳送，避免 PowerShell 5.1 剝除引號。第一次以命令列參數傳送的搜尋因引號被剝除，結果不採信。
+- 原始檔：`/home/arashiyun/hermes-fenshenmin/.fuyun-tools/release/admin-token-callers.json`
+  - 5089 bytes、mtime 2026-09-29 01:21:19 +0800、arashiyun:arashiyun 664
+  - generatedBy：fenshenmin（Hermes agent），generatedAt：2026-09-28T16:46:35Z
+- SHA-256：來源端 `7c8c27c39af4b955d2b3451ebe1e4d110b66326b37a814d741d9821e5765a7cb`；以 scp（嚴格 host key）下載後本機相同；存到 8940 之後相同。
+- 內容檢閱：沒有秘密值（無長隨機字串），無 BOM、無 CRLF。
+  - gx10、hermes 各一筆，都有 method 與 evidence。
+  - 兩筆都是 checked=true、usesAdminAccessToken=false、usesQueryParam=false、readyForNewValue=true。
+  - webAppNote 另說明網頁 App 本身的用法，不計入呼叫端。
+- Validator（PR #33 scripts/ops/admin-token-callers.mjs，HEAD 084f6a4 blob 2bae1cf3）：暫存檔與存檔後的預設路徑都是 `{"ok":true,"problems":[]}`。
+- 已原樣保存到 `%USERPROFILE%\.fuyun-tools\release\admin-token-callers.json`（ACL 只有 Administrator、SYSTEM）。
+- version-notes.md 追加來源與雜湊，並校正 webAppNote 兩處：
+  - 「接受 ?admin_token= 的 8 行」屬 ceee1b5。
+  - env 只在新部署生效，不是即時。
+- 另見 GX10 上 `/tmp/validate-callers.mjs`（1307 bytes）：來源端自行的檢查腳本，只記錄，未執行。
+
+### 21.3 runbook §8 回復清單重寫
+- 移除「整包 revert PR 即可安全回復」；整包回退與 Instant Rollback／Promote 到發版前部署皆列為禁止。
+- 每個回復候選的必要條件：
+  - 保留安全修正檔（列出路徑，diff 必須為空）。
+  - 與三個 additive migration 相容（不寫 down migration、不刪表）。
+  - 以當時有效的 Production env 新建置（Git integration，或不用 build cache 的 Redeploy）。
+  - 先停 worker。
+- 候選依序：
+  - A 前滾修正。
+  - B 營運功能關閉：移除 OPERATIONS_PERSISTENCE_MODE 後新建置 → 營運 API 503，安全修正不變。
+  - C 部分回退：只回退非安全檔案、走 PR。
+- 回復驗收：新部署 id／時間／sha、rotate verify、/me 與登出、query token 401、migrate status up to date。
+- §4 更新呼叫端紀錄狀態（已取得、雜湊一致、validator 通過；發版時預檢仍會重驗）。
+
+### 21.4 收尾證據
+- HEAD 084f6a421c1e2cb20d9849aac967bbc09132bb86 → Vercel Preview dpl_CvGUriQT9GCwvNMakdiR5QYAinse：Ready／success（2026-09-28T22:35Z）。
+  - 相對於已測程式 f59a01f57a135e3722cf466b18de7a14ed2dd347 只有文件差異（app／lib／prisma／scripts 0 檔）。
+- 已測程式 f59a01f57a135e3722cf466b18de7a14ed2dd347 的證據沿用 §20.3，本輪未重跑：
+  - E2E 38/38＋INFO @dpl_8vEShAN16ri1JQE52cLKkMHY6g6Y；真瀏覽器 14/14；sched PASS；verify 10/10 @dpl_9UhWVjz6BAkpfXdkotWUEiUPbtPN。
+  - 本機各測試套件；升級演練 13/13。
+- 本節文件提交後的 HEAD 與 Vercel 結果記於 PR 說明。
+
+### 21.5 狀態（分開陳述）
+- **修正與測試：完成。** 15 則審查都已修正並逐則回覆；程式 f59a01f 的雲端與本機驗證全數通過。
+- **Reviewer：尚待驗收與有效 approval。** PR #33 Ready for review，reviewDecision=REVIEW_REQUIRED；15 則 thread 未 resolved，留給 reviewer。
+- **原始呼叫端紀錄：已交接。** 雜湊一致（7c8c27c3…5765a7cb），validator ok；原始內容未改，校正另存。
+- **正式發版窗口尚需執行：**
+  - 有效 approval。
+  - 新備份＋SHA256SUMS＋pg_restore --list。
+  - LF clone 以 owner 身份套用三個 migration。
+  - Production env（OPERATIONS_*、R2_*，不複製 Preview）。
+  - ADMIN_ACCESS_TOKEN apply，並以新建置部署驗收。
+  - 預檢全數 PASS。
+  - 正常合併部署與正式驗證。
+  - 之後才啟用 worker（dry-run）。
+- PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）。
