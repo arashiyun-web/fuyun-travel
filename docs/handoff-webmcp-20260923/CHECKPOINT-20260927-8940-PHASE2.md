@@ -1077,3 +1077,63 @@
   - 正常合併部署與正式驗證。
   - 之後才啟用 worker（dry-run）。
 - PRODUCTION：未變（ceee1b5、Production env 32 列、migration 10/10、worker Disabled、真實發布關閉）。
+
+## 22. 第十八輪（2026-09-29）：發版順序統一、預檢分階段、審查交接
+起點 68fa1e86e06071522f17812248fa58928afad447，與遠端一致，之後無新提交。本輪沒有執行任何正式操作：Production env、正式 migration、憑證輪換、合併部署、worker 啟用、真實發布都未執行。
+
+### 22.1 發版順序（取代 §21.5 的「正式發版窗口尚需執行」清單）
+runbook 改為固定的第 1–8 步，回復改列為第 9 節：
+1. Reviewer 驗收修正，取得對目前 head 有效的 approval；Vercel check 成功。
+2. 發版前預檢 `--phase pre-release`：確認候選 SHA、原始呼叫端紀錄、正式資源、migration 清單與回復方案。
+3. 發版窗口內新建 DB 備份，驗證 SHA256SUMS 與 pg_restore --list。
+4. LF checkout，以 owner 身份套用三個 migration。
+5. 設定 Production env 並 apply 新的 ADMIN_ACCESS_TOKEN；秘密不進輸出或提交。
+6. 部署前預檢 `--phase pre-deploy` 全部 PASS 後，才正常合併。
+7. 部署後驗收，只在合併產生的新部署 D_new 上進行：SHA、deployment ID、createdAt 晚於 T_env、新 token 可用、舊 token 與 query token 被拒、登入／me／登出、詢價、營運持久化。
+8. 驗收通過後才以 dry-run 啟用 worker。真實發布需另外的內容核准與平台驗收。
+
+- 舊版把輪換的部署後驗收寫在第 4 步（合併之前），第 0 步又要求預檢全數 PASS，但當時備份還不存在。兩者都已移除。
+- Preview 結果不算正式驗收，這點已寫入 runbook 開頭。
+
+### 22.2 預檢分階段（程式變更）
+- **問題：** 舊的 release-preflight-pr33.mjs 永遠要求「正式只有 10 個 baseline、新 migration 未套用」。
+  - 第 4 步套用後再跑，必定 FAIL，runbook 要求的「合併前預檢全數 PASS」不可能成立。
+  - 同一支預檢在第 2 步時，備份與 env 也不可能 PASS。
+- **修正：** 新增 scripts/ops/release-phase.mjs（純函式）；預檢必須帶 `--phase pre-release|pre-deploy`，缺少或不合法時 exit 2，不做任何存取。
+  - pre-release：10/0、新 migration 未套用；備份與 Production env 回報 PENDING（不阻擋）；其餘必須 PASS。
+  - pre-deploy：13/0，而且新增的恰好是那三個；新備份 24 h 內且 SHA256SUMS 相符；env 名稱齊全；不得有 PENDING。
+  - 兩階段的 FAIL、UNVERIFIED 都阻擋；呼叫端紀錄、R2、worker Disabled、正式仍為 ceee1b5 在兩階段都檢查。
+- **測試：**
+  - 新增 scripts/ops/release-phase.test.mjs 8/8，先 RED 再 GREEN。
+  - scripts/ops 全部 16/16（callers、migrate-status、release-phase）。
+  - `node --check` 通過；不帶 phase 與 `--phase post-deploy` 都實測 exit 2。
+- **限制：** 預檢只看 env 名稱，無法證明 ADMIN_ACCESS_TOKEN 的值已替換；runbook 第 6 步要求另外確認 apply 紀錄與 T_env。
+
+### 22.3 本輪誤執行的舊版預檢（揭露）
+- 修改程式時，第一次自動編輯失敗（腳本未變）。原本用來確認「不帶 phase 會提前退出」的指令因此執行了**未修改的舊版預檢**兩次（約 2026-09-29，68fa1e8 工作樹）。
+- 舊版預檢的設計就是唯讀：
+  - DB 以 read-only transaction 讀取；Vercel env 只列名稱。
+  - r2-precheck A 在 fuyun-ops-production 寫入唯一合成物件，讀回後在 finally 刪除，兩次都回報「synthetic object deleted」PASS。
+- 沒有設定、migration、輪換、合併、部署或 worker 變更。
+- 輸出同時是目前正式狀態的旁證：
+  - 10/0、新 migration 未套用、DB session 唯讀。
+  - 備份 neon-prod-20260927T145911Z.dump 37.7 h（過期，發版窗口仍需新備份）、SHA256SUMS 相符。
+  - Production env 缺 OPERATIONS_*、R2_* 共 7 個名稱（預期中，屬第 5 步）；R2 D／C／A／B／E 全數 PASS。
+  - 輪換值已備妥、呼叫端紀錄 PASS、worker Disabled、正式仍為 ceee1b5。
+  - 「git working tree clean」FAIL，是因為本輪有未提交的修改。
+
+### 22.4 審查交接（實際狀態，2026-09-29 查詢）
+- **reviewDecision=REVIEW_REQUIRED、mergeStateStatus=BLOCKED。**
+  - 唯一的 review 是 chatgpt-codex-connector 的 COMMENTED，不是 approval。
+  - 沒有 pending review request。
+- **分支保護（main）：** required_approving_review_count=1、dismiss_stale_reviews=false、required_conversation_resolution=false、沒有必要 status checks、enforce_admins=false。未修改，也不使用管理員例外。
+- **Collaborators：** 只有 arashiyun-web（admin），也就是 PR 作者本人。GitHub 不允許作者 approve 自己的 PR，所以目前沒有人能給出符合規則的 approval。需要持有人另外加入有 write 權限的 reviewer。
+- **Threads：** 15 則全部未 resolved。每則都有作者回覆，指向 468bffe／f59a01f 的修正與測試；reviewer 尚未回應。不代為標記 resolved。
+- dismiss_stale_reviews=false：日後若在 approval 之後又有新提交，approval 不會自動失效。runbook 第 1、6 步因此要求 approval 必須對應目前 head，否則重新取得。
+
+### 22.5 狀態
+- 已測程式：本輪修改了 scripts/ops（預檢分階段），已測程式因此改為本節提交；app、lib、prisma 未變。
+  - f59a01f 的 E2E 與瀏覽器證據仍適用於應用程式碼。
+  - 預檢的證據是 22.2 的測試。
+- 新提交的完整 SHA 與 Vercel Preview deployment ID 記於 PR 說明。
+- PRODUCTION：未變（ceee1b5、migration 10/10、Production env 無新增名稱、worker Disabled、真實發布關閉）。

@@ -1,25 +1,44 @@
 # PR #33 正式發版清單（準備完成，尚未套用）
 
 適用：feat/ops-worker-integration-20260927 通過有效審查之後。本文件只列順序、設定、驗收與回復；撰寫時沒有套用任何正式變更。
-依據：checkpoint §13.3（升級演練）、§13.6（輪換）、§13.7（原始次序）、§14–§15（Preview 驗證）。
+依據：checkpoint §13.3（升級演練）、§13.6（輪換）、§13.7（原始次序）、§14–§15（Preview 驗證）、§22（本順序修正）。
 
-## 0. 前置條件（全部滿足才開始）
-- PR #33 取得符合分支規則的 reviewer approval。不使用管理員例外、不改分支保護、不 force-push。
-- 核准的完整 SHA 記為 `APPROVED_SHA`。之後若有新提交，本清單從頭重跑。
-- 唯讀預檢：
-  `powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --bucket fuyun-ops-production`
-  - **全部項目 PASS 才可進入第 4 步（輪換）與第 5 步（合併），沒有可略過的項目。**
-  - 「GX10／Hermes 呼叫端已確認」是阻擋項（BLOCKING）；未確認時 `rotate-admin-access-token.mjs apply` 也會拒絕（exit 3）。
-- 發版窗口內不啟用 worker，真實發布維持關閉。
+**順序固定為第 1–8 步，前一步未完成不得進入下一步。** 兩種檢查要分清楚：
+- **預檢**（第 2、6 步）：在合併前執行，對象是尚未部署的候選與正式資源。預檢不能證明正式部署可用。
+- **部署後驗收**（第 7 步）：只能在合併後、由 Git integration 產生的新 Production 部署上執行。部署尚未存在時不得要求它通過驗收；Preview（例如 dpl_C7ySkX4r3qeZotMmJHTHwQRfBaMJ）的結果也不能當成正式驗收。
+- 發版期間 worker 維持 Disabled，真實發布維持關閉（OPERATIONS_LIVE_PUBLISH_ENABLED=false）。
+- 所有秘密（token、金鑰、DB URL）只經 stdin 或秘密檔傳遞，不得出現在指令輸出、日誌、checkpoint、PR 或提交中。
 
-## 1. 正式 DB 備份（可恢復證據）
+## 1. Reviewer 驗收與合併條件
+- 分支規則（main）：需要 1 個有效 approving review；不要求對話全部 resolved；沒有指定必要 status checks，但 Vercel check 仍必須為成功。
+- Reviewer 逐則驗收 15 個 review threads 的修正。thread 是否 resolved 由 reviewer 依分支規則決定，作者不代為標記。
+- 作者回覆、自我審查、自動化 bot 評論（例如 chatgpt-codex-connector 的 COMMENTED）與自動測試都**不是** approval。
+- 取得 approval 的完整 SHA 記為 `APPROVED_SHA`，且必須等於 PR 目前的 head。approval 之後若有新提交，須對新 head 重新取得 approval，並從第 1 步重跑。
+- 不使用管理員例外、不改分支保護、不 force-push。
+
+## 2. 發版前預檢（`--phase pre-release`，唯讀）
+- 在 LF checkout 的 `APPROVED_SHA` 上執行：
+  `powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --phase pre-release --bucket fuyun-ops-production`
+- 通過條件：exit 0。備份與 Production env 屬於第 3、5 步，此時回報 PENDING；其餘項目都必須 PASS。FAIL 或 UNVERIFIED 一律阻擋。
+- 預檢涵蓋：
+  - **候選 SHA**：工作樹乾淨，HEAD＝`APPROVED_SHA`，三個 migration 為 LF 且等於 git blob。
+  - **原始呼叫端紀錄**：`%USERPROFILE%\.fuyun-tools\release\admin-token-callers.json` 的 validator 通過（BLOCKING）。另外手動確認 SHA-256＝`7c8c27c39af4b955d2b3451ebe1e4d110b66326b37a814d741d9821e5765a7cb`；若 GX10／Hermes 之後有變更，須重新取得紀錄。代理不得代填。
+  - **正式資源**：R2 fuyun-ops-production 與正式 token（r2-precheck D、C、A、B、E 全部 PASS；A 會寫入唯一的合成物件，並在 finally 刪除）；正式部署仍為 ceee1b5；worker 排程為 Disabled；輪換新值已準備。
+  - **migration 清單**：正式只有 10 個 baseline、0 個 unfinished，三個新 migration 尚未套用。
+- **回復方案**：人工確認第 9 節的候選 A／B／C 與回復後驗收，確認發版當下可執行（誰有 Vercel、GitHub、Neon 權限）。
+
+## 3. 正式 DB 備份（發版窗口內新建，可恢復證據）
 1. `node %USERPROFILE%\.fuyun-tools\neon-backup.cjs %USERPROFILE%\.fuyun-tools\pgsql-17\pgsql\bin <FuyunBackups\YYYYMMDD-neon-prod>`
 2. 在同一目錄產生 SHA256SUMS（`Get-FileHash -Algorithm SHA256`，格式 `<hash>  <file>`）；目錄 ACL 限 SYSTEM＋Administrator。
-3. 可恢復證據：`pg_restore --list <dump>` 成功，且表數與 §11.5 一致。完整還原演練沿用 §11.5／§13.3 方法（暫時 PG 17，完成後停止並限縮 ACL）。
-4. 預檢的「backup newer than 24 h」與「matches SHA256SUMS」轉為 PASS。
+3. 可恢復證據：`pg_restore --list <dump>` 成功，且表數與 §11.5 一致。完整還原演練沿用 §11.5／§13.3 的方法（暫時 PG 17，完成後停止並限縮 ACL）。
+4. 既有備份（例如 neon-prod-20260927T145911Z.dump）不算數，必須是本窗口新產生的；第 6 步會檢查「newer than 24 h」與「matches SHA256SUMS」。
 
-## 2. Additive migrations（正式 owner 身份、LF checkout）
-- 只會套用 202609280001_add_operations_tables、202609280002_add_line_webhook_events、202609290001_line_webhook_event_delivery，三者都只新增表或欄位（最後一個在 line_webhook_events 新增 status、reply_text、claimed_at，既有列預設 replied）。舊版 ceee1b5 與新表相容，可先於程式部署。
+## 4. Additive migrations（正式 owner 身份、LF checkout）
+- 只會套用三個 migration，都只新增表或欄位：
+  - 202609280001_add_operations_tables
+  - 202609280002_add_line_webhook_events
+  - 202609290001_line_webhook_event_delivery（在 line_webhook_events 新增 status、reply_text、claimed_at，既有列預設 replied）
+- 舊版 ceee1b5 與新表相容，可先於程式部署。
 - LF checkout（不要用 Windows worktree）：
   ```
   git -c core.autocrlf=false clone https://github.com/arashiyun-web/fuyun-travel.git C:\fuyun-release\src
@@ -27,88 +46,100 @@
   node scripts/ops/migrate-production-pr33.mjs --sha <APPROVED_SHA>          # 守門＋status
   node scripts/ops/migrate-production-pr33.mjs --sha <APPROVED_SHA> --apply  # 發版窗口
   ```
-- 腳本拒絕以下情況：HEAD≠核准 SHA、工作樹不乾淨、autocrlf=true、任何 migration 含 CRLF、角色不是 neondb_owner、不是正式直連 endpoint。
+- 腳本在以下情況拒絕執行：HEAD≠核准 SHA、工作樹不乾淨、autocrlf=true、任何 migration 含 CRLF、角色不是 neondb_owner、不是正式直連 endpoint。
 - 身份說明：正式 DATABASE_URL 與 UNPOOLED 目前都是 neondb_owner，也就是 runtime 與 owner 同一角色。DDL 只經這支腳本、走直連 endpoint 執行。拆分 runtime 角色列為後續強化，不在本次發版。
 - 驗收：`_prisma_migrations` 13 筆 finished、0 筆 unfinished；`pg_dump -s` 與演練結果比對，既有物件不變。
 
-## 3. 正式 R2 與 Production env
-- 正式 bucket：fuyun-ops-production，私有、Public Development URL Disabled、Custom Domains 無。
-  - 由持有人在 R2 控制台建立；wrangler OAuth 沒有 R2 寫入範圍。
-  - 2026-09-28 15:03Z 已建立（Automatic location、Standard、私有；r2.dev Disabled、無 Custom Domain）。
-- 正式憑證：R2 → API Tokens → Create Account API token。
-  - 權限 Object Read & Write；Specify bucket **只選 fuyun-ops-production**，不能選測試 bucket。
-  - 保存：`powershell -File scripts\test-support\save-r2-credentials.ps1 -Target production`，寫入 production-release.env，與 Preview 分開；R2_ACCOUNT_ID、R2_BUCKET_NAME 已補入。
-  - 2026-09-28 15:09Z 已建立 token「fuyun-ops-production」（id sha256 7873a5ba…）並保存到 production-release.env；`r2-precheck --target production` 全數 PASS（checkpoint §18）。
-  - 先前誤存的金鑰（c2371e1a…，範圍為測試 bucket）已於 2026-09-28 撤銷（checkpoint §19）。
-  - 範圍證據：與測試 token 同法，在 dashboard session 唯讀讀取 policy，比對 id sha256。
-    - 存成 `%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json`（只含 id_sha256）。
-- 驗證：`node scripts/test-support/r2-precheck.mjs --target production`，以下各項都必須 PASS：
+## 5. Production env 與新的 ADMIN_ACCESS_TOKEN
+### 5.1 正式 R2（已就緒）
+- 正式 bucket：fuyun-ops-production，私有、Public Development URL Disabled、Custom Domains 無。2026-09-28 15:03Z 由持有人建立（wrangler OAuth 沒有 R2 寫入範圍）。
+- 正式 token「fuyun-ops-production」：2026-09-28 15:09Z 建立（id sha256 7873a5ba…）。
+  - 權限 Object Read & Write，只限 fuyun-ops-production。
+  - 保存在 production-release.env（經 `scripts\test-support\save-r2-credentials.ps1 -Target production`），與 Preview 分開。
+  - 先前誤存的測試範圍金鑰（c2371e1a…）已於 2026-09-28 撤銷（checkpoint §18–§19）。
+- 範圍證據：policy 唯讀讀取後只存 id_sha256 到 `%USERPROFILE%\.fuyun-tools\release\r2-token-policy-production.json`。
+- `node scripts/test-support/r2-precheck.mjs --target production` 的 D、C、A、B、E 每一項都必須 PASS：
   - D：policy 只限正式 bucket，最先檢查；未通過就不寫入任何物件。
   - C：r2.dev Disabled、無 Custom Domains。
   - A：唯一合成物件寫入、讀回雜湊、簽名網址，最後在 finally 刪除。
   - B：匿名 S3 讀取被拒。
-  - E：正式金鑰不能列出測試 bucket，必須是 403 AccessDenied。
-- Production env 只新增下列名稱：
-  - OPERATIONS_PERSISTENCE_MODE=database
-  - OPERATIONS_LIVE_PUBLISH_ENABLED=false
-  - OPERATIONS_CRON_TOKEN：正式新值，不沿用 Preview 值
-  - R2_ACCOUNT_ID、R2_BUCKET_NAME（正式 bucket）、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY（正式 token）
-  - ADMIN_ACCESS_TOKEN：見第 4 步
+  - E：正式金鑰不能列出測試 bucket（403 AccessDenied）。
+
+### 5.2 Production env（只新增下列名稱）
+- OPERATIONS_PERSISTENCE_MODE=database
+- OPERATIONS_LIVE_PUBLISH_ENABLED=false
+- OPERATIONS_CRON_TOKEN：正式新值，不沿用 Preview 值
+- R2_ACCOUNT_ID、R2_BUCKET_NAME（正式 bucket）、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY（正式 token）
 - 經 stdin 寫入（`vercel env add NAME production`，透過 vercel-ascii.ps1）。
 - 禁止：
   - 整包複製 Preview 的 29 個 branch 變數。
   - 使用測試 Neon 分支 pr33-ops-e2e 或測試 bucket。
   - 改動 16 個 Neon 整合共用的 DB 名稱。
-- 驗收：預檢「Production env has the … names」PASS；`vercel env ls production` 前後比對只多出上述名稱。
+- 驗收：`vercel env ls production` 前後比對，只多出上述名稱。
 
-## 4. ADMIN_ACCESS_TOKEN 輪換
+### 5.3 ADMIN_ACCESS_TOKEN 輪換（apply）
 - 呼叫端：repo 內只有 lib/adminQuoteAuth.ts；8940 只有未部署的舊專案（§13.6）。
-- **GX10／Hermes 呼叫端：這是阻擋條件，不能略過。** 2026-09-29 已取得分身民產出的原始紀錄：
-  - 來源：`arashiyun@gx10-f6b2:/home/arashiyun/hermes-fenshenmin/.fuyun-tools/release/admin-token-callers.json`，SHA-256 來源端與本機一致（7c8c27c3…5765a7cb）。
-  - validator 通過；兩端皆 usesAdminAccessToken=false、usesQueryParam=false。
-  - 已原樣保存；版本校正另存 version-notes.md。
-  - 發版當下預檢仍會重新驗證；若 GX10／Hermes 在此之後有變更，需重新取得紀錄。
-  - 8940 無法讀取 GX10，需由實際查過的人（分身民）在 GX10 上查 `ADMIN_ACCESS_TOKEN`／`admin_token` 的使用處，並寫入紀錄 `%USERPROFILE%\.fuyun-tools\release\admin-token-callers.json`（格式見 scripts/ops/admin-token-callers.mjs）。
-    - gx10 與 hermes 各一筆：checked、checkedBy、checkedAt、method、usesAdminAccessToken、usesQueryParam=false、readyForNewValue。
-  - 紀錄不完整時：
-    - 預檢 FAIL（BLOCKING）。
-    - `rotate-admin-access-token.mjs apply` 拒絕（exit 3）。
-    - 第 5 步不得進行。
+- GX10／Hermes 呼叫端（阻擋條件）：
+  - 2026-09-29 已取得分身民產出的原始紀錄，來源為 `arashiyun@gx10-f6b2:/home/arashiyun/hermes-fenshenmin/.fuyun-tools/release/admin-token-callers.json`，來源端與本機 SHA-256 一致。
+  - validator 通過；兩端皆 usesAdminAccessToken=false、usesQueryParam=false。原樣保存，版本校正另存 version-notes.md。
+  - 紀錄不完整時，預檢 FAIL，且 `rotate-admin-access-token.mjs apply` 拒絕（exit 3）。
   - 若有依賴：先把呼叫端改為 header，並準備好新值的注入方式（readyForNewValue=true），再切換。
-  - 代理不得代填此紀錄。
-- 新值已由 `rotate-admin-access-token.mjs prepare` 產生，只在 admin-access-token.env（fp d3c45fa759）。
-- **env 變更只對之後建置的部署生效**；既有部署（含目前的正式部署）保留建置當時的值。因此輪換必須以「apply 之後才建置的新部署」驗收，不能在舊部署上判定。
-- 順序：
-  1. 呼叫端確認（上面的紀錄完整）。
-  2. `apply`：與第 3 步同一窗口，單值替換、不雙收；記下 env 更新時間 T_env。
-  3. 第 5 步合併，由 Git integration 產生新的 Production 部署 D_new。
-  4. 驗收（必須全部成立）：
-     - D_new 的 createdAt 晚於 T_env，且 D_new 的 sha＝合併 commit（GitHub deployments API／`vercel inspect`）。
-     - 正式網域已指向 D_new（`vercel inspect <正式網域>` 的 deployment id＝D_new）。
-     - `verify https://<正式網域>`：新值 header 404、新值 query 401。
-     - 舊部署的 deployment URL（例如 ceee1b5 的 `*.vercel.app`）在沒有 bypass 時回 Vercel 驗證（401／302），舊值無法從外部使用。
-  5. 通知已確認的呼叫端改用新值。
+- 新值由 `rotate-admin-access-token.mjs prepare` 產生，只存在 admin-access-token.env（fp d3c45fa759）。
+- `apply`：與 5.2 同一窗口，單值替換、不雙收；記下 env 更新時間 T_env（第 7 步用來判定部署是否為新建置）。
+- **env 變更只對之後建置的部署生效**；既有部署（含目前的正式部署）保留建置當時的值，所以本步驟無法驗收輪換。輪換要到第 7 步，在新部署上驗收。
 
-## 5. 合併與部署
-- 第 1–4 步完成、預檢全數 PASS（含 GX10／Hermes 呼叫端）後，才在 GitHub 正常合併到 main，由 Git integration 部署 Production。
-- 不先合併觸發部署再補環境；env 變更只在下一次部署生效。
+## 6. 部署前預檢（`--phase pre-deploy`）→ 正常合併
+- 在同一 LF checkout（HEAD＝`APPROVED_SHA`）執行：
+  `powershell -NoProfile -File scripts\tools\vercel-ascii.ps1 --exec node scripts/ops/release-preflight-pr33.mjs --phase pre-deploy --bucket fuyun-ops-production`
+- 通過條件：exit 0，**所有項目都是 PASS，不得有 PENDING**。項目如下：
+  - 13 個 migration finished、0 個 unfinished，且新增的恰好是那三個。
+  - 第 3 步的新備份在 24 h 內，且與 SHA256SUMS 相符。
+  - Production env 名稱齊全、R2 全數 PASS、呼叫端紀錄通過。
+  - worker 仍為 Disabled；正式部署仍為 ceee1b5。
+- 預檢只看 env 名稱，無法得知 ADMIN_ACCESS_TOKEN 的值是否已替換。需另外確認第 5.3 步 `apply` 的紀錄與 T_env 已保存。
+- 確認 PR head 仍等於 `APPROVED_SHA`，而且 approval 仍有效。
+- 以上都成立後，才在 GitHub 正常合併到 main，由 Git integration 產生新的 Production 部署 D_new。
+  - 不先合併觸發部署再補 env。
+  - 不使用管理員例外。
 
-## 6. 正式驗證
-- 部署：GitHub deployments API 的 Production sha＝合併 commit；記錄 deployment ID 與網域。
-- 公開頁：首頁與主要頁面 200。
-- 登入：Cookie HttpOnly／Secure／SameSite=Lax；同源可操作；跨來源與無 Origin 回 401。
-- 七頁詢價表單（`/charter-bus/{taipei,new-taipei,taoyuan,hsinchu,taichung,tainan,kaohsiung}` 的 WebMCPQuoteTool）：依實際程式，只在瀏覽器端校驗並產生 LINE `oaMessage` 深連結，**不呼叫伺服器、不寫入 DB、不推播**。
-  - 驗收：7 頁皆 200 且表單欄位完整；空白送出列出錯誤；合成資料送出後產生的連結以 `https://line.me/R/oaMessage/` 開頭、指向官方帳號，特殊字元已編碼、各欄位值完整；瀏覽器 Network 面板沒有對本站 API 的請求。不需要清理 DB。
-- `/contact/inquiry`（InquiryForm_v2 → `POST /api/inquiry`）才會寫入 `inquiries`，並寄信、推播管理員 LINE。
-  - 只在已核准的測試收件者與測試 LINE 帳號下以合成資料送出一次；確認寫入一筆後由 admin 刪除或標記合成。沒有核准的測試對象時不送出，只驗證頁面與前端校驗。
-- 報價授權：header 通過；`?admin_token=` 與錯誤 token 回 401；rotate verify。
-- 營運持久化：合成 intake → R2 物件 hash、未簽名 GET 拒絕、60 秒簽名 URL；dry-run process-due 每個 job 只 claim 一次；OPERATIONS_LIVE_PUBLISH_ENABLED=false。完成後清理合成內容。
+## 7. 部署後驗收（只在 D_new 上）
+D_new 建置完成（Ready）後才開始。任何一項失敗都轉第 9 節回復，worker 不啟用。
+- **部署身分**：記錄 D_new 的 deployment ID、建置時間 createdAt、網域。
+  - D_new 的 sha＝合併 commit（GitHub deployments API／`vercel inspect`）。
+  - createdAt 晚於 T_env。
+  - 正式網域已指向 D_new（`vercel inspect <正式網域>` 的 deployment id＝D_new）。
+- **Token**（`rotate-admin-access-token.mjs verify https://<正式網域>`）：
+  - 新值 header 可用（404）。
+  - 舊值 header 被拒（401）。
+  - 新值放在 query（`?admin_token=`）被拒（401）；錯誤 token 被拒（401）。
+  - 舊部署的 deployment URL（例如 ceee1b5 的 `*.vercel.app`）在沒有 bypass 時回 Vercel 驗證（401／302），外部無法用舊值呼叫。
+- **公開頁**：首頁與主要頁面 200。
+- **登入／me／登出**：
+  - Cookie 為 HttpOnly／Secure／SameSite=Lax；同源可操作；跨來源與無 Origin 回 401。
+  - `/api/auth/me` 帶 session cookie 200、不帶憑證 403。
+  - 登出後 cookie 清除。
+- **詢價**：
+  - 七頁表單（`/charter-bus/{taipei,new-taipei,taoyuan,hsinchu,taichung,tainan,kaohsiung}` 的 WebMCPQuoteTool）只在瀏覽器端校驗並產生 LINE `oaMessage` 深連結，不呼叫伺服器、不寫 DB、不推播。驗收項目：
+    - 7 頁皆 200，表單欄位完整。
+    - 空白送出會列出錯誤。
+    - 合成資料送出後的連結以 `https://line.me/R/oaMessage/` 開頭、指向官方帳號，特殊字元已編碼、各欄位值完整。
+    - Network 面板沒有對本站 API 的請求。
+  - `/contact/inquiry`（InquiryForm_v2 → `POST /api/inquiry`）會寫入 `inquiries`，並寄信、推播管理員 LINE。
+    - 只在已核准的測試收件者與測試 LINE 帳號下，以合成資料送出一次；確認寫入一筆後，由 admin 刪除或標記為合成。
+    - 沒有核准的測試對象時不送出，只驗證頁面與前端校驗。
+- **營運持久化**：
+  - 合成 intake 寫入 R2 後物件 hash 相符；未簽名 GET 被拒；60 秒簽名 URL 可讀。
+  - dry-run process-due 每個 job 只 claim 一次；OPERATIONS_LIVE_PUBLISH_ENABLED=false。
+  - 完成後清理合成內容。
+- 全部通過後，才通知已確認的呼叫端改用新值。
 
-## 7. worker
-- 第 6 步全數通過後，才更新 worker.env 指向正式網址與正式 cron token，啟用 Fuyun-Operations-Worker。保持 dry-run。
-- 真實對外發布需要內容核准，以及各平台以測試帳號實測，另案進行。
+## 8. worker（dry-run）
+- 第 7 步全數通過後，才更新 worker.env 指向正式網址與正式 cron token，再啟用 Fuyun-Operations-Worker。保持 dry-run。
+- 真實對外發布另案進行，需要：
+  - 內容核准。
+  - 各平台以測試帳號實測並驗收。
 
-## 8. 回復
+## 9. 回復
 - 程式基準 ceee1b5（部署 dpl_Fvr7b…）**不是**可用的回復目標：
   - 該部署保留建置當時的 env，會重新啟用舊的 ADMIN_ACCESS_TOKEN（§8.1 已確認舊值曾外洩於 Git 歷史）。
   - 它的程式接受 `?admin_token=`（8 處 URL 用法屬 main ceee1b5；PR #33 已移除）。
@@ -141,4 +172,4 @@
   - `prisma migrate status` 為 up to date（13 筆），沒有失敗的 migration。
   - 候選 B：營運 API 回 503、公開頁與詢價正常。
 - 程式回復不會回復資料庫；新增的 Production env 名稱也不會自動移除，移除同樣只在下一次新建置部署生效。
-- 資料回復只在確認資料錯誤時進行：以第 1 步 dump 還原到新 Neon 分支比對，不直接覆蓋正式。
+- 資料回復只在確認資料錯誤時進行：以第 3 步的 dump 還原到新 Neon 分支比對，不直接覆蓋正式。
