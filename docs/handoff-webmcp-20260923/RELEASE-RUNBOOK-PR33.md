@@ -10,7 +10,10 @@
 - 所有秘密（token、金鑰、DB URL）只經 stdin 或秘密檔傳遞，不得出現在指令輸出、日誌、checkpoint、PR 或提交中。
 
 ## 1. Reviewer 驗收與合併條件
-- 分支規則（main）：需要 1 個有效 approving review；不要求對話全部 resolved；沒有指定必要 status checks，但 Vercel check 仍必須為成功。
+- 分支規則（main）：2026-09-29 起必須核准數為 0。這是持有人決定自行審查，只改核准數，其餘規則不變（見 checkpoint §23）。
+  - 仍須經 PR 合併；不要求對話全部 resolved。
+  - 沒有指定必要 status checks，但 Vercel check 仍必須為成功。
+  - 發版時紀錄持有人自行審查的決定。核准數改回 1 之後，本步驟恢復為「需要另一人的有效 approval」。
 - Reviewer 逐則驗收 15 個 review threads 的修正。thread 是否 resolved 由 reviewer 依分支規則決定，作者不代為標記。
 - 作者回覆、自我審查、自動化 bot 評論（例如 chatgpt-codex-connector 的 COMMENTED）與自動測試都**不是** approval。
 - 取得 approval 的完整 SHA 記為 `APPROVED_SHA`，且必須等於 PR 目前的 head。approval 之後若有新提交，須對新 head 重新取得 approval，並從第 1 步重跑。
@@ -41,11 +44,12 @@
 - 舊版 ceee1b5 與新表相容，可先於程式部署。
 - LF checkout（不要用 Windows worktree）：
   ```
-  git -c core.autocrlf=false clone https://github.com/arashiyun-web/fuyun-travel.git C:\fuyun-release\src
-  cd C:\fuyun-release\src; git checkout <APPROVED_SHA>; npm ci
+  git -c core.autocrlf=false clone --no-checkout https://github.com/arashiyun-web/fuyun-travel.git C:\fuyun-release\src
+  cd C:\fuyun-release\src; git config core.autocrlf false; git checkout <APPROVED_SHA>; npm ci
   node scripts/ops/migrate-production-pr33.mjs --sha <APPROVED_SHA>          # 守門＋status
   node scripts/ops/migrate-production-pr33.mjs --sha <APPROVED_SHA> --apply  # 發版窗口
   ```
+- 只在 clone 指令加 `-c core.autocrlf=false` 不夠。之後的 `git checkout` 會改用全域 autocrlf=true，把檔案寫成 CRLF（2026-09-29 發版時由預檢攔下）。必須先 `--no-checkout`，設定 repo 的 core.autocrlf=false，然後才 checkout。
 - 腳本在以下情況拒絕執行：HEAD≠核准 SHA、工作樹不乾淨、autocrlf=true、任何 migration 含 CRLF、角色不是 neondb_owner、不是正式直連 endpoint。
 - 身份說明：正式 DATABASE_URL 與 UNPOOLED 目前都是 neondb_owner，也就是 runtime 與 owner 同一角色。DDL 只經這支腳本、走直連 endpoint 執行。拆分 runtime 角色列為後續強化，不在本次發版。
 - 驗收：`_prisma_migrations` 13 筆 finished、0 筆 unfinished；`pg_dump -s` 與演練結果比對，既有物件不變。
@@ -85,6 +89,9 @@
   - 紀錄不完整時，預檢 FAIL，且 `rotate-admin-access-token.mjs apply` 拒絕（exit 3）。
   - 若有依賴：先把呼叫端改為 header，並準備好新值的注入方式（readyForNewValue=true），再切換。
 - 新值由 `rotate-admin-access-token.mjs prepare` 產生，只存在 admin-access-token.env（fp d3c45fa759）。
+- 舊值無法取回：Production 的 ADMIN_ACCESS_TOKEN 是 Vercel sensitive 變數，`vercel env pull` 只回傳佔位字串，不是實際值。
+  - 不要把 pull 的結果記成 PREVIOUS，否則 verify 的「舊值 401」會是假 PASS。
+  - 舊值被拒改以下列證據判定：Production 只剩一筆且更新時間為 T_env；D_new 晚於 T_env 建置；程式以常數時間比對唯一設定值；錯誤 token 回 401。
 - `apply`：與 5.2 同一窗口，單值替換、不雙收；記下 env 更新時間 T_env（第 7 步用來判定部署是否為新建置）。
 - **env 變更只對之後建置的部署生效**；既有部署（含目前的正式部署）保留建置當時的值，所以本步驟無法驗收輪換。輪換要到第 7 步，在新部署上驗收。
 

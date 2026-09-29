@@ -100,3 +100,13 @@ test("launcher: usage errors exit 2", { skip: !isWindows }, () => {
   assert.equal(ps(["-File", LAUNCHER, "--exec"]).status, 2);
   assert.equal(ps(["-File", LAUNCHER, "--exec", "Get-ChildItem"]).status, 2, "cmdlets are refused (no reliable exit code)");
 });
+
+// PR #33 release: `--exec node <script>` (exactly one argument after the command) passed only the
+// first character of the script path, because $rest[2..2] is a string, not an array.
+test("launcher: a single argument after the command is passed whole", { skip: !isWindows }, () => withTempDir((dir) => {
+  const script = path.join(dir, "one-arg.mjs");
+  writeFileSync(script, "console.log('ran ' + process.argv.length)");
+  const r = ps(["-File", LAUNCHER, "--exec", process.execPath, script]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /ran 2/);
+}));

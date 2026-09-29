@@ -1137,3 +1137,75 @@ runbook 改為固定的第 1–8 步，回復改列為第 9 節：
   - 預檢的證據是 22.2 的測試。
 - 新提交的完整 SHA 與 Vercel Preview deployment ID 記於 PR 說明。
 - PRODUCTION：未變（ceee1b5、migration 10/10、Production env 無新增名稱、worker Disabled、真實發布關閉）。
+
+## 23. 第十九輪（2026-09-29）：PR #33 正式發版
+持有人授權執行正式發版，並決定自行審查。main 分支保護的必須核准數由 1 改為 0，只改這一項，其餘規則不變（前後設定比對只差這一欄）。沒有使用管理員例外，也沒有 force-push。
+
+### 23.1 時間線（UTC）
+| 時間 | 事件 |
+|---|---|
+| 05:36 前後 | LF clone（b2701a1）、pre-release 預檢 exit 0（備份與 env 為 PENDING）、呼叫端 validator ok、SHA-256 7c8c27c3…5765a7cb |
+| 05:42:31 | 正式備份 neon-prod-20260929T054231Z.dump |
+| 05:43:40–05:43:50 | 三個 migration 套用（neondb_owner、直連 endpoint），status up to date |
+| 05:47:31–05:47:46 | Production env 新增 7 個名稱 |
+| 05:52:18.868 | ADMIN_ACCESS_TOKEN apply（T_env） |
+| 05:53 前後 | pre-deploy 預檢全部 PASS（exit 0） |
+| 05:53:54 | PR #33 正常合併，merge commit 08bdd4f182847728c4c18b7861ae3d2e6e6345da |
+| 05:53:58.822 | D_new = dpl_9d3JJd7tPc7X9a2r3riBvfmsu8f1 建立（git、main、sha＝merge commit）；05:55:01 Ready |
+| 05:56–06:03 | 部署後驗收：API 46/46、瀏覽器 28/28、rotation verify 兩個網域 |
+| 06:05–06:07 | worker 更新為 merge 版本並以 dry-run 啟用 |
+
+### 23.2 備份與 migration
+- 備份：`FuyunBackups\20260929-neon-prod-release\neon-prod-20260929T054231Z.dump`，28858 bytes。
+  - SHA-256 c726bc6bda5afc43d9bc68f6adffab10fa2a76bd8181453423d44c6ae5714bc2，與 SHA256SUMS 相符。
+  - ACL 只有 Administrator 與 SYSTEM。
+- 可恢復：`pg_restore --list` 共 49 項（10 張表）。完整還原到暫時的本機 PG 17（127.0.0.1:55432）後，逐表列數與正式唯讀計數完全一致（MATCH_EXPECTED=true）；暫時 PG 已停止。
+- Migration：以 LF clone、neondb_owner、直連 endpoint 執行 `prisma migrate deploy`（沒有用 db push）。之後 `_prisma_migrations` 13 筆 finished、0 筆 unfinished，新增的恰好是那三個。
+- Schema 比對（遷移前取自備份、遷移後 `pg_dump -s`）：既有 10 張表沒有任何變動。只新增 5 張表（instagram_login_tokens、line_webhook_events、operations_contents／events／jobs）及其索引與外鍵。
+- 過程問題（已處理）：
+  - LF clone 後另外執行的 `git checkout` 因全域 autocrlf=true 寫成 CRLF。pre-release 預檢的 LF 檢查攔下，重新 checkout 後 481 個檔案與 blob 逐位元相同。runbook §4 已修正。
+  - 初次設定備份 ACL 時，`/T` 使檔案的 DACL 變成空的，改以繼承目錄 ACL 修正；修正後雜湊不變。
+
+### 23.3 Production env、R2、token
+- 新增 7 個名稱，前後比對只多出這些、沒有移除（31→38）：OPERATIONS_PERSISTENCE_MODE、OPERATIONS_LIVE_PUBLISH_ENABLED（false）、OPERATIONS_CRON_TOKEN（新值 fp 954444bf51，不同於 Preview）、R2_ACCOUNT_ID、R2_BUCKET_NAME、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY。
+  - 全部是 sensitive 類型，只設在 production；值只經 stdin 傳遞。
+  - 沒有複製 Preview 設定。
+- R2（兩次預檢都是 D／C／A／B／E 全數 PASS）：fuyun-ops-production 私有、r2.dev Disabled、無 Custom Domain；token 只限正式 bucket；合成物件寫入、讀回後刪除。
+- ADMIN_ACCESS_TOKEN：Production 只有一筆，更新時間 05:52:18.868Z，新值 fp d3c45fa759。
+  - D_new 晚於 T_env 建置，兩個正式網域都指向 D_new。
+  - rotation verify（yunsun.com.tw、fuyuntravel.com）：新值放在 header 回 404（已接受）、放在 query 回 401。
+  - **舊值無法直接測試。** 它是 Vercel sensitive 變數，`vercel env pull` 只回傳佔位字串；一度誤記為 PREVIOUS，發現後已刪除，沒有拿來判定。
+  - 舊值被拒的依據：Production 只剩一筆、D_new 晚於 T_env 建置、程式以常數時間比對唯一設定值、錯誤 token 回 401。
+  - 舊部署網址（dpl_Fvr7b…）在沒有 bypass 時回 302（Vercel 驗證）。
+
+### 23.4 部署後驗收（D_new、正式網域）
+- `https://yunsun.com.tw`，API 46/46 PASS：
+  - 公開頁（/、7 個包車城市頁、/contact/inquiry）都是 200。
+  - Token：新值 header 可用、放在 query 401、錯誤值 401、沒帶 401。
+  - 登入：cookie 為 HttpOnly／Secure／SameSite=Lax；/me 帶 cookie 200、不帶 403；登出清除 cookie（Max-Age=0）；跨來源登出 403。
+  - 報價：header 與 cookie 200；query 與錯誤 token 401；跨來源 PATCH 與 send 401。
+  - 營運（dry-run）：
+    - 跨來源與無 Origin 的 cookie mutation 401，同源 201。
+    - 同時送出相同 intake 得到同一個 id；DB 1 筆內容、3 筆 job。
+    - 圖片 hash 相符；未帶 auth 401；R2 物件在 fuyun-ops-production，匿名讀取被拒，60 秒簽名網址可讀。
+    - 核准後三次同時 process-due：每個 job 只 claim 一次，狀態 dry_run_verified，沒有 externalId。錯誤的 cron token 回 401。
+  - 詢價：POST /api/inquiry 回 200，DB 寫入一筆。正式環境沒有設定 SMTP 與管理員 LINE，所以沒有寄信或推播。
+  - 清理：2 筆內容、4 個 R2 物件、1 筆詢價都已刪除，剩餘 0。
+- 瀏覽器 28/28 PASS（Chromium，playwright-core 1.63）：7 個城市頁都是 200 且 8 個欄位齊全；空白送出出現錯誤；連結為 `https://line.me/R/oaMessage/@954fyicw/?…`（官方帳號，與首頁連結相同），各欄位值完整、特殊字元已編碼；沒有對本站 /api 的請求。
+- 營運相關資料表清理後為 0／0／0。
+
+### 23.5 worker
+- 已部署的 worker（bd04de67）比 merge 版本舊，更新為 b32526f5（來源 08bdd4f）。舊檔保留為 `.prev-bd04de67`，並更新 DEPLOYED.sha256。
+- worker.env 新增兩項：OPERATIONS_AGENT_BASE_URL=https://fuyuntravel.com（canonical 網域）、正式 cron token。
+- 手動 one-shot 執行：completed 0 job、exit 0。
+- 排程已啟用並啟動：Administrator、S4U、Limited；node v24.16.0；每 60 秒一次，日誌為「completed: 0 job(s)」。
+- Dry-run 由伺服器端保證：OPERATIONS_LIVE_PUBLISH_ENABLED=false（status 端點回 livePublishEnabled=false），executeJob 另有第二道關閉判斷。真實發布維持關閉。
+
+### 23.6 發現與待辦
+- **CRITICAL（發版前就存在，已開 PR #34，未合併）：**
+  - `GET /api/inquiry` 不需驗證就回傳全部詢價，含未遮罩電話、姓名、LINE。
+  - `PATCH /api/inquiry` 不需驗證就能修改任何詢價。
+  - 修正：GET 用 verifyAdminRequest、PATCH 用 verifyAdminMutation。測試 4/4（舊版 3 項 FAIL）；tsc 與 next build 通過；Preview 煙霧測試 6/6（不寫入）。
+- **管理員密碼外洩於本次工作階段輸出：** 檢查 admin-login.txt 格式時，指令把帳號與密碼印出。需要輪換：provision-admin-credentials，更新 Production 的 ADMIN_PASSWORD_HASH／SALT，再以新建置部署生效。
+- vercel-ascii.ps1：`--exec` 後只有一個參數時，只會傳入第一個字元。已在本 PR 修正，launcher 測試 10/10。
+- 合成資料的注意事項：dry-run 之後 job 仍可被 claim。之後若啟用 live，殘留的合成內容會被發布，所以驗收必須清理（本次已清理）。
