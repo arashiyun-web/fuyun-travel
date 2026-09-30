@@ -42,6 +42,14 @@ test("accepts only the configured username and hashed password", async () => {
   assert.equal(await auth.validateAdminCredentials(USER, undefined), false);
 });
 
+test("username tolerates surrounding whitespace from mobile autofill, but not other changes; password is exact", async () => {
+  configure();
+  assert.equal(await auth.validateAdminCredentials(` ${USER} `, PASSWORD), true);
+  assert.equal(await auth.validateAdminCredentials(USER.toUpperCase(), PASSWORD), false);
+  assert.equal(await auth.validateAdminCredentials(USER, ` ${PASSWORD}`), false);
+  assert.equal(await auth.validateAdminCredentials("   ", PASSWORD), false);
+});
+
 test("rejects a short signing secret instead of falling back", () => {
   configure();
   process.env.JWT_SECRET = "too-short";
