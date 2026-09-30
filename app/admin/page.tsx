@@ -58,7 +58,7 @@ export default function AdminPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || "登入失敗");
@@ -125,11 +125,11 @@ export default function AdminPage() {
           <form className="space-y-4 text-xs" onSubmit={login}>
             <div>
               <label htmlFor="admin-username" className="text-slate-400 block mb-1">帳號</label>
-              <input id="admin-username" value={username} onChange={(event) => setUsername(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 font-mono focus:outline-none focus:border-amber-500" />
+              <input id="admin-username" name="username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" value={username} onChange={(event) => setUsername(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 font-mono focus:outline-none focus:border-amber-500" />
             </div>
             <div>
               <label htmlFor="admin-password" className="text-slate-400 block mb-1">密碼</label>
-              <input id="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 font-mono focus:outline-none focus:border-amber-500" />
+              <input id="admin-password" name="password" type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 font-mono focus:outline-none focus:border-amber-500" />
             </div>
             <button type="submit" disabled={isLoggingIn} className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all disabled:opacity-60">
               {isLoggingIn ? "驗證最高權限中..." : "登入核心控制台"}

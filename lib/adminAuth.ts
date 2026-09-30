@@ -52,7 +52,8 @@ export async function validateAdminCredentials(username: unknown, password: unkn
   const encodedHash = process.env.ADMIN_PASSWORD_HASH?.trim() || "";
   if (!configuredUsername || !salt || !encodedHash) return false;
   if (typeof username !== "string" || typeof password !== "string" || !password) return false;
-  if (username !== configuredUsername) return false;
+  // Mobile autofill/keyboards may add surrounding spaces to the username; the password is compared exactly.
+  if (username.trim() !== configuredUsername) return false;
 
   try {
     const expected = Buffer.from(encodedHash, "hex");
