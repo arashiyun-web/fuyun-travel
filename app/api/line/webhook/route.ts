@@ -499,8 +499,60 @@ async function saveDispatch(
   }
 }
 
+// ── 派車查詢 ──
+const QUERY_TRIGGERS = ["查派車", "派車查詢", "今天派車", "今日派車", "查一下派車", "查詢派車"];
+
+async function queryDispatchReply(message: string): Promise<string | null> {
+  if (!QUERY_TRIGGERS.some((kw) => message.includes(kw))) return null;
+
+  // 提取日期（可選）
+  const dateMatch = message.match(/(\d{1,2})[\/月](\d{1,2})[日]?/);
+  let tripDate: string | undefined;
+  if (dateMatch) {
+    const mo = dateMatch[1].padStart(2, "0");
+    const d = dateMatch[2].padStart(2, "0");
+    tripDate = `${mo}/${d}`;
+  }
+
+  try {
+    const where: Record<string, unknown> = {};
+    if (tripDate) where.tripDate = tripDate;
+    const rows = await prisma.dispatchOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    if (rows.length === 0) {
+      const label = tripDate ? tripDate : "最近";
+      return `📋 未找到${label}派車記錄。`;
+    }
+
+    const lines = [
+      tripDate ? `📋 ${tripDate} 派車記錄（${rows.length} 筆）` : `📋 最近派車記錄（${rows.length} 筆）`,
+      "",
+      ...rows.map((r) =>
+        [
+          r.tripTime && `🕐 ${r.tripTime}`,
+          r.licensePlate && `🚐 ${r.licensePlate}`,
+          r.driverName && `👤 ${r.driverName}`,
+          r.driverPhone && `📞 ${r.driverPhone}`,
+          r.destination && `📍 ${r.destination}`,
+        ].filter(Boolean).join(" ")
+      ),
+    ];
+    return lines.join("\n").slice(0, 4500);
+  } catch {
+    return "⚠️ 查詢失敗，請稍後重試。";
+  }
+}
+
 async function buildReply(text: string, userId: string, groupId: string | null = null) {
   const message = clean(text);
+
+  // ── 派車查詢 ──
+  const qResp = await queryDispatchReply(message);
+  if (qResp) return qResp;
 
   // ── 派車訊息（最高優先）──
   const dispatch = parseDispatch(message);
