@@ -6,7 +6,7 @@ import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClai
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-intent-router-v4-20260929";
+const HANDLER_VERSION = "line-intent-router-v5-dispatch-20261011";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
@@ -447,8 +447,76 @@ async function handleOfficialQuote(userId: string) {
   return quote ? officialQuoteCreatedReply() : officialQuoteMissingReply();
 }
 
-async function buildReply(text: string, userId: string) {
+// ===== 派車訊息 parser（2026-10-11, fenshenmin）=====
+function parseDispatch(text: string): Record<string, string | undefined> {
+  const f: Record<string, string | undefined> = {};
+  const plateM = text.match(/[KZB]\s*[-/／]?\s*\d{3,6}/i);
+  if (plateM) f.licensePlate = plateM[0].replace(/\s+/g, "").toUpperCase();
+  const drvM = text.match(/司機[：:]\s*(.{1,30})/);
+  if (drvM) f.driverName = drvM[1].trim().split(/\s|\n/)[0].slice(0, 30);
+  const phM = text.match(/電話[：:]\s*(.+)/) || text.match(/(\d{3,4}[-]\d{3,4}\d{0,2})/);
+  if (phM) f.driverPhone = phM[1].trim().slice(0, 20);
+  const dtM = text.match(/(\d{4})[-/．/．](\d{1,2})[-/．](\d{1,2})/)
+           || text.match(/(?<!\d)(\d{1,2})[-/.](\d{1,2})(?!\d)/)
+           || text.match(/(\d{1,2})月(\d{1,2})日?/);
+  if (dtM) {
+    if (String(dtM[1]).length === 4) f.tripDate = dtM[0];
+    else f.tripDate = dtM[1] + "/" + dtM[2];
+  }
+  const tmM = text.match(/(\d{1,2})[:：](\d{2})/);
+  if (tmM) f.tripTime = String(tmM[1]).padStart(2, "0") + ":" + tmM[2];
+  const destM = text.match(/(?:目的地|到|往)[：:]?\s*(\S{2,40})/);
+  if (destM) f.destination = destM[1].trim().slice(0, 50);
+  if (!f.licensePlate) return {};
+  if (!(f.tripDate || f.tripTime || f.driverName || f.driverPhone || f.destination)) return {};
+  return f;
+}
+
+async function saveDispatch(
+  f: Record<string, string | undefined>,
+  userId: string,
+  groupId: string | null,
+  rawText: string,
+): Promise<boolean> {
+  try {
+    await prisma.dispatchOrder.create({
+      data: {
+        tripDate: f.tripDate || null,
+        tripTime: f.tripTime || null,
+        licensePlate: f.licensePlate || null,
+        driverName: f.driverName || null,
+        driverPhone: f.driverPhone || null,
+        destination: f.destination || null,
+        groupId: groupId,
+        senderUserId: userId || null,
+        rawText: rawText.slice(0, 2000),
+      },
+    });
+    return true;
+  } catch (e) {
+    console.error("saveDispatch failed", { userId, groupId, error: String(e).slice(0, 200) });
+    return false;
+  }
+}
+
+async function buildReply(text: string, userId: string, groupId: string | null = null) {
   const message = clean(text);
+
+  // ── 派車訊息（最高優先）──
+  const dispatch = parseDispatch(message);
+  if (Object.keys(dispatch).length >= 2) {
+    const saved = await saveDispatch(dispatch, userId, groupId, message);
+    const lines = [
+      saved ? "✅ 派車已記錄" : "⚠️ 已收到，寫入失敗",
+      dispatch.tripDate     && "📅 " + dispatch.tripDate,
+      dispatch.tripTime     && "🕐 " + dispatch.tripTime,
+      dispatch.licensePlate && "🚐 " + dispatch.licensePlate,
+      dispatch.driverName   && "👤 " + dispatch.driverName,
+      dispatch.driverPhone  && "📞 " + dispatch.driverPhone,
+      dispatch.destination  && "📍 " + dispatch.destination,
+    ].filter(Boolean);
+    return lines.join("\n");
+  }
 
   if (isOfficialQuoteRequest(message)) {
     return handleOfficialQuote(userId);
@@ -556,8 +624,9 @@ export async function POST(request: Request) {
       resent += 1;
     } else {
       const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
+      const groupId = (event.source as { groupId?: string } | undefined)?.groupId || null;
       try {
-        replyText = await buildReply(message.text, userId);
+        replyText = await buildReply(message.text, userId, groupId);
       } catch (error) {
         console.error("line-webhook reply build failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
         if (tracked) await track("release", webhookEventId, (store) => releaseClaim(store, webhookEventId));

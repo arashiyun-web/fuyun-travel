@@ -340,3 +340,20 @@ model LineWebhookEvent {
   @@index([handledAt])
   @@map("line_webhook_events")
 }
+
+model DispatchOrder {
+  id            String   @id @default(cuid())
+  tripDate      String?  @map("trip_date")
+  tripTime      String?  @map("trip_time")
+  licensePlate  String?  @map("license_plate")
+  driverName    String?  @map("driver_name")
+  driverPhone   String?  @map("driver_phone")
+  destination   String?
+  groupId       String?  @map("group_id")
+  senderUserId  String?  @map("sender_user_id")
+  rawText       String   @map("raw_text")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tripDate])
+  @@map("dispatch_orders")
+}
