@@ -452,9 +452,9 @@ function parseDispatch(text: string): Record<string, string | undefined> {
   const f: Record<string, string | undefined> = {};
   const plateM = text.match(/[KZB]\s*[-/／]?\s*\d{3,6}/i);
   if (plateM) f.licensePlate = plateM[0].replace(/\s+/g, "").toUpperCase();
-  const drvM = text.match(/司機[：:]\s*(.{1,30})/);
+  const drvM = text.match(/司[機机][：:]\s*(.{1,30})/);
   if (drvM) f.driverName = drvM[1].trim().split(/\s|\n/)[0].slice(0, 30);
-  const phM = text.match(/電話[：:]\s*(.+)/) || text.match(/(\d{3,4}[-]\d{3,4}\d{0,2})/);
+  const phM = text.match(/電話[：:]?\s*([\d\-]{6,20})/) || text.match(/(0?\d{2,3}[-]\d{3}[-]?\d{3,4})/) || text.match(/(\d{3,4}[-]\d{3,4})/);
   if (phM) f.driverPhone = phM[1].trim().slice(0, 20);
   const dtM = text.match(/(\d{4})[-/．/．](\d{1,2})[-/．](\d{1,2})/)
            || text.match(/(?<!\d)(\d{1,2})[-/.](\d{1,2})(?!\d)/)
