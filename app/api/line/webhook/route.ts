@@ -450,7 +450,7 @@ async function handleOfficialQuote(userId: string) {
 // ===== 派車訊息 parser（2026-10-11, fenshenmin）=====
 function parseDispatch(text: string): Record<string, string | undefined> {
   const f: Record<string, string | undefined> = {};
-  const plateM = text.match(/[KZB]\s*[-/／]?\s*\d{3,6}/i);
+  const plateM = text.match(/[A-Z]{1,3}\s*[-/／]?\s*\d{3,5}/i);
   if (plateM) f.licensePlate = plateM[0].replace(/\s+/g, "").toUpperCase();
   const drvM = text.match(/司[機机][：:]?\s*([\u4e00-\u9fffA-Za-z]{1,20})/);
   if (drvM) f.driverName = drvM[1].trim().split(/\s|\n/)[0].slice(0, 30);
@@ -467,8 +467,7 @@ function parseDispatch(text: string): Record<string, string | undefined> {
   if (tmM) f.tripTime = String(tmM[1]).padStart(2, "0") + ":" + tmM[2];
   const destM = text.match(/(?:目的地|到|往)[：:]?\s*(\S{2,40})/);
   if (destM) f.destination = destM[1].trim().slice(0, 50);
-  if (!f.licensePlate) return {};
-  if (!(f.tripDate || f.tripTime || f.driverName || f.driverPhone || f.destination)) return {};
+  if (Object.values(f).every(v => !v)) return {};
   return f;
 }
 
@@ -556,7 +555,7 @@ async function buildReply(text: string, userId: string, groupId: string | null =
 
   // ── 派車訊息（最高優先）──
   const dispatch = parseDispatch(message);
-  if (Object.keys(dispatch).length >= 2) {
+  if (Object.keys(dispatch).length >= 1) {
     const saved = await saveDispatch(dispatch, userId, groupId, message);
     const lines = [
       saved ? "✅ 派車已記錄" : "⚠️ 已收到，寫入失敗",
