@@ -357,3 +357,26 @@ model DispatchOrder {
   @@index([tripDate])
   @@map("dispatch_orders")
 }
+
+/// LINE raw message events (full capture, deduped by messageId + contentHash).
+model LineRawEvent {
+  id               String   @id @default(cuid())
+  lineEventId      String?  @unique
+  messageId        String?  @unique
+  contentHash      String
+  sourceType       String   @default("LINE")
+  sourceUserId     String?
+  sourceMessageId  String?
+  sourceText       String
+  sourceTimestamp  DateTime?
+  sourceSender     String?
+  rawPayload       String
+  processingStatus String   @default("RECEIVED")
+  receivedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([contentHash])
+  @@index([processingStatus])
+  @@map("line_raw_events")
+}
