@@ -6,7 +6,7 @@ import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClai
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-intent-router-v5-dispatch-20261011d";
+const HANDLER_VERSION = "line-group-muted-v1-20261016";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
@@ -660,6 +660,17 @@ export async function POST(request: Request) {
   for (const event of payload.events || []) {
     const message = event.message as { type?: string; text?: string } | undefined;
     if (event.type !== "message" || message?.type !== "text" || !message.text || !event.replyToken) continue;
+
+    // 群組訊息：只記錄、不回覆（Owner 2026-10-16 明確要求關閉 HH 在群組的回覆；DM 照常）
+    const sourceType = (event.source as { type?: string } | undefined)?.type || "";
+    if (sourceType === "group" || sourceType === "room") {
+      console.info("line-webhook group-skip", {
+        handlerVersion: HANDLER_VERSION,
+        sourceType,
+        messageLength: message.text.length,
+      });
+      continue;
+    }
 
     const webhookEventId = clean(event.webhookEventId, 64);
     const claimed = await claim(webhookEventId);
