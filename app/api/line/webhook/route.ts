@@ -626,52 +626,8 @@ async function replyToLine(replyToken: string, replyText: string, accessToken: s
   return response;
 }
 
-// ===== RAW EVENT ARCHIVE (2026-10-16) =====
-// 全量收錄：任何進入 webhook 的文字訊息都先落庫 line_raw_events，
-// 重複訊息（同 messageId / content hash）自動跳過。
-async function archiveRawEvent(event: Record<string, any>, text: string): Promise<void> {
-  try {
-    const messageId: string = event.message?.messageId || "";
-    const eventId: string = event.id || "";
-    const userId: string = clean(event.source?.userId, 160);
-    const groupId: string | null = event.source?.groupId || null;
-    const timestampMs: number | undefined = event.timestamp;
-    const sourceTimestamp = timestampMs ? new Date(timestampMs) : null;
-
-    // 重複偵測
-    const hash = crypto.createHash("sha256").update(text).digest("hex");
-    const dup = messageId
-      ? await prisma.lineRawEvent.findFirst({
-          where: { OR: [{ messageId }, { contentHash: hash }] },
-          select: { id: true },
-        })
-      : await prisma.lineRawEvent.findFirst({
-          where: { contentHash: hash },
-          select: { id: true },
-        });
-    if (dup) return;
-
-    await prisma.lineRawEvent.create({
-      data: {
-        lineEventId: eventId || null,
-        messageId: messageId || null,
-        contentHash: hash,
-        sourceType: groupId ? "LINE_GROUP" : "LINE",
-        sourceUserId: userId,
-        sourceMessageId: messageId || null,
-        sourceText: text.slice(0, 4000),
-        sourceTimestamp,
-        sourceSender: groupId ? `group:${groupId}` : userId,
-        rawPayload: JSON.stringify(event).slice(0, 20000),
-      },
-    });
-  } catch (e) {
-    console.error("line-webhook raw archive failed", e);
-  }
-}
-
 export async function GET() {
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, handlerVersion: HANDLER_VERSION });
 }
 
 export async function POST(request: Request) {
@@ -704,9 +660,6 @@ export async function POST(request: Request) {
   for (const event of payload.events || []) {
     const message = event.message as { type?: string; text?: string } | undefined;
     if (event.type !== "message" || message?.type !== "text" || !message.text || !event.replyToken) continue;
-
-    // 全量收錄：任何文字訊息先落庫 line_raw_events（重複自動跳過）
-    await archiveRawEvent(event, message.text);
 
     // 群組訊息：只記錄、不回覆（Owner 2026-10-16 明確要求關閉 HH 在群組的回覆；DM 照常）
     const sourceType = (event.source as { type?: string } | undefined)?.type || "";
