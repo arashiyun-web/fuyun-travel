@@ -6,7 +6,7 @@ import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClai
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-group-muted-v1-20261016";
+const HANDLER_VERSION = "line-dm-no-dispatch-v1-20261019";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
@@ -447,127 +447,8 @@ async function handleOfficialQuote(userId: string) {
   return quote ? officialQuoteCreatedReply() : officialQuoteMissingReply();
 }
 
-// ===== 派車訊息 parser（2026-10-11, fenshenmin）=====
-function parseDispatch(text: string): Record<string, string | undefined> {
-  const f: Record<string, string | undefined> = {};
-  const plateM = text.match(/[A-Z]{1,3}\s*[-/／]?\s*\d{3,5}/i);
-  if (plateM) f.licensePlate = plateM[0].replace(/\s+/g, "").toUpperCase();
-  const drvM = text.match(/司[機机][：:]?\s*([\u4e00-\u9fffA-Za-z]{1,20})/);
-  if (drvM) f.driverName = drvM[1].trim().split(/\s|\n/)[0].slice(0, 30);
-  const phM = text.match(/電話[：:]?\s*([\d\-]{6,20})/) || text.match(/(0?\d{2,3}[-]\d{3}[-]?\d{3,4})/) || text.match(/(\d{3,4}[-]\d{3,4})/);
-  if (phM) f.driverPhone = phM[1].trim().slice(0, 20);
-  const dtM = text.match(/(\d{4})[-/．/．](\d{1,2})[-/．](\d{1,2})/)
-           || text.match(/(?<!\d)(\d{1,2})[-/.](\d{1,2})(?!\d)/)
-           || text.match(/(\d{1,2})月(\d{1,2})日?/);
-  if (dtM) {
-    if (String(dtM[1]).length === 4) f.tripDate = dtM[0];
-    else f.tripDate = dtM[1] + "/" + dtM[2];
-  }
-  const tmM = text.match(/(\d{1,2})[:：](\d{2})/);
-  if (tmM) f.tripTime = String(tmM[1]).padStart(2, "0") + ":" + tmM[2];
-  const destM = text.match(/(?:目的地|到|往)[：:]?\s*(\S{2,40})/);
-  if (destM) f.destination = destM[1].trim().slice(0, 50);
-  if (Object.values(f).every(v => !v)) return {};
-  return f;
-}
-
-async function saveDispatch(
-  f: Record<string, string | undefined>,
-  userId: string,
-  groupId: string | null,
-  rawText: string,
-): Promise<boolean> {
-  try {
-    await prisma.dispatchOrder.create({
-      data: {
-        tripDate: f.tripDate || null,
-        tripTime: f.tripTime || null,
-        licensePlate: f.licensePlate || null,
-        driverName: f.driverName || null,
-        driverPhone: f.driverPhone || null,
-        destination: f.destination || null,
-        groupId: groupId,
-        senderUserId: userId || null,
-        rawText: rawText.slice(0, 2000),
-      },
-    });
-    return true;
-  } catch (e) {
-    console.error("saveDispatch failed", { userId, groupId, error: String(e).slice(0, 200) });
-    return false;
-  }
-}
-
-// ── 派車查詢 ──
-const QUERY_TRIGGERS = ["查派車", "派車查詢", "今天派車", "今日派車", "查一下派車", "查詢派車"];
-
-async function queryDispatchReply(message: string): Promise<string | null> {
-  if (!QUERY_TRIGGERS.some((kw) => message.includes(kw))) return null;
-
-  // 提取日期（可選）
-  const dateMatch = message.match(/(\d{1,2})[\/月](\d{1,2})[日]?/);
-  let tripDate: string | undefined;
-  if (dateMatch) {
-    const mo = dateMatch[1].padStart(2, "0");
-    const d = dateMatch[2].padStart(2, "0");
-    tripDate = `${mo}/${d}`;
-  }
-
-  try {
-    const where: Record<string, unknown> = {};
-    if (tripDate) where.tripDate = tripDate;
-    const rows = await prisma.dispatchOrder.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
-
-    if (rows.length === 0) {
-      const label = tripDate ? tripDate : "最近";
-      return `📋 未找到${label}派車記錄。`;
-    }
-
-    const lines = [
-      tripDate ? `📋 ${tripDate} 派車記錄（${rows.length} 筆）` : `📋 最近派車記錄（${rows.length} 筆）`,
-      "",
-      ...rows.map((r) =>
-        [
-          r.tripTime && `🕐 ${r.tripTime}`,
-          r.licensePlate && `🚐 ${r.licensePlate}`,
-          r.driverName && `👤 ${r.driverName}`,
-          r.driverPhone && `📞 ${r.driverPhone}`,
-          r.destination && `📍 ${r.destination}`,
-        ].filter(Boolean).join(" ")
-      ),
-    ];
-    return lines.join("\n").slice(0, 4500);
-  } catch {
-    return "⚠️ 查詢失敗，請稍後重試。";
-  }
-}
-
-async function buildReply(text: string, userId: string, groupId: string | null = null) {
+async function buildReply(text: string, userId: string) {
   const message = clean(text);
-
-  // ── 派車查詢 ──
-  const qResp = await queryDispatchReply(message);
-  if (qResp) return qResp;
-
-  // ── 派車訊息（最高優先）──
-  const dispatch = parseDispatch(message);
-  if (Object.keys(dispatch).length >= 1) {
-    const saved = await saveDispatch(dispatch, userId, groupId, message);
-    const lines = [
-      saved ? "✅ 派車已記錄" : "⚠️ 已收到，寫入失敗",
-      dispatch.tripDate     && "📅 " + dispatch.tripDate,
-      dispatch.tripTime     && "🕐 " + dispatch.tripTime,
-      dispatch.licensePlate && "🚐 " + dispatch.licensePlate,
-      dispatch.driverName   && "👤 " + dispatch.driverName,
-      dispatch.driverPhone  && "📞 " + dispatch.driverPhone,
-      dispatch.destination  && "📍 " + dispatch.destination,
-    ].filter(Boolean);
-    return lines.join("\n");
-  }
 
   if (isOfficialQuoteRequest(message)) {
     return handleOfficialQuote(userId);
@@ -686,9 +567,8 @@ export async function POST(request: Request) {
       resent += 1;
     } else {
       const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
-      const groupId = (event.source as { groupId?: string } | undefined)?.groupId || null;
       try {
-        replyText = await buildReply(message.text, userId, groupId);
+        replyText = await buildReply(message.text, userId);
       } catch (error) {
         console.error("line-webhook reply build failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
         if (tracked) await track("release", webhookEventId, (store) => releaseClaim(store, webhookEventId));

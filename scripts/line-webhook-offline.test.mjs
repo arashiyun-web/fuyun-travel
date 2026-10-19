@@ -138,7 +138,32 @@ const staleBody = bodyOf(textEvent("01SYNTHSTALE", "我要正式報價", true, u
 const s1 = await call(staleBody, sign(staleBody));
 chk("stale in-progress claim → acknowledgement reply, no quote rebuilt", s1.status === 200 && /已收到您的訊息/.test(replyTexts().at(-1) || "") && (await prisma.charterQuote.count({ where: { lineUserId: userS } })) === qS0, `${s1.status} reply=${(replyTexts().at(-1) || "").slice(0, 12)}`);
 
-for (const u of [userC, userF, userS]) {
+// ---- 2026-10-19: customer DMs must go through the quote flow, never the dispatch parser ----
+// Replies the customer flow can produce: quote, missing-field prompts, helper / service menu.
+const CUSTOMER_FLOW = /初步行情|請補充|小幫手|您好，請提供|您好，請問需要包車|真人客服|感謝您的詢問|請先提供完整包車資訊/;
+const DM_SENTENCES = ["11/20 板橋到台中 40人 來回", "請問到九份要多少錢", "我想包車到九份", "下週六早上8:00出發可以嗎", "我的電話 0912-345-678", "我想包車去九份", "包車"];
+const dmUsers = [];
+for (const [i, text] of DM_SENTENCES.entries()) {
+  const u = `Usyntheticdm${String(i).padStart(2, "0")}000000000000000000`;
+  dmUsers.push(u);
+  const b = bodyOf(textEvent(`01SYNTHDM${i}`, text, false, u));
+  const r = await call(b, sign(b));
+  const reply = replyTexts().at(-1) || "";
+  chk(`DM #${i + 1} gets a customer-flow reply, not 派車已記錄`, r.status === 200 && !reply.includes("派車已記錄") && CUSTOMER_FLOW.test(reply), `${r.status} reply=${reply.slice(0, 12)}`);
+}
+// A synthetic dispatch row exists, so a route that still answers 查派車 would leak it.
+const SYNTH_PLATE = "SYN-9999";
+const dispatchModel = prisma.dispatchOrder;
+if (dispatchModel) await dispatchModel.create({ data: { licensePlate: SYNTH_PLATE, senderUserId: "Usyntheticdispatchseed0000000000", rawText: "synthetic" } }).catch(() => null);
+const userQ = "Usyntheticdispatchquery000000000";
+dmUsers.push(userQ);
+const qBody = bodyOf(textEvent("01SYNTHDISPQ", "查派車", false, userQ));
+const q = await call(qBody, sign(qBody));
+const qReply = replyTexts().at(-1) || "";
+chk("DM 查派車 returns no dispatch data", q.status === 200 && !qReply.includes(SYNTH_PLATE) && !qReply.includes("派車記錄") && CUSTOMER_FLOW.test(qReply), `${q.status} reply=${qReply.slice(0, 12)}`);
+if (dispatchModel) await dispatchModel.deleteMany({ where: { senderUserId: { startsWith: "Usynthetic" } } }).catch(() => null);
+
+for (const u of [userC, userF, userS, ...dmUsers]) {
   await prisma.charterQuote.deleteMany({ where: { lineUserId: u } });
   await prisma.lineSession.deleteMany({ where: { userId: u } }).catch(() => {});
 }

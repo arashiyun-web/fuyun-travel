@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+import { unauthorized, verifyAdminRequest } from "@/lib/adminQuoteAuth";
 import { envConfig } from "@/lib/config/company";
 import { generateFaq } from "@/lib/seo/generateFaq";
 import { generateGeo } from "@/lib/seo/generateGeo";
@@ -71,12 +73,18 @@ function buildSeo(title: string, content: string, tags: string[], location: stri
   };
 }
 
-export async function GET() {
+function apiKeyMatches(supplied: string | null, configured: string) {
+  const a = Buffer.from(supplied || "");
+  const b = Buffer.from(configured);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export async function GET(request: Request) {
+  if (!verifyAdminRequest(request)) return unauthorized();
   const persisted = await prisma.article.findMany({ orderBy: { createdAt: "desc" }, take: 50 }).catch(() => []);
   return NextResponse.json({
     success: true,
     source: "小羽旅遊趣 / Facebook Graph API ready",
-    auth: envConfig.travelImportApiKey ? "x-api-key required" : "development mode; TRAVEL_IMPORT_API_KEY not configured",
     flow: ["Facebook", "Graph API", "n8n", "GX10 AI", "SEO改寫", "網站發布", "Google收錄", "LINE推播", "詢價", "成交"],
     imports: persisted.length ? persisted : imports,
   });
@@ -84,11 +92,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    if (envConfig.travelImportApiKey) {
-      const apiKey = request.headers.get("x-api-key");
-      if (apiKey !== envConfig.travelImportApiKey) {
-        return NextResponse.json({ success: false, message: "Invalid x-api-key." }, { status: 401 });
-      }
+    // 沒設金鑰就不開放匯入（以前會變成任何人都能發文）
+    if (!envConfig.travelImportApiKey) {
+      return NextResponse.json({ success: false, message: "Travel import is disabled." }, { status: 503 });
+    }
+    if (!apiKeyMatches(request.headers.get("x-api-key"), envConfig.travelImportApiKey)) {
+      return NextResponse.json({ success: false, message: "Invalid x-api-key." }, { status: 401 });
     }
 
     const body = await request.json();
