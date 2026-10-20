@@ -4,11 +4,13 @@
  * The raw body and x-line-signature are forwarded unchanged so the receiver verifies the same LINE
  * signature itself. The forward runs after the response (waitUntil), times out after 1.5 s and is never
  * retried: LINE times out at 2 s, and a slow or offline receiver must never affect customer DMs.
- * Unset LINE_GROUP_RELAY_URL → nothing is sent.
+ * LINE_GROUP_RELAY_URL overrides the default receiver URL.
  */
 import { waitUntil } from "@vercel/functions";
 
 export const RELAY_TIMEOUT_MS = 1500;
+// 老闆 2026-10-20 核准；公開 repo 看得到網址，靠 LINE 簽章擋（接收端只收 HH channel secret 簽過的 body）
+export const DEFAULT_RELAY_URL = "https://gx10-worker-02.tailde7162.ts.net/api/line/events/ingest";
 
 type RelayEvent = { source?: { type?: string } };
 
@@ -32,8 +34,8 @@ async function forward(url: string, body: string, signature: string) {
 
 /** Schedules the forward; returns whether one was scheduled. */
 export function relayGroupEvents(body: string, signature: string, events: RelayEvent[] | undefined) {
-  const url = process.env.LINE_GROUP_RELAY_URL;
-  if (!url || !hasGroupEvent(events)) return false;
+  const url = process.env.LINE_GROUP_RELAY_URL || DEFAULT_RELAY_URL;
+  if (!hasGroupEvent(events)) return false;
   waitUntil(forward(url, body, signature));
   return true;
 }

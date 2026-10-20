@@ -88,12 +88,18 @@ await settle();
 chk("invalid signature → 403, not relayed", bad.status === 403 && relays().length === before);
 chk("malformed JSON → 400, not relayed", bj.status === 400 && relays().length === before);
 
-// 5. relay URL unset → skipped
+// 5. relay URL unset → the built-in receiver URL (Owner 2026-10-20), raw body and signature unchanged
 delete process.env.LINE_GROUP_RELAY_URL;
-before = relays().length;
+const { DEFAULT_RELAY_URL } = jiti(path.join(root, "lib/line/groupRelay.ts"));
+const toDefault = () => outbound.filter((o) => o.url === DEFAULT_RELAY_URL);
 const unset = await post(gBody, gSig);
 await settle();
-chk("LINE_GROUP_RELAY_URL unset → 200, not relayed", unset.status === 200 && relays().length === before);
+const d1 = toDefault().at(-1);
+chk("LINE_GROUP_RELAY_URL unset → 200, relayed to built-in URL", unset.status === 200 && toDefault().length === 1 && d1.body === gBody && d1.headers["x-line-signature"] === gSig);
+chk("built-in URL is the second machine's Funnel ingest path", DEFAULT_RELAY_URL === "https://gx10-worker-02.tailde7162.ts.net/api/line/events/ingest");
+const dmUnset = await post(dmBody, sign(dmBody));
+await settle();
+chk("LINE_GROUP_RELAY_URL unset, DM → not relayed", dmUnset.status === 200 && toDefault().length === 1);
 process.env.LINE_GROUP_RELAY_URL = RELAY;
 
 // 6. receiver hangs → response does not wait for it; the relay aborts at ~1.5 s with no retry

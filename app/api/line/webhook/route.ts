@@ -7,7 +7,7 @@ import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClai
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-group-relay-v1-20261020";
+const HANDLER_VERSION = "line-group-relay-v2-20261020";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
