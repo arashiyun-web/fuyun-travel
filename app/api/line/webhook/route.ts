@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { relayGroupEvents } from "@/lib/line/groupRelay";
 import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClaim, type Claim, type WebhookEventStore } from "@/lib/line/webhookEvents";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HANDLER_VERSION = "line-dm-no-dispatch-v1-20261019";
+const HANDLER_VERSION = "line-group-relay-v1-20261020";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ENTRY_KEYWORDS = new Set(["包車", "租車", "遊覽車", "訂車", "詢價", "立即報價", "?", "？"]);
 const OFFICIAL_QUOTE_KEYWORDS = ["我要正式報價", "正式報價", "報價", "給我正式報價", "客服報價"];
@@ -533,6 +534,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
+  // 群組／多人聊天事件原封轉給二號機（背景送，不影響回應與私訊流程）
+  relayGroupEvents(body, signature, payload.events);
   let replied = 0;
   let skippedRedelivery = 0;
   let resent = 0;
