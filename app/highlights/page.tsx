@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/site";
 import { getPublishedFeaturedSpots } from "@/lib/content-sync/getFeaturedSpots";
+import { localPhotosForSource } from "@/lib/content-sync/highlightsLocalPhotos";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,14 @@ export const metadata: Metadata = pageMeta({
 });
 
 export default async function HighlightsPage() {
-  const spots = await getPublishedFeaturedSpots();
+  let spots: Awaited<ReturnType<typeof getPublishedFeaturedSpots>> = [];
+  let unavailable = false;
+  try {
+    spots = await getPublishedFeaturedSpots();
+  } catch (error) {
+    unavailable = true;
+    console.error("[highlights] could not load featured spots", error);
+  }
 
   return (
     <div className="highlights-page">
@@ -25,16 +33,17 @@ export default async function HighlightsPage() {
 
         {spots.length === 0 ? (
           <p className="lead" style={{ padding: "24px 0" }}>
-            這裡真好玩專區準備中，敬請期待。
+            {unavailable ? "內容暫時無法載入，請稍後再試。" : "這裡真好玩專區準備中，敬請期待。"}
           </p>
         ) : (
           <div className="spot-list">
             {spots.map((spot) => {
-              const photos = spot.photoUrls.length > 0
+              const stored = spot.photoUrls.length > 0
                 ? spot.photoUrls
                 : spot.photoUrl
                   ? [spot.photoUrl]
                   : [];
+              const photos = localPhotosForSource(spot.sourceUrl) ?? stored;
 
               return (
                 <article className="spot-article" key={spot.id}>
