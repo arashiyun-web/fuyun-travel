@@ -5,6 +5,12 @@ import { useState } from "react";
 import { COMPANY } from "@/lib/site";
 import { getAttribution, trackEvent } from "@/lib/analytics";
 
+const PHONE_RE = /^0\d{8,10}$/;
+
+function isValidPhone(value: string) {
+  return PHONE_RE.test(value.replace(/\D/g, ""));
+}
+
 export default function InquiryFormV2() {
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
@@ -15,6 +21,21 @@ export default function InquiryFormV2() {
     e.preventDefault();
     setError("");
 
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    const phone = String(formData.get("phone") || "").trim();
+
+    if (!name) {
+      setError("請輸入姓名。");
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      setError("請輸入可聯絡的手機或市話，例如 0912-345-678 或 02-2685-1666。");
+      return;
+    }
+
     if (!consent) {
       setError("送出前請先同意隱私權政策與個人資料使用說明。");
       return;
@@ -23,12 +44,13 @@ export default function InquiryFormV2() {
     setSending(true);
 
     try {
-      const formData = new FormData(e.currentTarget);
       const attribution = getAttribution();
       const response = await fetch("/api/inquiry", {
         method: "POST",
         body: JSON.stringify({
           ...Object.fromEntries(formData.entries()),
+          name,
+          phone,
           source_page: attribution.sourcePage,
           referer: attribution.referer,
           utm_source: attribution.utmSource,
@@ -43,8 +65,9 @@ export default function InquiryFormV2() {
         },
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError("詢價送出失敗，請稍後再試，或改用 LINE / 電話聯絡。");
+        setError(typeof data.message === "string" && data.message ? data.message : "詢價送出失敗，請稍後再試，或改用 LINE / 電話聯絡。");
         return;
       }
 
@@ -55,7 +78,7 @@ export default function InquiryFormV2() {
         keyword: attribution.keyword,
       });
 
-      e.currentTarget.reset();
+      form.reset();
       setConsent(false);
       setSubmitted(true);
     } catch {
@@ -75,6 +98,16 @@ export default function InquiryFormV2() {
 
   return (
     <form className="inquiry-form" onSubmit={handleSubmit} noValidate>
+      <label className="field">
+        <span>姓名</span>
+        <input type="text" name="name" autoComplete="name" required />
+      </label>
+
+      <label className="field">
+        <span>電話</span>
+        <input type="tel" name="phone" inputMode="tel" autoComplete="tel" placeholder="0912-345-678" required />
+      </label>
+
       <label className="field">
         <span>出發日期</span>
         <input type="date" name="date" required />
