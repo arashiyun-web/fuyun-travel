@@ -9,6 +9,8 @@ const nextConfig = {
       { source: "/platform/:path*", headers: noindex },
       { source: "/admin", headers: noindex },
       { source: "/admin/:path*", headers: noindex },
+      { source: "/ai-test", headers: noindex },
+      { source: "/ai-test/:path*", headers: noindex },
     ];
   },
 };

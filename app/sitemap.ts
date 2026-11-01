@@ -11,6 +11,9 @@ import { charterRouteEntries } from "@/src/data/charterRoutes";
 
 export const dynamic = "force-dynamic";
 
+// Test and debug pages. Kept reachable, but never listed for crawlers.
+const unindexedPaths = new Set(["/ai-test"]);
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articles = await listPublishedTravelArticles();
   const staticPaths = [
@@ -51,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...moneyPages.map((page) => `/service/${page.slug}`),
   ];
 
-  const standardEntries: MetadataRoute.Sitemap = [...staticPaths, ...dynamicPaths].map((path) => ({
+  const standardEntries: MetadataRoute.Sitemap = [...staticPaths, ...dynamicPaths].filter((path) => !unindexedPaths.has(path)).map((path) => ({
     url: absoluteUrl(path),
     lastModified: new Date(),
     changeFrequency: path === "/" ? "daily" : "weekly",
@@ -79,5 +82,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...standardEntries, ...knowledgeSitemapEntries, ...attractionSitemapEntries, ...routeSitemapEntries];
+  return [...standardEntries, ...knowledgeSitemapEntries, ...attractionSitemapEntries, ...routeSitemapEntries].filter((entry) => {
+    const path = new URL(entry.url).pathname.replace(/\/$/, "") || "/";
+    return !unindexedPaths.has(path);
+  });
 }
