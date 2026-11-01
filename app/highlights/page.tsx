@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { pageMeta } from "@/lib/site";
 import { getPublishedFeaturedSpots } from "@/lib/content-sync/getFeaturedSpots";
 import { localPhotosForSource } from "@/lib/content-sync/highlightsLocalPhotos";
@@ -24,12 +25,12 @@ export default async function HighlightsPage() {
   return (
     <div className="highlights-page">
       <div className="highlights-page__inner">
-        <div className="highlights-hero">
+        <Link href="/" className="highlights-hero" aria-label="回首頁">
           <div className="highlights-hero__content">
             <h1>這裡真好玩</h1>
             <p className="lead">浮雲輕鬆遊真實走過的行程分享，完整列表。</p>
           </div>
-        </div>
+        </Link>
 
         {spots.length === 0 ? (
           <p className="lead" style={{ padding: "24px 0" }}>

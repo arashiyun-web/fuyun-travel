@@ -404,6 +404,15 @@ h3 { font-size: 17px; margin: 16px 0 8px; }
   background-size: cover;
   background-position: center 30%;
 }
+a.highlights-hero,
+a.highlights-hero:hover,
+a.highlights-hero:focus,
+a.highlights-hero:visited,
+a.highlights-hero:active {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
 .highlights-hero__content {
   max-width: 640px;
 }
