@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { SITE } from "@/lib/site";
@@ -73,6 +74,20 @@ function clean(value: unknown, limit = 600) {
 
 function cleanArray(value: unknown) {
   return Array.isArray(value) ? value.map((item) => clean(item, 80)).filter(Boolean) : [];
+}
+
+function isValidPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return /^0\d{8,10}$/.test(digits);
+}
+
+function isDatabaseUnavailable(error: unknown) {
+  if (error instanceof Prisma.PrismaClientInitializationError) return true;
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return ["P1001", "P1002", "P1008", "P1017"].includes(error.code);
+  }
+  const message = error instanceof Error ? error.message : "";
+  return /can't reach database server|ECONNREFUSED|ETIMEDOUT|Connection terminated|Server has closed the connection/i.test(message);
 }
 
 function clientIp(request: Request) {
@@ -258,15 +273,23 @@ async function notifyInquiryFallback(inquiry: InquiryRecord) {
 // session cookie / admin JWT bearer, or ADMIN_ACCESS_TOKEN in the Authorization header.
 export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return unauthorized();
-  addAudit(request, "READ_INQUIRIES", "");
-  const inquiries = await prisma.inquiry.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
+  try {
+    addAudit(request, "READ_INQUIRIES", "");
+    const inquiries = await prisma.inquiry.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
 
-  return NextResponse.json({
-    success: true,
-    inquiries: inquiries.map((item) => publicInquiry(toPublicRecord(item), true)),
-    audit: store.audit,
-    source: "postgresql",
-  });
+    return NextResponse.json({
+      success: true,
+      inquiries: inquiries.map((item) => publicInquiry(toPublicRecord(item), true)),
+      audit: store.audit,
+      source: "postgresql",
+    });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return NextResponse.json({ success: false, message: "資料庫暫時無法連線。" }, { status: 503 });
+    }
+    console.error("inquiry read failed", error);
+    return NextResponse.json({ success: false, message: "讀取失敗。" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -274,8 +297,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: "送出太頻繁，請稍後再試。" }, { status: 429 });
   }
 
+  let body: {
+    id?: unknown;
+    name?: unknown;
+    phone?: unknown;
+    line_id?: unknown;
+    trip_type?: unknown;
+    start_date?: unknown;
+    date?: unknown;
+    pickup_location?: unknown;
+    destination?: unknown;
+    passenger_count?: unknown;
+    passengers?: unknown;
+    preferred_vehicle?: unknown;
+    special_requests?: unknown;
+    note?: unknown;
+    source_page?: unknown;
+    referer?: unknown;
+    utm_source?: unknown;
+    utm_medium?: unknown;
+    utm_campaign?: unknown;
+    utm_term?: unknown;
+    utm_content?: unknown;
+    keyword?: unknown;
+  };
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 400 });
+  }
+
+  try {
     const inquiry: InquiryRecord = {
       id: clean(body.id, 80) || `iq-${Date.now()}`,
       name: clean(body.name, 120),
@@ -300,11 +352,16 @@ export async function POST(request: Request) {
       keyword: clean(body.keyword, 160),
     };
 
-    if (!inquiry.name || !inquiry.phone || !inquiry.start_date) {
-      return NextResponse.json(
-        { success: false, message: "請填寫姓名、電話與出發日期。" },
-        { status: 400 },
-      );
+    if (!inquiry.name) {
+      return NextResponse.json({ success: false, message: "請填寫姓名。" }, { status: 400 });
+    }
+
+    if (!inquiry.phone || !isValidPhone(inquiry.phone)) {
+      return NextResponse.json({ success: false, message: "請填寫可聯絡的電話。" }, { status: 400 });
+    }
+
+    if (!inquiry.start_date) {
+      return NextResponse.json({ success: false, message: "請填寫出發日期。" }, { status: 400 });
     }
 
     if (!Number.isFinite(inquiry.passenger_count) || inquiry.passenger_count < 1) {
@@ -354,8 +411,15 @@ export async function POST(request: Request) {
       message: "Inquiry received",
       inquiry: publicInquiry(toPublicRecord(created), true),
     });
-  } catch {
-    return NextResponse.json({ success: false, message: "資料解析失敗。" }, { status: 500 });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return NextResponse.json(
+        { success: false, message: "系統暫時無法儲存，請稍後再試，或改用 LINE / 電話聯絡。" },
+        { status: 503 },
+      );
+    }
+    console.error("inquiry create failed", error);
+    return NextResponse.json({ success: false, message: "詢價送出失敗，請稍後再試。" }, { status: 500 });
   }
 }
 
@@ -395,7 +459,11 @@ export async function PATCH(request: Request) {
       success: true,
       inquiry: publicInquiry(toPublicRecord(updated), true),
     });
-  } catch {
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return NextResponse.json({ success: false, message: "資料庫暫時無法連線。" }, { status: 503 });
+    }
+    console.error("inquiry update failed", error);
     return NextResponse.json({ success: false, message: "更新失敗。" }, { status: 500 });
   }
 }
