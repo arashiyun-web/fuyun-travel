@@ -10,8 +10,8 @@ const STORE = {
   session: "travel-commerce-session-v1",
 };
 
-// Owner/admin sign-in is verified only by /api/auth/login; no real account is embedded in this file.
-// The admin/editor/customer users below are fictional localStorage demo accounts.
+// Owner/admin sign-in is verified only by /api/auth/login, then the browser goes to /admin.
+// No admin or editor password is stored here. The customer record below is a fictional member demo.
 
 // Demo VAPID public key. In production this comes from the backend and pairs
 // with the private VAPID key used by web-push on the server.
@@ -39,8 +39,6 @@ const labels = { themes: "旅遊主題", regions: "旅遊地區", durations: "�
 
 const seed = {
   users: [
-    { id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" },
-    { id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" },
     { id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" },
   ],
   tours: [
@@ -134,13 +132,13 @@ function ensureSystemUser(account) {
   state.users.unshift({ ...account });
 }
 
-ensureSystemUser({ id: "u-admin", name: "平台管理員", username: "admin", password: "admin", role: "admin" });
-// Drop the owner record that earlier versions cached in localStorage (it held a real password).
-state.users = state.users.filter((user) => user.id !== "u-owner");
-ensureSystemUser({ id: "u-editor", name: "行程編輯", username: "editor", password: "editor123", role: "editor" });
+// Drop staff records that earlier versions cached in localStorage, including any demo admin/editor password.
+state.users = state.users.filter((user) => user.role === "customer" && user.id !== "u-owner" && user.username !== "admin" && user.username !== "editor");
 ensureSystemUser({ id: "u-customer", name: "王小旅", username: "customer", password: "customer123", role: "customer" });
 save("users");
-state.user = state.users.find((u) => u.id === sessionStorage.getItem(STORE.session)) || null;
+const sessionId = sessionStorage.getItem(STORE.session);
+state.user = state.users.find((u) => u.id === sessionId) || null;
+if (!state.user) sessionStorage.removeItem(STORE.session);
 syncMemberNotificationConsents();
 
 const $ = (selector) => document.querySelector(selector);
@@ -242,7 +240,19 @@ function parseRoute() {
   return { name: name || "home", id };
 }
 
+function isAdminRoute(route) {
+  return String(route || "").replace(/^#/, "").split(":")[0] === "admin";
+}
+
+function redirectRealAdmin() {
+  window.location.replace("/admin");
+}
+
 function go(route) {
+  if (isAdminRoute(route)) {
+    redirectRealAdmin();
+    return;
+  }
   if ((location.hash || "#home") === route) {
     renderRoute();
     return;
@@ -261,12 +271,15 @@ function renderShell() {
 function guard(route) {
   if (["checkout", "member"].includes(route.name) && !state.user) return "login";
   if (route.name === "member" && state.user?.role !== "customer") return "home";
-  if (route.name === "admin" && !["admin", "editor"].includes(state.user?.role)) return "login";
   return route.name;
 }
 
 function renderRoute() {
   const route = parseRoute();
+  if (route.name === "admin") {
+    redirectRealAdmin();
+    return;
+  }
   const allowed = guard(route);
   if (allowed !== route.name) {
     go(`#${allowed}`);
@@ -282,7 +295,6 @@ function renderRoute() {
   if (allowed === "tour") renderTourDetail(route.id);
   if (allowed === "checkout") renderCheckout(route.id);
   if (allowed === "member") renderMember();
-  if (allowed === "admin") renderAdmin();
   if (allowed === "preview") renderPreview();
 }
 
@@ -816,19 +828,13 @@ function renderPreview() {
       "後台管理",
       "查看營收、訂單、會員管理、行程管理與推播控制台。",
       "管理預覽",
-      () => {
-        const user = state.users.find((item) => item.username === "admin");
-        login(user.username, user.password);
-      },
+      () => redirectRealAdmin(),
     ],
     [
       "內容管理",
-      "驗證內容維護人員只能新增與編輯行程，不能看金流與推播。",
-      "內容預覽",
-      () => {
-        const user = state.users.find((item) => item.role === "editor");
-        login(user.username, user.password);
-      },
+      "內容維護改由正式後台處理，這裡不再用本機帳號進入。",
+      "前往後台",
+      () => redirectRealAdmin(),
     ],
     [
       "Web Push 推播",
@@ -1229,14 +1235,10 @@ async function loginOwnerDashboard(username, password) {
 }
 
 function login(username, password) {
-  const user = state.users.find((item) => item.username === username && item.password === password);
+  const user = state.users.find((item) => item.role === "customer" && item.username === username && item.password === password);
   if (!user) return false;
   setSession(user);
-  if (user.role === "customer") go("#member");
-  else {
-    go("#admin");
-    renderRoute();
-  }
+  go("#member");
   return true;
 }
 
@@ -1269,7 +1271,7 @@ function bind() {
     const submit = event.currentTarget.querySelector("button[type='submit']");
     message.textContent = "";
     submit.disabled = true;
-    // Try the server-verified admin login first; fall back to the local demo accounts.
+    // Staff accounts are checked only by the server. A failure may still open the local member demo.
     loginOwnerDashboard(username, password).catch(() => {
       submit.disabled = false;
       if (!login(username, password)) message.textContent = "登入失敗，請確認帳號資訊。";
@@ -1278,8 +1280,12 @@ function bind() {
   $$("[data-demo-login]").forEach((button) => {
     button.addEventListener("click", () => {
       const role = button.dataset.demoLogin;
-      const user = state.users.find((item) => item.role === role);
-      login(user.username, user.password);
+      if (role === "admin" || role === "editor") {
+        redirectRealAdmin();
+        return;
+      }
+      const user = state.users.find((item) => role === "customer" && item.role === "customer");
+      if (user) login(user.username, user.password);
     });
   });
   $("#register-button")?.addEventListener("click", () => {

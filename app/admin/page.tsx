@@ -86,8 +86,7 @@ export default function AdminPage() {
   }
 
   function openPlatformAdmin() {
-    sessionStorage.setItem("travel-commerce-session-v1", "u-owner");
-    window.location.href = "/platform/index.html?v=official-owner-login-v5#admin";
+    window.location.assign("/admin");
   }
 
   function openSocialDistribute() {
