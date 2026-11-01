@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>浮雲輕旅｜專業包車旅遊服務</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("travel-commerce-users-v1");
+          if (raw) {
+            var users = JSON.parse(raw).filter(function (user) {
+              return user && user.role === "customer" && user.id !== "u-owner" && user.username !== "admin" && user.username !== "editor";
+            });
+            localStorage.setItem("travel-commerce-users-v1", JSON.stringify(users));
+          }
+          var sessionId = sessionStorage.getItem("travel-commerce-session-v1");
+          if (sessionId === "u-admin" || sessionId === "u-editor" || sessionId === "u-owner") sessionStorage.removeItem("travel-commerce-session-v1");
+        } catch (e) {}
+        var name = (location.hash || "").replace(/^#/, "").split(":")[0];
+        if (name === "admin") location.replace("/admin");
+      })();
+    </script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -135,7 +153,7 @@
     <div id="notification-panel" class="notification-panel hidden"></div>
     <div id="toast-root" class="toast-root"></div>
 
-    <script src="./app.js?v=admin-auth-hardening-20260927"></script>
+    <script src="./app.js?v=platform-admin-redirect-20261101"></script>
     <script src="./inquiry-module.js"></script>
     <script src="./fuyun-protect.js"></script>
   </body>

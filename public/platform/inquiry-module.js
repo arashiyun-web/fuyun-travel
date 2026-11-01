@@ -296,12 +296,11 @@
 
   function enhanceAdmin() {
     const adminView = $("#admin-view.active");
-    if (!adminView) return;
+    // Refreshing the table rewrites nodes. Calling refresh on every mutation
+    // queues another mutation forever and freezes the page on #admin.
+    if (!adminView || $("#ft-inquiry-admin", adminView)) return;
 
-    if (!$("#ft-inquiry-admin", adminView)) {
-      adminView.appendChild(renderInquiryAdminPanel());
-    }
-
+    adminView.appendChild(renderInquiryAdminPanel());
     refreshAdminPanel();
   }
 
