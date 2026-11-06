@@ -1,4 +1,4 @@
-export const OPERATIONS_PLATFORMS = ["website", "facebook_group", "instagram"] as const;
+export const OPERATIONS_PLATFORMS = ["website", "facebook_group", "facebook_page", "instagram", "x"] as const;
 export type OperationsPlatform = (typeof OPERATIONS_PLATFORMS)[number];
 
 export const CONTENT_TYPES = ["招生", "回顧"] as const;
@@ -54,7 +54,7 @@ export interface PlatformDraft {
   postUrl: string | null;
   lastError: string | null;
   verification: "not_tested" | "pending" | "verified" | "failed";
-  adapter: "website_article" | "website_preview" | "facebook_group_manual" | "instagram_graph" | "instagram_login_v2";
+  adapter: "website_article" | "website_preview" | "facebook_group_manual" | "facebook_page" | "instagram_graph" | "instagram_login_v2" | "x_oauth1";
   /** sha256 over the exact caption, image hashes, platform and target account at approval time. */
   approvalHash?: string | null;
   /** Deterministic fact check of the caption (lib/operations/contentGuard.mjs). */
@@ -122,4 +122,6 @@ export interface ContentIntakeInput {
   selectedPlatforms: OperationsPlatform[];
   images: IntakeImage[];
   publicImageUrls?: string[];
+  /** When set, replaces the deterministic template for that platform. */
+  captions?: Partial<Record<OperationsPlatform, string>>;
 }

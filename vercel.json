@@ -1,1 +1,12 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/operations/process-due",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/content-sync/weekly-pull",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

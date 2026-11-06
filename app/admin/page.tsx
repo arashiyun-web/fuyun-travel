@@ -3,10 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Summary = {
-  total_revenue: number;
-  total_cost: number;
-  total_net_profit: number;
-  overall_profit_margin: number | string;
+  inquiries: number;
+  quotes: number;
+  operationsJobs: number;
+  operationsQueued: number;
+  operationsPublished: number;
 };
 
 type Order = {
@@ -18,10 +19,11 @@ type Order = {
 };
 
 const initialSummary: Summary = {
-  total_revenue: 0,
-  total_cost: 0,
-  total_net_profit: 0,
-  overall_profit_margin: 0,
+  inquiries: 0,
+  quotes: 0,
+  operationsJobs: 0,
+  operationsQueued: 0,
+  operationsPublished: 0,
 };
 
 export default function AdminPage() {
@@ -89,6 +91,10 @@ export default function AdminPage() {
     window.location.assign("/admin");
   }
 
+  function openOperations() {
+    window.location.href = "/admin/operations";
+  }
+
   function openSocialDistribute() {
     window.location.href = "/admin/distribute";
   }
@@ -142,16 +148,16 @@ export default function AdminPage() {
   return (
     <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5 bg-slate-900 p-6 rounded-2xl border border-slate-800">
-        <Metric label="總營業額" value={`$${summary.total_revenue}`} />
-        <Metric label="總營運成本" value={`$${summary.total_cost}`} muted />
-        <Metric label="核心絕對淨利" value={`$${summary.total_net_profit}`} highlight />
-        <Metric label="總毛利率" value={`${summary.overall_profit_margin}%`} success />
+        <Metric label="詢價筆數" value={String(summary.inquiries)} />
+        <Metric label="報價筆數" value={String(summary.quotes)} muted />
+        <Metric label="發布工作" value={String(summary.operationsJobs)} highlight />
+        <Metric label="待發／已發" value={`${summary.operationsQueued}／${summary.operationsPublished}`} success />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4 gap-3">
-            <h2 className="text-base font-medium text-slate-200">全線訂單營運控制台</h2>
+            <h2 className="text-base font-medium text-slate-200">發布工作狀態</h2>
             <button type="button" onClick={() => void logout()} className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:border-red-500/60 hover:text-red-300 transition-all">登出</button>
           </div>
           {loadError ? <div className="mb-4 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{loadError}</div> : null}
@@ -159,10 +165,10 @@ export default function AdminPage() {
             <div key={order.order_id} className="p-4 rounded-xl border bg-slate-950 border-slate-800 mb-3">
               <div className="flex justify-between items-center">
                 <span className="font-mono font-bold text-amber-400">{order.order_id}</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">{order.order_status}</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">{order.order_status} 筆</span>
               </div>
             </div>
-          )) : <div className="text-center py-12 text-xs text-slate-600 tracking-wide">目前尚無訂單資料。</div>}
+          )) : <div className="text-center py-12 text-xs text-slate-600 tracking-wide">目前沒有發布工作。</div>}
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
@@ -179,6 +185,9 @@ export default function AdminPage() {
             <p className="text-xs text-slate-500 mt-2">行程管理、即時訂單、會員明細、系統級推播。</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
+            <button type="button" onClick={openOperations} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              營運發布
+            </button>
             <button type="button" onClick={openContentSync} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               社群內容同步清單
             </button>

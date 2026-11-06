@@ -411,6 +411,8 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
 
       if (data.success && data.items) {
         setItems(data.items);
+        const contentId = (data as { operationsContentId?: string }).operationsContentId;
+        if (contentId) alert(`已建立營運草稿 ${contentId}。請到營運後台核准，不會在這裡直接發文。`);
       } else {
         alert(`生成失敗：${data.error || "未知錯誤"}`);
       }
@@ -418,33 +420,6 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
       alert(`生成錯誤：${String(error)}`);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handlePublish(item: GeneratedItem) {
-    setStatus((current) => ({ ...current, [item.platform]: "發布中..." }));
-
-    try {
-      const response = await fetch("/api/social/publish", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify({
-          platform: item.platform,
-          caption: item.caption,
-          imageUrl: item.imageUrl,
-        }),
-      });
-      const data: { success?: boolean; error?: string } = await response.json();
-
-      setStatus((current) => ({
-        ...current,
-        [item.platform]: data.success ? "已發布" : `發布失敗：${data.error || "未知錯誤"}`,
-      }));
-    } catch (error) {
-      setStatus((current) => ({ ...current, [item.platform]: `發布失敗：${String(error)}` }));
     }
   }
 
@@ -866,7 +841,7 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
             <div className={styles.cardHeader}>
               <span className={styles.platformName}>{item.label}</span>
               <span className={item.autoPost ? styles.autoTag : styles.manualTag}>
-                {item.autoPost ? "全自動" : "半自動"}
+                {item.autoPost ? "排程發布" : "人工送出"}
               </span>
             </div>
 
@@ -879,27 +854,10 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
             <textarea value={item.caption} readOnly className={styles.cardCaption} rows={6} />
 
             <div className={styles.cardActions}>
-              {item.autoPost ? (
-                <button
-                  type="button"
-                  onClick={() => handlePublish(item)}
-                  disabled={!item.imageUrl && item.platform !== "x"}
-                  className={styles.publishBtn}
-                >
-                  發布到 {item.label}
-                </button>
-              ) : (
-                <>
-                  <button type="button" onClick={() => copyText(item.caption)} className={styles.copyBtn}>
-                    複製文案
-                  </button>
-                  {imageSource(item) ? (
-                    <a href={imageSource(item) || ""} download={`${item.platform}.jpg`} className={styles.downloadBtn}>
-                      下載圖片
-                    </a>
-                  ) : null}
-                </>
-              )}
+              <a href="/admin/operations" className={styles.copyBtn}>到營運後台核准</a>
+              <button type="button" onClick={() => copyText(item.caption)} className={styles.copyBtn}>
+                複製文案
+              </button>
             </div>
 
             {status[item.platform] ? <p className={styles.status}>{status[item.platform]}</p> : null}

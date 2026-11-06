@@ -1,78 +1,71 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import type { ContentDraftItem } from "@/lib/content-factory/types";
+import { prisma } from "@/lib/prisma";
+import type { ContentFactoryInput, GeneratedContent } from "@/lib/content-factory/types";
 
 export const dynamic = "force-dynamic";
 
-const store = globalThis as typeof globalThis & {
-  __contentDrafts?: ContentDraftItem[];
-};
-const drafts: ContentDraftItem[] =
-  store.__contentDrafts || (store.__contentDrafts = []);
+function toDraft(row: { id: string; inputJson: unknown; outputJson: unknown; status: string; createdAt: Date }) {
+  return {
+    id: row.id,
+    input: row.inputJson as ContentFactoryInput,
+    output: row.outputJson as GeneratedContent,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 export async function GET(request: Request) {
-  const authResult = verifyAdminToken(request.headers.get("authorization"));
-  if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
-  return NextResponse.json({ success: true, drafts });
+  if (!verifyAdminToken(request.headers.get("authorization"))) return NextResponse.json({ error: "未授權" }, { status: 401 });
+  const rows = await prisma.contentDraft.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
+  return NextResponse.json({ success: true, drafts: rows.map(toDraft) });
 }
 
 export async function POST(request: Request) {
-  const authResult = verifyAdminToken(request.headers.get("authorization"));
-  if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
+  if (!verifyAdminToken(request.headers.get("authorization"))) return NextResponse.json({ error: "未授權" }, { status: 401 });
 
-  let body: { input: ContentDraftItem["input"]; output: ContentDraftItem["output"] };
+  let body: { input: ContentFactoryInput; output: GeneratedContent };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON 格式錯誤" }, { status: 400 });
   }
-
   if (!body.input || !body.output) {
     return NextResponse.json({ error: "缺少 input 或 output 欄位" }, { status: 400 });
   }
 
-  const hasCover = !!(body.input.cover_image_url);
-  const status: ContentDraftItem["status"] = hasCover ? "draft" : "draft";
-
-  const draft: ContentDraftItem = {
-    id: `cf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    input: body.input,
-    output: body.output,
-    status,
-    createdAt: new Date().toISOString(),
-  };
-
-  drafts.unshift(draft);
-  drafts.splice(100);
+  const draft = await prisma.contentDraft.create({
+    data: {
+      tripTitle: body.input.trip_title || "未命名行程",
+      inputJson: body.input as unknown as Prisma.InputJsonValue,
+      outputJson: body.output as unknown as Prisma.InputJsonValue,
+      imageUrls: Array.isArray(body.input.image_urls) ? body.input.image_urls : [],
+      coverImageUrl: body.input.cover_image_url || null,
+      status: "draft",
+    },
+  });
 
   return NextResponse.json({
     success: true,
-    draft,
-    warning: !hasCover ? "未上傳封面圖片，草稿無法進入 ready 狀態" : undefined,
+    draft: toDraft(draft),
+    warning: body.input.cover_image_url ? undefined : "未上傳封面圖片。文案已存入 content_drafts，發布草稿仍需要圖片。",
   });
 }
 
 export async function PATCH(request: Request) {
-  const authResult = verifyAdminToken(request.headers.get("authorization"));
-  if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
-
-  let body: { id: string; status: ContentDraftItem["status"] };
+  if (!verifyAdminToken(request.headers.get("authorization"))) return NextResponse.json({ error: "未授權" }, { status: 401 });
+  let body: { id: string; status: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON 格式錯誤" }, { status: 400 });
   }
-
-  const draft = drafts.find((d) => d.id === body.id);
+  const draft = await prisma.contentDraft.findUnique({ where: { id: body.id } });
   if (!draft) return NextResponse.json({ error: "找不到草稿" }, { status: 404 });
-
-  if (body.status === "ready" && !draft.input.cover_image_url) {
-    return NextResponse.json(
-      { error: "封面圖片未上傳，不可進入 ready 狀態" },
-      { status: 422 },
-    );
+  if (body.status === "ready" && !draft.coverImageUrl) {
+    return NextResponse.json({ error: "封面圖片未上傳，不可進入 ready 狀態" }, { status: 422 });
   }
-
-  draft.status = body.status;
-  return NextResponse.json({ success: true, draft });
+  const updated = await prisma.contentDraft.update({ where: { id: body.id }, data: { status: body.status } });
+  return NextResponse.json({ success: true, draft: toDraft(updated) });
 }

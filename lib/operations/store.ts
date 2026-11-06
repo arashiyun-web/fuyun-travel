@@ -377,6 +377,17 @@ async function fileRunJob(jobId: string, mode: RunMode, statuses: JobStatus[]) {
     },
     // File mode has no public object storage; Instagram publishing requires database mode.
     instagramImageUrls: async () => [],
+    publicImageUrls: async () => claimed.content.images.map((image) => image.publicUrl || "").filter((url) => url.startsWith("https://")),
+    primaryImage: async () => {
+      const image = claimed.content.images[0];
+      if (!image) return null;
+      try {
+        const buffer = await readFile(path.join(fileDirs().uploadDir, claimed.content.id, image.fileName));
+        return { buffer, contentType: image.mimeType };
+      } catch {
+        return null;
+      }
+    },
     approvedInstagramAccount: claimed.accounts.instagram,
   });
   const plan = nextAttemptPlan(result, claimed.job.attempts);
