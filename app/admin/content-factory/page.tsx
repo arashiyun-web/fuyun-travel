@@ -222,6 +222,11 @@ export default function ContentFactoryPage() {
       }
       setResult(data.generated as GeneratedContent);
       setResultInput(data.input as ContentFactoryInput);
+      const notes = [
+        data.operationsContentId ? `已建立營運草稿 ${data.operationsContentId}。請到營運後台核准，由排程發布。` : "",
+        data.operationsError ? String(data.operationsError) : "",
+      ].filter(Boolean);
+      if (notes.length) setSaveWarning(notes.join(" "));
       setEditedChannels({});
       setActiveChannel("geo_summary");
     } catch (err) {

@@ -6,8 +6,10 @@ import type { ContentRecord, OperationsPlatform } from "@/lib/operations/types";
 
 const platformLabels: Record<OperationsPlatform, string> = {
   website: "官網文章",
-  facebook_group: "Facebook 社團",
+  facebook_group: "Facebook 社團（人工）",
+  facebook_page: "Facebook 粉專",
   instagram: "Instagram",
+  x: "X",
 };
 
 function todayTaipei() {
@@ -99,7 +101,7 @@ export default function OperationsPage() {
   const [type, setType] = useState<"招生" | "回顧">("招生");
   const [tripDate, setTripDate] = useState(todayTaipei());
   const [body, setBody] = useState("");
-  const [platforms, setPlatforms] = useState<OperationsPlatform[]>(["website", "facebook_group", "instagram"]);
+  const [platforms, setPlatforms] = useState<OperationsPlatform[]>(["website", "facebook_group", "facebook_page", "instagram", "x"]);
   const [images, setImages] = useState<{ dataUrl: string; originalName: string }[]>([]);
   // Keyed by content id: each draft card keeps its own schedule and fact-warning acknowledgement.
   const [schedules, setSchedules] = useState<Record<string, string>>({});

@@ -202,7 +202,16 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
   const to = process.env.INQUIRY_TO_EMAIL || user;
   const from = process.env.INQUIRY_FROM_EMAIL || user;
 
-  if (!host || !user || !pass || !to || !from) return;
+  if (!host || !user || !pass || !to || !from) {
+    console.error("inquiry email notify skipped", {
+      SMTP_HOST: Boolean(host),
+      SMTP_USER: Boolean(user),
+      SMTP_PASS: Boolean(pass),
+      INQUIRY_TO_EMAIL: Boolean(to),
+      INQUIRY_FROM_EMAIL: Boolean(from),
+    });
+    return;
+  }
 
   const transporter = nodemailer.createTransport({
     host,
@@ -400,10 +409,29 @@ export async function POST(request: Request) {
 
     addAudit(request, "CREATE_INQUIRY", created.id);
 
+    const stored = toPublicRecord(created);
+    const adminUserId = process.env.LINE_ADMIN_USER_ID || process.env.ADMIN_LINE_USER_ID || "";
+    if (!adminUserId) {
+      console.error("inquiry line notify skipped", { reason: "LINE_ADMIN_USER_ID unset" });
+    } else {
+      try {
+        await pushLineText(adminUserId, [
+          "【詢價已存入系統】",
+          `姓名：${stored.name}`,
+          `電話：${stored.phone}`,
+          `日期：${stored.start_date}`,
+          `人數：${stored.passenger_count}`,
+          `路線：${stored.pickup_location} → ${stored.destination}`,
+        ].join("\n"));
+      } catch (error) {
+        console.error("inquiry line notify failed", { error: String(error) });
+      }
+    }
     try {
-      await sendNotificationEmail(toPublicRecord(created));
-    } catch {
+      await sendNotificationEmail(stored);
+    } catch (error) {
       addAudit(request, "EMAIL_FAILED", created.id);
+      console.error("inquiry email notify failed", { error: String(error) });
     }
 
     return NextResponse.json({

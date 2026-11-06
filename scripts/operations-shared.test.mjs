@@ -123,8 +123,9 @@ test("resolveInstagramAccountId prefers the explicit env and otherwise uses the 
   process.env.INSTAGRAM_LOGIN_ACCOUNT_ID = "17841400000000001";
   assert.equal(await shared.resolveInstagramAccountId(), "17841400000000001");
   delete process.env.INSTAGRAM_LOGIN_ACCOUNT_ID;
+  delete process.env.FACEBOOK_PAGE_ID;
   assert.equal(await shared.resolveInstagramAccountId(), "", "no env and no token store → unset");
-  assert.deepEqual(await shared.resolveApprovalAccounts(), { instagram: "unset" });
+  assert.deepEqual(await shared.resolveApprovalAccounts(), { instagram: "unset", facebookPage: "unset" });
 
   // The review case: credentials come only from the OAuth store (no INSTAGRAM_LOGIN_ACCOUNT_ID).
   const dir = mkdtempSync(path.join(os.tmpdir(), "ig-store-"));
@@ -137,10 +138,10 @@ test("resolveInstagramAccountId prefers the explicit env and otherwise uses the 
   try {
     await save("17841400000000001");
     const first = await shared.resolveApprovalAccounts();
-    assert.deepEqual(first, { instagram: "17841400000000001" });
+    assert.deepEqual(first, { instagram: "17841400000000001", facebookPage: "unset" });
     await save("17841499999999999"); // re-authorized with a different account
     const second = await shared.resolveApprovalAccounts();
-    assert.deepEqual(second, { instagram: "17841499999999999" });
+    assert.deepEqual(second, { instagram: "17841499999999999", facebookPage: "unset" });
     const job = { caption: "cap", platform: "instagram" };
     assert.notEqual(shared.jobApprovalHash(["s1"], job, first), shared.jobApprovalHash(["s1"], job, second), "earlier approval no longer matches");
   } finally {

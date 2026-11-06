@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 import { verifyAdminToken } from "@/lib/adminAuth";
+import { uploadToR2 } from "@/lib/storage/r2";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +12,8 @@ export async function POST(request: Request) {
   if (!authResult) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
-  // Writing into public/ is only durable on a local dev server. On Vercel the function filesystem
-  // is read-only/ephemeral, so refuse clearly instead of failing or losing the upload.
-  if (process.env.VERCEL) {
-    return NextResponse.json({ error: "圖片上傳需要正式物件儲存；目前未配置，已拒絕以免資料遺失" }, { status: 503 });
+  if (!process.env.R2_PUBLIC_URL?.trim()) {
+    return NextResponse.json({ error: "R2_PUBLIC_URL 未設定，無法產生可公開抓取的圖片網址。" }, { status: 503 });
   }
 
   let formData: FormData;
@@ -41,13 +38,11 @@ export async function POST(request: Request) {
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "content-drafts");
-
-  await fs.mkdir(uploadDir, { recursive: true });
-  await fs.writeFile(path.join(uploadDir, filename), buffer);
-
-  return NextResponse.json({ url: `/uploads/content-drafts/${filename}` });
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const key = `content-drafts/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const url = await uploadToR2(key, buffer, file.type);
+  if (!url) {
+    return NextResponse.json({ error: "R2 上傳失敗。請確認 R2 帳號與 R2_PUBLIC_URL。" }, { status: 503 });
+  }
+  return NextResponse.json({ url });
 }

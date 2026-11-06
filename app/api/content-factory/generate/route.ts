@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { Prisma } from "@prisma/client";
+import { CopywriterUnavailableError, generateCopy } from "@/lib/ai/copywriter";
 import { verifyAdminToken } from "@/lib/adminAuth";
+import { prisma } from "@/lib/prisma";
+import { createContentDraft } from "@/lib/operations/store";
+import type { OperationsPlatform } from "@/lib/operations/types";
 import { parseInput } from "@/lib/content-factory/parser";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/content-factory/systemPrompt";
 import { getLineOaUrl } from "@/lib/config/company";
@@ -29,20 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
 
-  const modelName = process.env.AI_MODEL_NAME;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!modelName || !apiKey) {
-    return NextResponse.json(
-      { error: "AI_MODEL_NAME 或 ANTHROPIC_API_KEY 環境變數未設定" },
-      { status: 503 },
-    );
-  }
-
-  // AI_API_BASE is an optional override (e.g. a self-hosted Anthropic-compatible
-  // proxy). Leave unset to use Anthropic's default https://api.anthropic.com.
-  const apiBase = process.env.AI_API_BASE || undefined;
-
   let body: ContentFactoryInput;
   try {
     body = await request.json();
@@ -70,27 +60,12 @@ export async function POST(request: Request) {
   const systemPrompt = buildSystemPrompt(lineOaUrl);
   const userMessage = buildUserMessage(fullInput);
 
-  const client = new Anthropic({ apiKey, baseURL: apiBase, timeout: 300_000 });
-
   let rawText = "";
   try {
-    const response = await client.messages.create({
-      model: modelName,
-      max_tokens: 16000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-    });
-
-    const textBlock = response.content.find(
-      (block): block is Anthropic.TextBlock => block.type === "text",
-    );
-    rawText = textBlock?.text || "";
+    rawText = await generateCopy({ system: systemPrompt, user: userMessage });
   } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      return NextResponse.json(
-        { error: `LLM 回應錯誤 ${err.status}`, raw: err.message },
-        { status: 502 },
-      );
+    if (err instanceof CopywriterUnavailableError) {
+      return NextResponse.json({ error: err.message }, { status: 503 });
     }
     return NextResponse.json(
       { error: "無法連線到 LLM 服務", raw: String(err) },
@@ -133,5 +108,55 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, generated, input: fullInput });
+  const draft = await prisma.contentDraft.create({
+    data: {
+      tripTitle: fullInput.trip_title || "未命名行程",
+      inputJson: fullInput as unknown as Prisma.InputJsonValue,
+      outputJson: generated as unknown as Prisma.InputJsonValue,
+      imageUrls: fullInput.image_urls || [],
+      coverImageUrl: fullInput.cover_image_url || null,
+      status: "draft",
+    },
+  }).catch((error: unknown) => {
+    console.error("content draft persist failed", error);
+    return null;
+  });
+
+  let operationsContentId: string | null = null;
+  let operationsError = "";
+  const cover = fullInput.cover_image_url || fullInput.image_urls?.[0] || "";
+  if (!cover) {
+    operationsError = "沒有封面圖，尚未建立營運發布草稿。";
+  } else {
+    try {
+      const imageDataUrl = cover.startsWith("data:") ? cover : await fetch(cover).then(async (response) => {
+        if (!response.ok) throw new Error(`封面圖 HTTP ${response.status}`);
+        const type = (response.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
+        const bytes = Buffer.from(await response.arrayBuffer());
+        return `data:${type};base64,${bytes.toString("base64")}`;
+      });
+      const platforms: OperationsPlatform[] = ["website", "facebook_group", "facebook_page", "instagram", "x"];
+      const content = await createContentDraft({
+        title: fullInput.trip_title || generated.meta?.trip_title || "未命名行程",
+        type: "招生",
+        tripDate: new Date().toISOString().slice(0, 10),
+        body: fullInput.user_notes || generated.seo_article?.body_markdown || fullInput.trip_title,
+        selectedPlatforms: platforms,
+        images: [{ dataUrl: imageDataUrl, originalName: "cover.jpg" }],
+        captions: {
+          website: generated.seo_article?.body_markdown || fullInput.user_notes,
+          facebook_group: generated.facebook?.body || "",
+          facebook_page: generated.facebook?.body || "",
+          instagram: generated.instagram?.caption || "",
+          x: (generated.facebook?.body || fullInput.user_notes || "").slice(0, 280),
+        },
+      });
+      operationsContentId = content.id;
+    } catch (error) {
+      operationsError = error instanceof Error ? error.message : "建立營運發布草稿失敗";
+      console.error("operations draft from content factory failed", error);
+    }
+  }
+
+  return NextResponse.json({ success: true, generated, input: fullInput, draftId: draft?.id || null, operationsContentId, operationsError });
 }

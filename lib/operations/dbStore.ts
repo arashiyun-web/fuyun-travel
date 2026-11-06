@@ -147,6 +147,7 @@ async function uploadIntakeImages(id: string, input: ContentIntakeInput, parsedI
       uploadedKeys.push(instagramStorageKey);
       await putObject(instagramStorageKey, jpeg, "image/jpeg");
     }
+    const publicBase = process.env.R2_PUBLIC_URL?.trim().replace(/\/$/, "") || "";
     images.push({
       id: randomUUID(),
       originalName: trimText(input.images[index].originalName || fileName, 120),
@@ -156,6 +157,8 @@ async function uploadIntakeImages(id: string, input: ContentIntakeInput, parsedI
       fileName,
       storageKey: stored.key,
       instagramStorageKey,
+      publicUrl: publicBase ? `${publicBase}/${stored.key}` : undefined,
+      instagramPublicUrl: publicBase && instagramStorageKey ? `${publicBase}/${instagramStorageKey}` : undefined,
     });
   }
   return images;
@@ -346,6 +349,14 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
       await prisma.operationsJob.updateMany({ where: { jobId, lockOwner: LOCK_OWNER, status: "processing" }, data: { submission: next as unknown as Prisma.InputJsonValue } });
     },
     instagramImageUrls: async () => Promise.all(images.map((image) => presignGet(image.instagramStorageKey || image.storageKey || ""))),
+    publicImageUrls: async () => images.map((image) => image.instagramPublicUrl || image.publicUrl || "").filter((url) => url.startsWith("https://")),
+    primaryImage: async () => {
+      const image = images[0];
+      const key = image?.instagramStorageKey || image?.storageKey || "";
+      if (!key) return null;
+      const object = await getObject(key);
+      return { buffer: object.buffer, contentType: object.contentType };
+    },
     approvedInstagramAccount: claim.accounts.instagram,
     publishWebsite: () => publishWebsiteArticle({
       contentId: claimed.contentId,

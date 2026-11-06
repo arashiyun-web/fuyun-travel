@@ -1,5 +1,7 @@
 import { createHash } from "crypto";
+import { publishToFacebook } from "@/lib/social/publishers";
 import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";
+import { publishXPost, xCredentialsFromEnv } from "@/lib/social/xOauth";
 import { clearStoredInstagramLoginTokenFromEnvironment, readStoredInstagramLoginTokenFromEnvironment } from "@/lib/social/instagram-oauth";
 import { approvalHash, validateGenerated } from "./contentGuard";
 import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft } from "./types";
@@ -119,12 +121,23 @@ export function makePlatformCaptions(input: ContentIntakeInput, contentId: strin
   const facebook = [`【${input.title}】`, input.type === "回顧" ? "這次實際走過的行程分享：" : "行程招生資訊：", input.body, "", dateLine, inquiryLine].join("\n");
   const instagramBase = [input.title, input.body, dateLine].join("\n\n");
   const instagram = `${instagramBase}\n\n#浮雲輕鬆遊 #台灣包車 #團體旅遊 #${topicTag(input.title)}`.slice(0, 2100);
-  return { website, facebook_group: facebook, instagram } satisfies Record<OperationsPlatform, string>;
+  const x = [`${input.title}`, input.body, dateLine].join("\n").slice(0, 280);
+  const templates = { website, facebook_group: facebook, facebook_page: facebook, instagram, x } satisfies Record<OperationsPlatform, string>;
+  const overrides = input.captions || {};
+  return {
+    website: overrides.website || templates.website,
+    facebook_group: overrides.facebook_group || templates.facebook_group,
+    facebook_page: overrides.facebook_page || templates.facebook_page,
+    instagram: overrides.instagram || templates.instagram,
+    x: (overrides.x || templates.x).slice(0, 280),
+  };
 }
 
 export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter"] {
   if (platform === "website") return "website_article";
   if (platform === "facebook_group") return "facebook_group_manual";
+  if (platform === "facebook_page") return "facebook_page";
+  if (platform === "x") return "x_oauth1";
   return "instagram_login_v2";
 }
 
@@ -136,7 +149,7 @@ export const FACEBOOK_GROUP_ID = "2875144269218828";
 export const FACEBOOK_GROUP_URL = `https://www.facebook.com/groups/${FACEBOOK_GROUP_ID}/`;
 
 /** Accounts the platforms would publish to right now. Resolved once per approval/claim. */
-export type ApprovalAccounts = { instagram: string };
+export type ApprovalAccounts = { instagram: string; facebookPage: string };
 
 /**
  * The Instagram account the publisher would use: INSTAGRAM_LOGIN_ACCOUNT_ID, otherwise the account of
@@ -153,13 +166,18 @@ export async function resolveInstagramAccountId() {
 }
 
 export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {
-  return { instagram: (await resolveInstagramAccountId()) || "unset" };
+  return {
+    instagram: (await resolveInstagramAccountId()) || "unset",
+    facebookPage: process.env.FACEBOOK_PAGE_ID?.trim() || "unset",
+  };
 }
 
 /** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */
 export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {
   if (platform === "instagram") return `instagram:${accounts.instagram}`;
   if (platform === "facebook_group") return `facebook_group:${FACEBOOK_GROUP_ID}`;
+  if (platform === "facebook_page") return `facebook_page:${accounts.facebookPage}`;
+  if (platform === "x") return "x:oauth1-user";
   return "website:fuyuntravel.com";
 }
 
@@ -240,6 +258,10 @@ export type ExecuteDeps = {
   markSubmission: (patch: Partial<JobSubmission>) => Promise<void>;
   /** Resolve HTTPS image URLs Instagram can fetch (e.g. short-lived presigned URLs). */
   instagramImageUrls: () => Promise<string[]>;
+  /** Stable https URLs from R2_PUBLIC_URL. Empty when that setting is missing. */
+  publicImageUrls?: () => Promise<string[]>;
+  /** First image bytes for publishers that upload the file themselves (X). */
+  primaryImage?: () => Promise<{ buffer: Buffer; contentType: string } | null>;
   /** Instagram account the approval was checked against at claim time; publishing to any other account is refused. */
   approvedInstagramAccount?: string;
   /** Publish the approved website version as a public /travel article and read it back (database store only). */
@@ -322,6 +344,33 @@ export async function executeJob(job: PlatformDraft, mode: RunMode, deps: Execut
   }
   if (job.platform === "facebook_group") {
     return { status: "manual_required", verification: "pending", error: "Facebook 社團不使用粉專 API；需老闆在核對社團身份後於正常介面送出。" };
+  }
+  if (job.platform === "facebook_page") {
+    if (!process.env.FACEBOOK_PAGE_ID?.trim() || !process.env.FACEBOOK_ACCESS_TOKEN?.trim()) {
+      return { status: "awaiting_auth", verification: "pending", error: "缺少 FACEBOOK_PAGE_ID 或 FACEBOOK_ACCESS_TOKEN；未對粉專發布。" };
+    }
+    const urls = (await deps.publicImageUrls?.()) || [];
+    const imageUrl = urls.find((url) => url.startsWith("https://")) || "";
+    if (!imageUrl) {
+      return { status: "retryable_failed", verification: "failed", error: "粉專發布需要 R2_PUBLIC_URL 組成的 https 圖片網址；未對粉專發布。" };
+    }
+    const published = await publishToFacebook({ caption: job.caption, imageUrl });
+    if (!published.success || !published.postId) {
+      return { status: "retryable_failed", verification: "failed", error: published.error || "粉專發布失敗" };
+    }
+    return { status: "published", externalId: published.postId, postUrl: `https://www.facebook.com/${published.postId}`, verification: "verified" };
+  }
+  if (job.platform === "x") {
+    if (!xCredentialsFromEnv()) {
+      return { status: "awaiting_auth", verification: "pending", error: "缺少 X_API_KEY、X_API_SECRET、X_ACCESS_TOKEN 或 X_ACCESS_SECRET；未對 X 發布。" };
+    }
+    try {
+      const image = await deps.primaryImage?.();
+      const published = await publishXPost({ text: job.caption, image });
+      return { status: "published", externalId: published.id, postUrl: `https://x.com/i/status/${published.id}`, verification: "verified" };
+    } catch (error) {
+      return { status: "retryable_failed", verification: "failed", error: error instanceof Error ? error.message : "X 發布失敗" };
+    }
   }
   if (job.platform === "website") {
     if (!deps.publishWebsite) return { status: "manual_required", verification: "pending", error: "此儲存模式沒有官網發布接口；未對外發布。" };
