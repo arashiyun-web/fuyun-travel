@@ -32,6 +32,7 @@ import {
   type JobSubmission,
   type RunMode,
 } from "./shared";
+import { publishApprovedFeaturedDrafts, unpublishFeaturedSpots } from "@/lib/content-sync/featuredSpotApproval";
 import { OPERATIONS_OWNER_APPROVER, hasExplicitOwnerApproval, reviseCaptionsAfterApproval } from "./approvalGate";
 import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft, StoredImage } from "./types";
 
@@ -236,7 +237,10 @@ async function persistDraft(id: string, input: ContentIntakeInput, platforms: Op
 export async function approveContent(contentId: string, approvedBy: string, scheduledAt?: string | null, acknowledgeFactWarnings = false) {
   const record = await getContentRecord(contentId);
   if (!record) throw new Error("找不到內容");
-  if (record.approval.status === "approved") return record;
+  if (record.approval.status === "approved") {
+    if (hasExplicitOwnerApproval(record.approval)) await publishHighlightsIfOwnerApproved(record.id, record.title, record.body);
+    return record;
+  }
   const failing = assertFactCheckApprovable(record, acknowledgeFactWarnings);
   const schedule = scheduledAt ? new Date(scheduledAt) : null;
   if (schedule && Number.isNaN(schedule.getTime())) throw new Error("排程日期格式錯誤");
@@ -266,7 +270,16 @@ export async function approveContent(contentId: string, approvedBy: string, sche
     if (failing.length) await addEvent(tx, { type: "fact_warnings_acknowledged", contentId, detail: `${approver}: ${failing.join(",")}` });
     await addEvent(tx, { type: "content_approved", contentId, detail: schedule ? `scheduled:${schedule.toISOString()}` : "approved" });
   });
-  return (await getContentRecord(contentId))!;
+  const approved = (await getContentRecord(contentId))!;
+  if (hasExplicitOwnerApproval(approved.approval)) await publishHighlightsIfOwnerApproved(approved.id, approved.title, approved.body);
+  return approved;
+}
+
+/** Own-site cards only. Social jobs and /travel articles stay on the cron and the live-publish switch. */
+async function publishHighlightsIfOwnerApproved(contentId: string, title: string, body: string) {
+  const event = await prisma.operationsEvent.findFirst({ where: { contentId, type: "content_approved" }, select: { id: true } });
+  if (!event) return;
+  await publishApprovedFeaturedDrafts(title, body);
 }
 
 /** Write edited captions. An approved record is returned to pending review. */
@@ -285,18 +298,24 @@ async function persistCaptionRevision(contentId: string, record: ContentRecord, 
 
 /** Withdraw the content approval and return every not-yet-executed job to pending_approval. */
 async function invalidateApproval(contentId: string, changedJob: { jobId: string; platform: string }) {
+  const copy = await prisma.operationsContent.findUnique({ where: { id: contentId }, select: { title: true, body: true } });
+  let cleared = false;
   await prisma.$transaction(async (tx) => {
     const content = await tx.operationsContent.updateMany({
       where: { id: contentId, approvalStatus: "approved" },
       data: { approvalStatus: "pending", approvedAt: null, approvedBy: null, status: "pending_approval" },
     });
     if (content.count !== 1) return;
+    cleared = true;
     await tx.operationsJob.updateMany({
       where: { contentId, status: { in: CLAIMABLE_STATUSES } },
       data: { status: "pending_approval", approvalHash: null, lastError: "核准後內容、圖片或目標帳號已變更；原核准失效，需重新核准。" },
     });
     await addEvent(tx, { type: "approval_invalidated", contentId, jobId: changedJob.jobId, platform: changedJob.platform, detail: "approval hash mismatch" });
   });
+  if (!cleared || !copy) return;
+  const stillCovered = await ownerHasApprovedCopy(copy.title, copy.body);
+  if (!stillCovered) await unpublishFeaturedSpots(copy.title, copy.body);
 }
 
 /** Atomic claim: exactly one caller can move a job into processing. */
