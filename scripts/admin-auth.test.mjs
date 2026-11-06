@@ -57,6 +57,20 @@ test("rejects a short signing secret instead of falling back", () => {
   assert.throws(() => auth.createAdminToken(), auth.AdminAuthNotConfiguredError);
 });
 
+test("issued token and session cookie both last 90 days", () => {
+  configure();
+  const token = auth.createAdminToken();
+  const payload = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8"));
+  const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+  assert.ok(payload.exp - Date.now() > ninetyDaysMs - 5_000);
+  assert.ok(payload.exp - Date.now() <= ninetyDaysMs);
+  const options = auth.adminCookieOptions(new Request("https://fuyuntravel.com/api/auth/login"));
+  assert.equal(options.maxAge, 90 * 24 * 60 * 60);
+  assert.equal(options.httpOnly, true);
+  assert.equal(options.secure, true);
+  assert.equal(options.sameSite, "lax");
+});
+
 test("issued token verifies; tampered token does not", () => {
   configure();
   const token = auth.createAdminToken();

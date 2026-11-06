@@ -3,7 +3,7 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt) as (password: string, salt: string, keylen: number) => Promise<Buffer>;
 
-const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const MIN_SECRET_LENGTH = 32;
 /**
  * Token format version. Tokens issued before the 2026-09-27 hardening carry no
