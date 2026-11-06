@@ -3,13 +3,12 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { deriveTitleFromSummary } from "@/lib/content-sync/deriveTitle";
 import { cleanSourceUrl, collectPhotoUrls } from "@/lib/content-sync/photos";
+import { ownerHasApprovedCopy } from "@/lib/operations/store";
 
 export const dynamic = "force-dynamic";
 
-// 老闆按「全部確認上首頁」時呼叫：把「本週待選清單」裡有照片、且還沒
-// 個別建立過 FeaturedSpot 的項目，一次全部發布。跟單則的
-// POST /api/featured-spots 走同一套邏輯（直接 published，不另外審核），
-// 只是批次跑，也不改動 ContentSyncItem.status。
+// 老闆按「全部確認上首頁」時呼叫。文案必須先在 /admin/operations 核准
+// （標題與說明逐字相同，且有老闆核准事件），這裡才寫入 published。
 export async function POST(request: Request) {
   const authResult = verifyAdminToken(request.headers.get("authorization"));
   if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
@@ -25,11 +24,18 @@ export async function POST(request: Request) {
   const eligible = items.filter((item) => collectPhotoUrls(item.rawPayload).length > 0 && !alreadyFeatured.has(item.id));
 
   const created = [];
+  let needsApproval = 0;
   for (const item of eligible) {
     const photoUrls = collectPhotoUrls(item.rawPayload);
+    const title = deriveTitleFromSummary(item.summary);
+    const description = item.summary;
+    if (!(await ownerHasApprovedCopy(title, description))) {
+      needsApproval += 1;
+      continue;
+    }
     const spot = await prisma.featuredSpot.create({
       data: {
-        title: deriveTitleFromSummary(item.summary),
+        title,
         description: item.summary,
         photoUrl: photoUrls[0] ?? null,
         photoUrls,
@@ -42,5 +48,8 @@ export async function POST(request: Request) {
     created.push(spot);
   }
 
-  return NextResponse.json({ success: true, created: created.length, skipped: items.length - eligible.length, spots: created });
+  if (!created.length && needsApproval > 0) {
+    return NextResponse.json({ success: false, error: `有 ${needsApproval} 則文案尚未在 /admin/operations 核准，沒有發布。`, needsApproval }, { status: 409 });
+  }
+  return NextResponse.json({ success: true, created: created.length, skipped: items.length - eligible.length, needsApproval, spots: created });
 }

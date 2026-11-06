@@ -32,6 +32,7 @@ import {
   type JobSubmission,
   type RunMode,
 } from "./shared";
+import { OPERATIONS_OWNER_APPROVER, hasExplicitOwnerApproval, reviseCaptionsAfterApproval } from "./approvalGate";
 import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft, StoredImage } from "./types";
 
 /**
@@ -116,7 +117,13 @@ export async function getContentRecord(contentId: string) {
 export async function createContentDraft(input: ContentIntakeInput) {
   const { platforms, parsedImages, fingerprint } = prepareIntake(input);
   const existing = await prisma.operationsContent.findUnique({ where: { contentFingerprint: fingerprint }, include: { jobs: true } });
-  if (existing) return toRecord(existing);
+  if (existing) {
+    const captions = makePlatformCaptions(input, existing.id);
+    const record = toRecord(existing);
+    const revised = reviseCaptionsAfterApproval(record, captions);
+    if (revised.captionUpdated) await persistCaptionRevision(existing.id, record, revised.reset);
+    return revised.captionUpdated ? (await getContentRecord(existing.id))! : record;
+  }
 
   const id = `FUYUN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
   // Every key is recorded before its upload starts, so a partly written object is cleaned up too.
@@ -233,7 +240,8 @@ export async function approveContent(contentId: string, approvedBy: string, sche
   const failing = assertFactCheckApprovable(record, acknowledgeFactWarnings);
   const schedule = scheduledAt ? new Date(scheduledAt) : null;
   if (schedule && Number.isNaN(schedule.getTime())) throw new Error("排程日期格式錯誤");
-  const approver = trimText(approvedBy || "admin", 80);
+  const approver = trimText(approvedBy, 80);
+  if (approver !== OPERATIONS_OWNER_APPROVER) throw new Error("只有 /admin/operations 的老闆核准可以放行發布");
   const shas = record.images.map((image) => image.sha256);
   const accounts = await resolveApprovalAccounts();
   await prisma.$transaction(async (tx) => {
@@ -261,8 +269,22 @@ export async function approveContent(contentId: string, approvedBy: string, sche
   return (await getContentRecord(contentId))!;
 }
 
+/** Write edited captions. An approved record is returned to pending review. */
+async function persistCaptionRevision(contentId: string, record: ContentRecord, reset: boolean) {
+  for (const platform of record.selectedPlatforms) {
+    const job = record.platforms[platform];
+    await prisma.operationsJob.updateMany({
+      where: { jobId: job.jobId, status: { notIn: ["published", "processing", "submitted_pending_verification", "withdrawn"] } },
+      data: { caption: job.caption },
+    });
+  }
+  if (!reset) return;
+  const changed = record.selectedPlatforms.map((platform) => record.platforms[platform]).find((job) => job.status === "pending_approval");
+  if (changed) await invalidateApproval(contentId, changed);
+}
+
 /** Withdraw the content approval and return every not-yet-executed job to pending_approval. */
-async function invalidateApproval(contentId: string, changedJob: JobRow) {
+async function invalidateApproval(contentId: string, changedJob: { jobId: string; platform: string }) {
   await prisma.$transaction(async (tx) => {
     const content = await tx.operationsContent.updateMany({
       where: { id: contentId, approvalStatus: "approved" },
@@ -280,7 +302,9 @@ async function invalidateApproval(contentId: string, changedJob: JobRow) {
 /** Atomic claim: exactly one caller can move a job into processing. */
 async function claimJob(jobId: string, statuses: string[] = CLAIMABLE_STATUSES) {
   const job = await prisma.operationsJob.findUnique({ where: { jobId }, include: { content: { include: { jobs: true } } } });
-  if (!job || job.content.approvalStatus !== "approved") return null;
+  if (!job || !hasExplicitOwnerApproval({ status: job.content.approvalStatus, approvedBy: job.content.approvedBy, approvedAt: job.content.approvedAt })) return null;
+  const approvalEvent = await prisma.operationsEvent.findFirst({ where: { contentId: job.contentId, type: "content_approved" }, select: { id: true } });
+  if (!approvalEvent) return null;
   // Every not-yet-executed job of the content must still match its approval snapshot.
   const shas = imageShas(job.content);
   const accounts = await resolveApprovalAccounts();
@@ -302,7 +326,7 @@ async function claimJob(jobId: string, statuses: string[] = CLAIMABLE_STATUSES) 
       status: { in: statuses },
       OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
       AND: [{ OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }] }],
-      content: { approvalStatus: "approved" },
+      content: { approvalStatus: "approved", approvedBy: OPERATIONS_OWNER_APPROVER, approvedAt: { not: null } },
     },
     data: { status: "processing", attempts: { increment: 1 }, lockedUntil: new Date(now.getTime() + JOB_LEASE_MS), lockOwner: LOCK_OWNER },
   });
@@ -402,7 +426,7 @@ export async function runDueJobs(mode: RunMode) {
     where: {
       status: { in: statuses },
       OR: [{ scheduledAt: null }, { scheduledAt: { lte: new Date() } }],
-      content: { approvalStatus: "approved" },
+      content: { approvalStatus: "approved", approvedBy: OPERATIONS_OWNER_APPROVER, approvedAt: { not: null } },
     },
     orderBy: { createdAt: "asc" },
     take: DUE_BATCH_LIMIT,
@@ -415,7 +439,10 @@ export async function runDueJobs(mode: RunMode) {
 
 /** New credentials were stored: parked awaiting_auth jobs for that platform become due again. */
 export async function requeueAwaitingAuth(platform: OperationsPlatform) {
-  const jobs = await prisma.operationsJob.findMany({ where: { platform, status: "awaiting_auth" }, select: { jobId: true, contentId: true } });
+  const jobs = await prisma.operationsJob.findMany({
+    where: { platform, status: "awaiting_auth", content: { approvalStatus: "approved", approvedBy: OPERATIONS_OWNER_APPROVER, approvedAt: { not: null } } },
+    select: { jobId: true, contentId: true },
+  });
   let requeued = 0;
   for (const job of jobs) {
     const changed = await prisma.operationsJob.updateMany({ where: { jobId: job.jobId, status: "awaiting_auth" }, data: { status: "queued", scheduledAt: null, lastError: null } });
@@ -425,6 +452,19 @@ export async function requeueAwaitingAuth(platform: OperationsPlatform) {
     }
   }
   return requeued;
+}
+
+export async function ownerHasApprovedCopy(title: string, body: string) {
+  const rows = await prisma.operationsContent.findMany({
+    where: { title, body, approvalStatus: "approved", approvedBy: OPERATIONS_OWNER_APPROVER, approvedAt: { not: null } },
+    select: { id: true },
+  });
+  if (!rows.length) return false;
+  const event = await prisma.operationsEvent.findFirst({
+    where: { type: "content_approved", contentId: { in: rows.map((row) => row.id) } },
+    select: { id: true },
+  });
+  return Boolean(event);
 }
 
 export async function getJob(jobId: string) {
@@ -441,7 +481,9 @@ export async function recordFacebookManualResult(jobId: string, externalId: stri
   }
   const job = await prisma.operationsJob.findUnique({ where: { jobId }, include: { content: true } });
   if (!job || job.platform !== "facebook_group") throw new Error("找不到 Facebook 社團工作");
-  if (job.content.approvalStatus !== "approved") throw new Error("內容尚未核准，不能回填外部貼文");
+  if (!hasExplicitOwnerApproval({ status: job.content.approvalStatus, approvedBy: job.content.approvedBy, approvedAt: job.content.approvedAt })) throw new Error("內容尚未核准，不能回填外部貼文");
+  const approvalEvent = await prisma.operationsEvent.findFirst({ where: { contentId: job.contentId, type: "content_approved" }, select: { id: true } });
+  if (!approvalEvent) throw new Error("內容尚未核准，不能回填外部貼文");
   await prisma.operationsJob.update({
     where: { jobId },
     data: { externalId: safeExternalId, postUrl: safePostUrl, status: "manual_required", verification: "pending", lockedUntil: null, lockOwner: null, lastError: "已回填 Facebook 社團貼文連結；請人工開啟網址核對內容、照片與社團身份。" },

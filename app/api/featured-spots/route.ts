@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { cleanSourceUrl, mergePhotoUrls } from "@/lib/content-sync/photos";
+import { ownerHasApprovedCopy } from "@/lib/operations/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ success: true, spots });
 }
 
-// 老闆在 /admin/content-sync 對某則 ContentSyncItem 按「確認上首頁」時呼叫。
-// 這個點擊動作本身就代表內容與版權都已經過老闆確認，直接以 published 狀態
-// 寫入，不另外審核。跟 ContentSyncItem 的「生成草稿」流程（/select）完全
-// 獨立，不會改動 ContentSyncItem 的 status。
+// 確認上首頁只發布已經在 /admin/operations 核准過的同一則標題與說明。
 export async function POST(request: Request) {
   const authResult = verifyAdminToken(request.headers.get("authorization"));
   if (!authResult) return NextResponse.json({ error: "未授權" }, { status: 401 });
@@ -47,6 +45,9 @@ export async function POST(request: Request) {
   }
   if (!body.description?.trim()) {
     return NextResponse.json({ error: "缺少說明文字" }, { status: 400 });
+  }
+  if (!(await ownerHasApprovedCopy(body.title, body.description))) {
+    return NextResponse.json({ error: "文案必須先在 /admin/operations 由老闆核准，才能發布。" }, { status: 409 });
   }
 
   let postedAt: Date | null = null;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
+import { ownerHasApprovedCopy } from "@/lib/operations/store";
 import {
   articleTypeToCategory,
   evaluatePublisherChecks,
@@ -62,6 +63,10 @@ export async function POST(request: Request) {
   const checks = evaluatePublisherChecks(input, slugState);
   const photoBlocked = schoolPhotoBlocked(input);
   const publishBlocked = checks.some((check) => !check.passed) || photoBlocked;
+
+  if (action === "publish" && !(await ownerHasApprovedCopy(input.title.trim(), input.contentMarkdown.trim()))) {
+    return NextResponse.json({ success: false, error: "文案必須先在 /admin/operations 由老闆核准，才能發布。" }, { status: 409 });
+  }
 
   if (action === "publish" && publishBlocked) {
     return NextResponse.json(

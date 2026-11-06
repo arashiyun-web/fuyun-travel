@@ -277,7 +277,7 @@ export default function ContentSyncPage() {
       if (!res.ok) {
         setFeatureAllMsg(data.error || "批次確認失敗");
       } else {
-        setFeatureAllMsg(`已發布 ${data.created} 則到首頁，略過 ${data.skipped} 則（無照片或已處理過）`);
+        setFeatureAllMsg(data.needsApproval ? `已發布 ${data.created} 則。另有 ${data.needsApproval} 則尚未在營運後台核准，沒有上首頁。` : `已發布 ${data.created} 則到首頁，略過 ${data.skipped} 則（無照片或已處理過）`);
         loadFeaturedStatus();
       }
     } catch (error) {

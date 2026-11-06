@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { OPERATIONS_OWNER_APPROVER, hasExplicitOwnerApproval, hasOwnerApprovalEvent, reviseCaptionsAfterApproval } from "./approvalGate";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
 import * as db from "./dbStore";
@@ -191,7 +192,15 @@ async function fileCreateContentDraft(input: ContentIntakeInput) {
     const { platforms, parsedImages, fingerprint } = prepareIntake(input);
     const state = await readState();
     const existing = state.contents.find((item) => item.contentFingerprint === fingerprint);
-    if (existing) return existing;
+    if (existing) {
+      const revised = reviseCaptionsAfterApproval(existing, makePlatformCaptions(input, existing.id));
+      if (revised.captionUpdated) {
+        existing.updatedAt = now();
+        if (revised.reset) addEvent(state, { type: "approval_invalidated", contentId: existing.id, detail: "caption edited after approval" });
+        await writeState(state);
+      }
+      return existing;
+    }
 
     const id = `FUYUN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const contentUploadDir = path.join(fileDirs().uploadDir, id);
@@ -277,7 +286,8 @@ async function fileApproveContent(contentId: string, approvedBy: string, schedul
     const schedule = scheduledAt ? new Date(scheduledAt) : null;
     if (schedule && Number.isNaN(schedule.getTime())) throw new Error("排程日期格式錯誤");
     const timestamp = now();
-    const approver = trimText(approvedBy || "admin", 80);
+    const approver = trimText(approvedBy, 80);
+    if (approver !== OPERATIONS_OWNER_APPROVER) throw new Error("只有 /admin/operations 的老闆核准可以放行發布");
     content.approval = { status: "approved", approvedAt: timestamp, approvedBy: approver };
     content.status = "approved";
     content.updatedAt = timestamp;
@@ -307,7 +317,7 @@ async function fileClaimJob(jobId: string, statuses: JobStatus[]) {
     const lockActive = job.lockedUntil && new Date(job.lockedUntil).getTime() > Date.now();
     if (lockActive || !statuses.includes(job.status)) return null;
     if (job.scheduledAt && new Date(job.scheduledAt).getTime() > Date.now()) return null;
-    if (content.approval.status !== "approved") return null;
+    if (!hasExplicitOwnerApproval(content.approval) || !hasOwnerApprovalEvent(state.events, content.id)) return null;
     // Every not-yet-executed job of the content must still match its approval snapshot.
     const shas = content.images.map((image) => image.sha256);
     const changed = content.selectedPlatforms
@@ -427,9 +437,22 @@ export async function createContentDraft(input: ContentIntakeInput) {
 }
 
 export async function approveContent(contentId: string, approvedBy: string, scheduledAt?: string | null, acknowledgeFactWarnings = false) {
+  if (approvedBy !== OPERATIONS_OWNER_APPROVER) throw new Error("只有 /admin/operations 的老闆核准可以放行發布");
   return backend() === "database"
     ? db.approveContent(contentId, approvedBy, scheduledAt, acknowledgeFactWarnings)
     : fileApproveContent(contentId, approvedBy, scheduledAt, acknowledgeFactWarnings);
+}
+
+/** True when this exact title and body were approved by the owner action in /admin/operations. */
+export async function ownerHasApprovedCopy(title: string, body: string) {
+  const wantedTitle = title.trim();
+  const wantedBody = body.trim();
+  if (!wantedTitle || !wantedBody) return false;
+  if (backend() === "database") return db.ownerHasApprovedCopy(wantedTitle, wantedBody);
+  return serialize(async () => {
+    const state = await readState();
+    return state.contents.some((content) => content.title === wantedTitle && content.body === wantedBody && hasExplicitOwnerApproval(content.approval) && hasOwnerApprovalEvent(state.events, content.id));
+  });
 }
 
 export async function runJob(jobId: string, mode: RunMode = "dry-run") {
@@ -455,7 +478,7 @@ export async function recordFacebookManualResult(jobId: string, externalId: stri
     const state = await readState();
     const found = findJob(state, jobId);
     if (!found || found.job.platform !== "facebook_group") throw new Error("找不到 Facebook 社團工作");
-    if (found.content.approval.status !== "approved") throw new Error("內容尚未核准，不能回填外部貼文");
+    if (!hasExplicitOwnerApproval(found.content.approval) || !hasOwnerApprovalEvent(state.events, found.content.id)) throw new Error("內容尚未核准，不能回填外部貼文");
     found.job.externalId = safeExternalId;
     found.job.postUrl = safePostUrl;
     found.job.status = "manual_required";
@@ -482,7 +505,7 @@ export async function runDueJobs(mode: RunMode = process.env.OPERATIONS_LIVE_PUB
   const statuses = dueStatusesFor(mode);
   const state = await serialize(() => readState());
   const due = state.contents
-    .filter((content) => content.approval.status === "approved")
+    .filter((content) => hasExplicitOwnerApproval(content.approval) && hasOwnerApprovalEvent(state.events, content.id))
     .flatMap((content) => content.selectedPlatforms.map((platform) => content.platforms[platform]))
     .filter((job) => statuses.includes(job.status) && (!job.scheduledAt || new Date(job.scheduledAt).getTime() <= Date.now()));
   const results = [];
@@ -499,6 +522,7 @@ export async function requeueAwaitingAuth(platform: OperationsPlatform) {
     for (const content of state.contents) {
       const job = content.platforms[platform];
       if (!job || job.status !== "awaiting_auth") continue;
+      if (!hasExplicitOwnerApproval(content.approval) || !hasOwnerApprovalEvent(state.events, content.id)) continue;
       job.status = "queued";
       job.scheduledAt = null;
       job.lastError = null;

@@ -63,8 +63,11 @@ export async function PATCH(request: Request) {
   }
   const draft = await prisma.contentDraft.findUnique({ where: { id: body.id } });
   if (!draft) return NextResponse.json({ error: "找不到草稿" }, { status: 404 });
-  if (body.status === "ready" && !draft.coverImageUrl) {
-    return NextResponse.json({ error: "封面圖片未上傳，不可進入 ready 狀態" }, { status: 422 });
+  if (body.status !== "draft" && body.status !== "reviewing") {
+    return NextResponse.json({ error: "草稿不能標成已核准或已發布。請到 /admin/operations 核准。" }, { status: 409 });
+  }
+  if (body.status === "reviewing" && !draft.coverImageUrl) {
+    return NextResponse.json({ error: "封面圖片未上傳，不可進入審核狀態" }, { status: 422 });
   }
   const updated = await prisma.contentDraft.update({ where: { id: body.id }, data: { status: body.status } });
   return NextResponse.json({ success: true, draft: toDraft(updated) });

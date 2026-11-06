@@ -87,6 +87,7 @@ export async function POST(request: Request) {
         where: { id },
         data: { selected: true, status: "draft_generated", contentDraftId: saved.draft?.id },
       });
+      // 生成只建立待核准草稿。這裡不呼叫核准，也不把文案標成已發布。
       results.push({ id, success: true });
     } catch (error) {
       results.push({ id, success: false, error: String(error) });
