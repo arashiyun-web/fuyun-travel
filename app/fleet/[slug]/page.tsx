@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import { publicFleetProfile } from "@/lib/fleetCatalog";
 import { findContentItem, fleetItems } from "@/lib/siteContent";
 import { SITE, pageMeta } from "@/lib/site";
 import { generateFaq } from "@/lib/seo/generateFaq";
@@ -28,6 +29,7 @@ export function generateMetadata({ params }: FleetDetailPageProps) {
 
 export default function FleetDetailPage({ params }: FleetDetailPageProps) {
   const vehicle = findContentItem(fleetItems, params.slug);
+  const catalog = publicFleetProfile(params.slug);
 
   if (!vehicle) {
     notFound();
@@ -80,6 +82,16 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
             <div className="mt-8 rounded-md bg-[#fffaf0] p-6 ring-1 ring-[#d8ccb2]">
               <p className="leading-9 text-[#4b463d]">{vehicle.detail}</p>
             </div>
+            {catalog?.sections.map((section) => (
+              <div className="mt-8 rounded-md bg-[#fffaf0] p-6 ring-1 ring-[#d8ccb2]" key={section.heading}>
+                <h2 className="text-lg font-black">{section.heading}</h2>
+                <ul className="mt-3 list-disc pl-5 leading-8 text-[#4b463d]">
+                  {section.lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {faq.slice(0, 4).map((item) => (
                 <div className="rounded-md bg-[#fffaf0] p-5 ring-1 ring-[#d8ccb2]" key={item.question}>

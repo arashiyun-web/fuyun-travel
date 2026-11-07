@@ -1,3 +1,4 @@
+import { publicFleetProfiles } from "@/lib/fleetCatalog";
 import {
   BriefcaseBusiness,
   BusFront,
@@ -152,6 +153,15 @@ export const fleetItems: ContentItem[] = [
     icon: BusFront,
     keywords: ["Daewoo", "包車旅遊"],
   },
+  ...publicFleetProfiles().map((vehicle) => ({
+    slug: vehicle.slug,
+    title: vehicle.title,
+    summary: vehicle.cardSummary,
+    detail: vehicle.detail,
+    icon: vehicle.slug === "mercedes-van" ? Car : BusFront,
+    keywords: vehicle.keywords,
+    photos: vehicle.photos,
+  })),
 ];
 
 export const contactItems: ContentItem[] = [
