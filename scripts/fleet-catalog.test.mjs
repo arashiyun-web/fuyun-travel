@@ -46,31 +46,34 @@ test("known rates are structured and unknown amounts are null, never zero", () =
   assert.equal(JSON.stringify(van).includes("toyota-midibus"), false);
 });
 
-test("public pages omit seat guesses, the van overtime calculator, and unreviewed legal text", () => {
+test("public copy keeps prices and uncertainty without staff notes", () => {
   const mercedes = catalog.publicFleetProfile("mercedes-van");
   const toyota = catalog.publicFleetProfile("toyota-midibus");
   const mercedesText = JSON.stringify(mercedes);
   const toyotaText = JSON.stringify(toyota);
-  assert.equal(mercedesText.includes("尚未建檔"), false);
-  assert.equal(toyotaText.includes("尚未建檔"), false);
-  assert.equal(mercedesText.includes("toyota-midibus"), false);
-  assert.match(toyotaText, /昱境通運公司/);
-  assert.match(mercedesText, /座位數：尚未提供/);
-  assert.match(mercedesText, /不自動算出超時費/);
-  assert.match(mercedesText, /訂金金額洽詢/);
-  assert.match(mercedesText, /是否收費未知/);
-  assert.match(mercedesText, /加價金額未定/);
-  assert.match(toyotaText, /最多 20 位乘客/);
-  assert.match(toyotaText, /台北一日遊價格未提供/);
-  assert.match(toyotaText, /住宿補貼金額未提供，洽詢/);
+  const shown = publicText();
+  const banned = ["頁面不把", "只用於這台", "不填0", "不填 0", "參考景點", "不自動算出", "資料沒有寫死", "未提供", "未知", "不沿用", "昱境", "自有", "尚未提供", "施工"];
+  for (const phrase of banned) assert.equal(shown.includes(phrase), false, phrase);
+  assert.match(mercedesText, /7,000 元/);
+  assert.match(mercedesText, /座位與行李配置請於預訂時確認/);
+  assert.match(mercedesText, /訂金及取消改期規則請於預訂時確認/);
+  assert.match(mercedesText, /夜間加價依行程另行確認/);
+  assert.match(mercedesText, /兒童安全座椅請預先告知需求，費用另行確認/);
+  assert.match(mercedesText, /超時費半小時 300 元、1 小時 500 元，超過約定時間半小時以上計收；具體計費請於預訂時確認/);
+  assert.match(toyotaText, /9,000 元/);
+  assert.match(toyotaText, /含司機 21 座，最多 20 位乘客，建議保留座位以維持舒適度；行李依實際人數及尺寸確認/);
+  assert.match(toyotaText, /台北一日遊費用請於預訂時確認/);
   assert.equal(toyotaText.includes("1,500"), false);
-  assert.equal(toyotaText.includes("1500"), false);
-  assert.equal(publicText().includes("30%"), false);
-  assert.equal(publicText().includes("不得取消"), false);
-  assert.equal(publicText().includes("免責"), false);
-  assert.match(catalog.internalFleetReviewNotes("toyota-midibus").join("\n"), /30%/);
-  assert.match(catalog.internalFleetReviewNotes("toyota-midibus").join("\n"), /內部待審/);
-  assert.deepEqual(catalog.internalFleetReviewNotes("mercedes-van"), []);
+  assert.equal(shown.includes("30%"), false);
+  assert.equal(shown.includes("不得取消"), false);
+  assert.equal(shown.includes("免責"), false);
+  const midibusNotes = catalog.internalFleetReviewNotes("toyota-midibus").join("\n");
+  const vanNotes = catalog.internalFleetReviewNotes("mercedes-van").join("\n");
+  assert.match(midibusNotes, /30%/);
+  assert.match(midibusNotes, /昱境通運公司/);
+  assert.match(midibusNotes, /1,500/);
+  assert.match(vanNotes, /不得從照片推測/);
+  assert.match(vanNotes, /不得自動計費/);
 });
 
 test("fleet pages read the catalog, and LINE quote code does not", () => {
