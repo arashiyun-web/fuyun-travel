@@ -57,7 +57,13 @@ test("public intros describe the ride and do not carry quote terms", () => {
   assert.match(JSON.stringify(toyota), /含司機 21 座，最多 20 位乘客/);
   assert.match(JSON.stringify(toyota), /建議不要坐滿/);
   assert.match(JSON.stringify(toyota), /親友同行、公司小型團體/);
-  assert.equal(JSON.stringify(toyota).includes("最少要"), true);
+  assert.match(JSON.stringify(toyota), /建議保留座位，讓同行旅客坐得更舒適；行李依人數與尺寸事先確認/);
+  assert.equal(JSON.stringify(toyota).includes("走道"), false);
+  assert.equal(JSON.stringify(toyota).includes("最少"), false);
+  assert.match(JSON.stringify(mercedes), /適合四人以上的家庭與朋友小團體同行，車內設有獨立乘客座與後座；可依同行人數與行李需求確認座位配置/);
+  assert.equal(shown.includes("車內看得到"), false);
+  assert.match(catalog.fleetQuoteRecord("mercedes-van").conditions.join("\n"), /九人座（老闆 11\/7 確認）/);
+  assert.equal(catalog.fleetQuoteRecord("mercedes-van").conditions.join("\n").includes("座位數未提供"), false);
   const vanQuote = catalog.fleetQuoteRecord("mercedes-van");
   const busQuote = catalog.fleetQuoteRecord("toyota-midibus");
   assert.equal(vanQuote.rates.find((rate) => rate.id === "taipei-day-10h").amountTwd, 7000);
