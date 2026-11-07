@@ -17,7 +17,7 @@ test("known rates are structured and unknown amounts are null, never zero", () =
   assert.equal(catalog.confirmedVehicleRate("toyota-midibus", "taipei-jiufen-10h"), 9000);
   assert.equal(catalog.confirmedVehicleRate("toyota-midibus", "taipei-day-10h"), null);
   assert.equal(catalog.confirmedVehicleRate("coach-42", "taipei-day-10h"), null);
-  const amounts = catalog.publicFleetProfiles().flatMap((profile) => profile.rates.map((rate) => rate.amountTwd));
+  const amounts = ["mercedes-van", "toyota-midibus"].flatMap((slug) => catalog.fleetQuoteRecord(slug).rates.map((rate) => rate.amountTwd));
   assert.equal(amounts.includes(0), false);
   assert.equal(catalog.FLEET_CATALOG_LINE_AUTO_QUOTE, false);
   const van = catalog.publicFleetProfile("mercedes-van");
@@ -46,34 +46,29 @@ test("known rates are structured and unknown amounts are null, never zero", () =
   assert.equal(JSON.stringify(van).includes("toyota-midibus"), false);
 });
 
-test("public copy keeps prices and uncertainty without staff notes", () => {
+test("public intros describe the ride and do not carry quote terms", () => {
   const mercedes = catalog.publicFleetProfile("mercedes-van");
   const toyota = catalog.publicFleetProfile("toyota-midibus");
-  const mercedesText = JSON.stringify(mercedes);
-  const toyotaText = JSON.stringify(toyota);
   const shown = publicText();
-  const banned = ["頁面不把", "只用於這台", "不填0", "不填 0", "參考景點", "不自動算出", "資料沒有寫死", "未提供", "未知", "不沿用", "昱境", "自有", "尚未提供", "施工"];
+  const banned = ["7,000", "7000", "9,000", "9000", "300 元", "500 元", "800 元", "1,500", "1500", "舉牌", "過路費", "訂金", "30%", "免責", "昱境", "油資", "加價", "超時"];
   for (const phrase of banned) assert.equal(shown.includes(phrase), false, phrase);
-  assert.match(mercedesText, /7,000 元/);
-  assert.match(mercedesText, /座位與行李配置請於預訂時確認/);
-  assert.match(mercedesText, /訂金及取消改期規則請於預訂時確認/);
-  assert.match(mercedesText, /夜間加價依行程另行確認/);
-  assert.match(mercedesText, /兒童安全座椅請預先告知需求，費用另行確認/);
-  assert.match(mercedesText, /超時費半小時 300 元、1 小時 500 元，超過約定時間半小時以上計收；具體計費請於預訂時確認/);
-  assert.match(toyotaText, /9,000 元/);
-  assert.match(toyotaText, /含司機 21 座，最多 20 位乘客，建議保留座位以維持舒適度；行李依實際人數及尺寸確認/);
-  assert.match(toyotaText, /台北一日遊費用請於預訂時確認/);
-  assert.equal(toyotaText.includes("1,500"), false);
-  assert.equal(shown.includes("30%"), false);
-  assert.equal(shown.includes("不得取消"), false);
-  assert.equal(shown.includes("免責"), false);
-  const midibusNotes = catalog.internalFleetReviewNotes("toyota-midibus").join("\n");
-  const vanNotes = catalog.internalFleetReviewNotes("mercedes-van").join("\n");
-  assert.match(midibusNotes, /30%/);
-  assert.match(midibusNotes, /昱境通運公司/);
-  assert.match(midibusNotes, /1,500/);
-  assert.match(vanNotes, /不得從照片推測/);
-  assert.match(vanNotes, /不得自動計費/);
+  assert.match(JSON.stringify(mercedes), /九人座賓士小車，適合四人以上的家庭、朋友小團體/);
+  assert.match(JSON.stringify(mercedes), /獨立乘客座/);
+  assert.match(JSON.stringify(toyota), /含司機 21 座，最多 20 位乘客/);
+  assert.match(JSON.stringify(toyota), /建議不要坐滿/);
+  assert.match(JSON.stringify(toyota), /親友同行、公司小型團體/);
+  assert.equal(JSON.stringify(toyota).includes("最少要"), true);
+  const vanQuote = catalog.fleetQuoteRecord("mercedes-van");
+  const busQuote = catalog.fleetQuoteRecord("toyota-midibus");
+  assert.equal(vanQuote.rates.find((rate) => rate.id === "taipei-day-10h").amountTwd, 7000);
+  assert.equal(vanQuote.rates.find((rate) => rate.id === "taipei-jiufen-10h").amountTwd, 7000);
+  assert.equal(busQuote.rates.find((rate) => rate.id === "taipei-jiufen-10h").amountTwd, 9000);
+  assert.equal(busQuote.rates.find((rate) => rate.id === "taipei-day-10h").amountTwd, null);
+  assert.match(vanQuote.conditions.join("\n"), /半小時 300 元、1 小時 500 元/);
+  assert.match(busQuote.conditions.join("\n"), /每小時 800 元/);
+  assert.match(catalog.internalFleetReviewNotes("toyota-midibus").join("\n"), /30%/);
+  assert.equal(catalog.FLEET_CATALOG_LINE_AUTO_QUOTE, false);
+  assert.equal(vanQuote.lineAutoQuote, false);
 });
 
 test("fleet pages read the catalog, and LINE quote code does not", () => {

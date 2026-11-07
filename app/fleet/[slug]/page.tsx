@@ -36,7 +36,7 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
   }
 
   const Icon = vehicle.icon;
-  const faq = generateFaq(vehicle.title, "車隊介紹");
+  const faq = catalog?.faqs ?? generateFaq(vehicle.title, "車隊介紹");
   const jsonLd = [
     vehicleSchema({
       name: vehicle.title,

@@ -32,10 +32,17 @@ export type PublicFleetProfile = {
   photosReady: boolean;
   /** False while this vehicle's own photos are missing. */
   readyForLaunch: boolean;
-  /** Pages may display these rates. They are not sent to LINE. */
-  rates: FleetRate[];
   sections: FleetSection[];
+  faqs: { question: string; answer: string }[];
   lineAutoQuote: false;
+};
+
+export type FleetQuoteRecord = {
+  slug: string;
+  lineAutoQuote: false;
+  rates: FleetRate[];
+  /** Verified commercial conditions. Not rendered on /fleet. */
+  conditions: string[];
 };
 
 const mercedesRates: FleetRate[] = [
@@ -70,16 +77,12 @@ const internalReviewNotes: Record<string, readonly string[]> = {
   ],
 };
 
-function money(amount: number | null) {
-  return amount === null ? "洽詢" : `${amount.toLocaleString("zh-Hant-TW")} 元`;
-}
-
 const mercedes: PublicFleetProfile = {
   slug: "mercedes-van",
-  title: "賓士小車",
-  cardSummary: "賓士小車。台北一日遊與台北至九份，用車 10 小時各 7,000 元，含油資、過路費與停車費。座位與行李配置請於預訂時確認。",
-  detail: "賓士小車可安排台北一日遊與台北至九份。座位、行李、訂金與夜間用車，請於預訂時一併確認。",
-  keywords: ["賓士小車", "台北九份包車", "小車包車"],
+  title: "九人座賓士小車",
+  cardSummary: "九人座賓士小車，適合四人以上的家庭、朋友小團體。車內有獨立乘客座與後座，行李依人數與行李箱尺寸確認。",
+  detail: "人數不多、又想坐同一台車時，用這台賓士小車。它適合四人以上的家庭出遊或朋友小團體，和要坐到二十人的中巴、以及四十二人座大巴不是同一種需求。車內看得到獨立乘客座與後座。行李依乘車人數與行李箱尺寸確認。",
+  keywords: ["九人座賓士", "家庭包車", "小團體包車"],
   photos: [
     "/fleet/mercedes-van-exterior.webp",
     "/fleet/mercedes-van-captain.webp",
@@ -88,39 +91,35 @@ const mercedes: PublicFleetProfile = {
   ],
   photosReady: true,
   readyForLaunch: true,
-  rates: mercedesRates,
   lineAutoQuote: false,
   sections: [
     {
-      heading: "車型",
+      heading: "適合誰",
       lines: [
-        "賓士小車，適合市區與近程一日行程。",
-        "座位與行李配置請於預訂時確認。",
-        "行李以最多 7 個 29 吋行李箱為參考，仍依乘車人數與當日車輛確認。",
+        "九人座賓士小車，適合四人以上的家庭、朋友小團體。",
+        "適合同一趟行程、人數還不需要中巴的客人。",
       ],
     },
     {
-      heading: "已確認費用",
+      heading: "乘坐與行李",
       lines: [
-        ...mercedesRates.map((rate) => `${rate.label}：${money(rate.amountTwd)}`),
-        "上述兩種 10 小時用車含油資、過路費、停車費。",
-        "機場航廈接機，舉牌加 100 元。",
-        "司機住宿由客人安排，或每晚補貼 1,500 元。",
+        "車內有獨立乘客座，後方另有後座。",
+        "行李依乘車人數與行李箱尺寸確認。",
       ],
     },
+  ],
+  faqs: [
     {
-      heading: "超時",
-      lines: [
-        "超時費半小時 300 元、1 小時 500 元，超過約定時間半小時以上計收；具體計費請於預訂時確認。",
-      ],
+      question: "九人座賓士小車適合幾人？",
+      answer: "適合四人以上的家庭、朋友小團體。實際怎麼坐、行李怎麼放，預訂時依人數確認。",
     },
     {
-      heading: "預訂時確認",
-      lines: [
-        "訂金及取消改期規則請於預訂時確認。",
-        "兒童安全座椅請預先告知需求，費用另行確認。",
-        "晚上 23 點後用車，夜間加價依行程另行確認。",
-      ],
+      question: "和小巴、大巴怎麼選？",
+      answer: "四人以上、想坐同一台小車，選九人座賓士。人數已經接近二十人的親友或公司小團，看中巴。大型團體用 42 人座遊覽車。",
+    },
+    {
+      question: "行李怎麼算？",
+      answer: "依乘車人數與行李箱尺寸確認，不另保證坐滿時可放幾個大箱。",
     },
   ],
 };
@@ -128,8 +127,8 @@ const mercedes: PublicFleetProfile = {
 const toyota: PublicFleetProfile = {
   slug: "toyota-midibus",
   title: "TOYOTA 中巴",
-  cardSummary: "TOYOTA 中巴。含司機 21 座，最多 20 位乘客，建議保留座位以維持舒適度。台北至九份 10 小時 9,000 元。",
-  detail: "TOYOTA 中巴可依行程安排一日或多日用車。台北至九份 10 小時 9,000 元，台北一日遊費用請於預訂時確認。",
+  cardSummary: "TOYOTA 中巴，含司機 21 座、最多 20 位乘客。適合親友同行、公司小型團體與團體出遊，建議不要坐滿。",
+  detail: "中巴給已經坐不進一台小車、又還不需要 42 人座大巴的團體。含司機 21 座，最多 20 位乘客，建議不要坐滿，把走道和行李空間留下來。適合親友同行、公司小型團體與團體出遊。沒有規定最少幾人才可以訂，行李依人數與尺寸確認。",
   keywords: ["TOYOTA 中巴", "中巴包車", "台北九份中巴"],
   photos: [
     "/fleet/toyota-midibus-side.webp",
@@ -139,42 +138,77 @@ const toyota: PublicFleetProfile = {
   ],
   photosReady: true,
   readyForLaunch: true,
-  rates: toyotaRates,
   lineAutoQuote: false,
   sections: [
     {
-      heading: "車型",
+      heading: "適合誰",
       lines: [
-        "TOYOTA 中巴。",
-        "含司機 21 座，最多 20 位乘客，建議保留座位以維持舒適度；行李依實際人數及尺寸確認。",
+        "含司機 21 座，最多 20 位乘客，建議不要坐滿。",
+        "適合親友同行、公司小型團體與團體出遊。",
+        "沒有規定最少人數。",
       ],
     },
     {
-      heading: "已確認費用",
+      heading: "乘坐與行李",
       lines: [
-        "台北至九份，用車 10 小時：9,000 元。",
-        "台北一日遊費用請於預訂時確認。",
-        "含駕駛薪資、過橋過路費、油資、法定乘客意外險。",
-        "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。",
-        "司機餐點由客人負責，或每餐補貼 200 元。",
-        "22:00–06:30 依行程加收 500–2,000 元。",
-        "台北、新北超時每小時 800 元。不足 1 小時以 1 小時計。時間包含報到、行駛、等待待命。",
-        "接機舉牌免費。",
-        "送機若超過約定出發時間，每 30 分鐘加 500 元。",
-        "接送機等待超過 45 分鐘，可以終止。",
-        "班機更改請盡快通知，可能另派車或取消。提前降落會盡量配合。",
-      ],
-    },
-    {
-      heading: "行程與其他條件",
-      lines: [
-        "多日遊依客人行程安排。",
-        "兒童座椅請客人自備。",
-        "遠程無法當天往返時，請於預訂時確認司機住宿安排。",
+        "行李依實際人數及尺寸確認。",
+        "多日遊依客人自己的行程安排。",
       ],
     },
   ],
+  faqs: [
+    {
+      question: "TOYOTA 中巴適合什麼團體？",
+      answer: "適合親友同行、公司小型團體與團體出遊。含司機 21 座，最多 20 位乘客，建議不要坐滿。",
+    },
+    {
+      question: "最少要幾人才可以訂？",
+      answer: "沒有規定最少人數。人數與行李於預訂時一起確認。",
+    },
+    {
+      question: "和九人座小車怎麼分？",
+      answer: "四人以上的家庭、朋友坐九人座賓士小車。人數已經超過一台小車、又還不用 42 人座大巴，選這台中巴。",
+    },
+  ],
 };
+
+const quoteBook: FleetQuoteRecord[] = [
+  {
+    slug: "mercedes-van",
+    lineAutoQuote: false,
+    rates: mercedesRates,
+    conditions: [
+      "台北一日遊與台北至九份，用車 10 小時各 7000 元。",
+      "含油資、過路費、停車費。",
+      "機場航廈接機，舉牌加 100 元。",
+      "司機住宿由客人安排，或每晚補貼 1500 元。",
+      "超過約定時間半小時以上才計超時；半小時 300 元、1 小時 500 元。不足該段或跨段如何進位未寫死，不得自動計費。",
+      "需要訂金。金額與取消規則未定。",
+      "可安排兒童安全座椅，是否收費未知。",
+      "晚上 23 點後加價，金額未定。",
+      "行李最多 7 個 29 吋箱，依乘車人數與實車確認，坐滿時不保證仍可放入。",
+      "座位數未提供，不得從照片推測。",
+    ],
+  },
+  {
+    slug: "toyota-midibus",
+    lineAutoQuote: false,
+    rates: toyotaRates,
+    conditions: [
+      "台北至九份，用車 10 小時 9000 元。台北一日遊價格未提供。",
+      "含駕駛薪資、過橋過路費、油資、法定乘客意外險。",
+      "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。",
+      "司機餐點由客人負責，或每餐補貼 200 元。",
+      "22:00–06:30 依行程加 500–2000 元，不是單一固定價。",
+      "台北、新北超時每小時 800 元。不足 1 小時以 1 小時計。時間包含報到、行駛、等待待命。",
+      "接機舉牌免費。送機超過約定出發時間，每 30 分鐘加 500 元。接送機等待超過 45 分鐘可以終止。",
+      "班機更改請盡快通知，可能另派車或取消。提前降落盡量配合。",
+      "兒童座椅須由客人自備。",
+      "遠程無法當天往返需安排司機住宿。住宿補貼金額未提供，不得沿用小車每晚 1500 元。",
+      "含司機 21 座，最多 20 位乘客，建議不要坐滿。",
+    ],
+  },
+];
 
 const profiles = [mercedes, toyota];
 
@@ -182,9 +216,15 @@ export function publicFleetProfiles(): PublicFleetProfile[] {
   return profiles.map((profile) => ({
     ...profile,
     photos: [...profile.photos],
-    rates: profile.rates.map((rate) => ({ ...rate })),
     sections: profile.sections.map((section) => ({ ...section, lines: [...section.lines] })),
+    faqs: profile.faqs.map((item) => ({ ...item })),
   }));
+}
+
+export function fleetQuoteRecord(slug: string) {
+  const record = quoteBook.find((item) => item.slug === slug);
+  if (!record) return null;
+  return { ...record, rates: record.rates.map((rate) => ({ ...rate })), conditions: [...record.conditions] };
 }
 
 export function publicFleetProfile(slug: string) {
@@ -193,7 +233,7 @@ export function publicFleetProfile(slug: string) {
 
 /** Confirmed amount only. Unknown routes and unknown vehicles return null, never 0. */
 export function confirmedVehicleRate(slug: string, rateId: FleetRateId): number | null {
-  const rate = publicFleetProfile(slug)?.rates.find((item) => item.id === rateId);
+  const rate = fleetQuoteRecord(slug)?.rates.find((item) => item.id === rateId);
   return rate?.amountTwd ?? null;
 }
 
