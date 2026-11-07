@@ -22,9 +22,15 @@ test("known rates are structured and unknown amounts are null, never zero", () =
   assert.equal(catalog.FLEET_CATALOG_LINE_AUTO_QUOTE, false);
   const van = catalog.publicFleetProfile("mercedes-van");
   const midibus = catalog.publicFleetProfile("toyota-midibus");
-  assert.deepEqual(van.photos, []);
-  assert.equal(van.photosReady, false);
-  assert.equal(catalog.fleetLaunchBlocked("mercedes-van"), true);
+  assert.deepEqual(van.photos, [
+    "/fleet/mercedes-van-exterior.webp",
+    "/fleet/mercedes-van-captain.webp",
+    "/fleet/mercedes-van-rear.webp",
+    "/fleet/mercedes-van-front.webp",
+  ]);
+  assert.equal(van.photosReady, true);
+  assert.equal(catalog.fleetLaunchBlocked("mercedes-van"), false);
+  for (const photo of van.photos) assert.equal(existsSync(path.join(root, "public", photo)), true, photo);
   assert.deepEqual(midibus.photos, [
     "/fleet/toyota-midibus-side.webp",
     "/fleet/toyota-midibus-interior-front.webp",
@@ -45,8 +51,9 @@ test("public pages omit seat guesses, the van overtime calculator, and unreviewe
   const toyota = catalog.publicFleetProfile("toyota-midibus");
   const mercedesText = JSON.stringify(mercedes);
   const toyotaText = JSON.stringify(toyota);
-  assert.match(mercedesText, /實車照片尚未建檔/);
+  assert.equal(mercedesText.includes("尚未建檔"), false);
   assert.equal(toyotaText.includes("尚未建檔"), false);
+  assert.equal(mercedesText.includes("toyota-midibus"), false);
   assert.match(toyotaText, /昱境通運公司/);
   assert.match(mercedesText, /座位數：尚未提供/);
   assert.match(mercedesText, /不自動算出超時費/);
@@ -77,6 +84,8 @@ test("fleet pages read the catalog, and LINE quote code does not", () => {
   assert.match(detail, /publicFleetProfile/);
   assert.match(fleet, /vehicle\.slug !== "coach-42"/);
   assert.match(fleet, /midibus\.photos\.slice\(1, 3\)/);
+  assert.match(fleet, /van\.photos\.slice\(1, 3\)/);
+  assert.equal(fleet.includes("mercedes-van-exterior.webp"), false);
   assert.equal(fleet.includes("toyota-midibus-side.webp"), false);
   assert.equal(line.includes("fleetCatalog"), false);
   assert.equal(workflow.includes("fleetCatalog"), false);

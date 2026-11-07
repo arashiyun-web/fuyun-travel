@@ -14,7 +14,8 @@ export const metadata: Metadata = pageMeta({
 export default function FleetPage() {
   const photographed = fleetItems.find((vehicle) => vehicle.slug === "coach-42");
   const midibus = fleetItems.find((vehicle) => vehicle.slug === "toyota-midibus");
-  const otherVehicles = fleetItems.filter((vehicle) => vehicle.slug !== "coach-42" && vehicle.slug !== "toyota-midibus");
+  const van = fleetItems.find((vehicle) => vehicle.slug === "mercedes-van");
+  const otherVehicles = fleetItems.filter((vehicle) => vehicle.slug !== "coach-42" && vehicle.slug !== "toyota-midibus" && vehicle.slug !== "mercedes-van");
 
   return (
     <div className={styles.fleet}>
@@ -80,6 +81,37 @@ export default function FleetPage() {
               ))}
             </div>
             <Link className={styles.featureLink} href={`/fleet/${midibus.slug}`}>
+              查看車輛照片與介紹 <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {van?.photos?.length ? (
+        <section className={styles.feature} aria-labelledby="fleet-van-title" style={{ marginTop: 28 }}>
+          <div className={styles.featureMedia}>
+            <img
+              className={styles.featurePhoto}
+              src={van.photos[0]}
+              alt="賓士小車實車外觀"
+            />
+            <span className={styles.photoTag}><Images size={15} aria-hidden="true" /> 實車照片</span>
+          </div>
+          <div className={styles.featureContent}>
+            <span className={styles.sectionLabel}>小車</span>
+            <h2 id="fleet-van-title">{van.title}</h2>
+            <p>{van.summary}</p>
+            <div className={styles.interiorPhotos}>
+              {van.photos.slice(1, 3).map((photo, index) => (
+                <img
+                  key={photo}
+                  src={photo}
+                  alt={`賓士小車乘客座實景 ${index + 1}`}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+            <Link className={styles.featureLink} href={`/fleet/${van.slug}`}>
               查看車輛照片與介紹 <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>

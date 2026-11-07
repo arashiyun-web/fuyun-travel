@@ -38,8 +38,6 @@ export type PublicFleetProfile = {
   lineAutoQuote: false;
 };
 
-const PHOTO_GAP = "外觀與內裝實車照片尚未建檔。此頁不使用其他車型的圖片，也不能視為照片已可上線。";
-
 const mercedesRates: FleetRate[] = [
   { id: "taipei-day-10h", label: "台北一日遊，用車 10 小時", hours: 10, amountTwd: 7000 },
   { id: "taipei-jiufen-10h", label: "台北至九份，用車 10 小時", hours: 10, amountTwd: 7000 },
@@ -69,16 +67,21 @@ const mercedes: PublicFleetProfile = {
   cardSummary: "賓士小車。台北一日遊與台北至九份，用車 10 小時各 7,000 元，含油資、過路費與停車費。座位數尚未提供。",
   detail: "賓士小車可安排台北一日遊與台北至九份。座位數、訂金金額與夜間加價金額都還沒有資料，頁面標成洽詢，不填 0，也不把這台車寫成公司自有。",
   keywords: ["賓士小車", "台北九份包車", "小車包車"],
-  photos: [],
-  photosReady: false,
-  readyForLaunch: false,
+  photos: [
+    "/fleet/mercedes-van-exterior.webp",
+    "/fleet/mercedes-van-captain.webp",
+    "/fleet/mercedes-van-rear.webp",
+    "/fleet/mercedes-van-front.webp",
+  ],
+  photosReady: true,
+  readyForLaunch: true,
   rates: mercedesRates,
   lineAutoQuote: false,
   sections: [
     {
       heading: "車型",
       lines: [
-        PHOTO_GAP,
+        "實車照片四張：外觀、獨立乘客座、後座、前座。只用於這台小車。",
         "品牌：賓士。具體型號未提供。",
         "座位數：尚未提供，洽詢。",
         "頁面不把這台車標成公司自有車輛。",
