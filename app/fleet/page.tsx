@@ -13,7 +13,8 @@ export const metadata: Metadata = pageMeta({
 
 export default function FleetPage() {
   const photographed = fleetItems.find((vehicle) => vehicle.slug === "coach-42");
-  const otherVehicles = fleetItems.filter((vehicle) => vehicle.slug !== "coach-42");
+  const midibus = fleetItems.find((vehicle) => vehicle.slug === "toyota-midibus");
+  const otherVehicles = fleetItems.filter((vehicle) => vehicle.slug !== "coach-42" && vehicle.slug !== "toyota-midibus");
 
   return (
     <div className={styles.fleet}>
@@ -48,6 +49,37 @@ export default function FleetPage() {
               ))}
             </div>
             <Link className={styles.featureLink} href={`/fleet/${photographed.slug}`}>
+              查看車輛照片與介紹 <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {midibus?.photos?.length ? (
+        <section className={styles.feature} aria-labelledby="fleet-midibus-title" style={{ marginTop: 28 }}>
+          <div className={styles.featureMedia}>
+            <img
+              className={styles.featurePhoto}
+              src={midibus.photos[0]}
+              alt="TOYOTA 中巴實車側面"
+            />
+            <span className={styles.photoTag}><Images size={15} aria-hidden="true" /> 實車照片</span>
+          </div>
+          <div className={styles.featureContent}>
+            <span className={styles.sectionLabel}>中巴</span>
+            <h2 id="fleet-midibus-title">{midibus.title}</h2>
+            <p>{midibus.summary}</p>
+            <div className={styles.interiorPhotos}>
+              {midibus.photos.slice(1, 3).map((photo, index) => (
+                <img
+                  key={photo}
+                  src={photo}
+                  alt={`TOYOTA 中巴車內實景 ${index + 1}`}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+            <Link className={styles.featureLink} href={`/fleet/${midibus.slug}`}>
               查看車輛照片與介紹 <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>

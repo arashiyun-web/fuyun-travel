@@ -27,11 +27,11 @@ export type PublicFleetProfile = {
   cardSummary: string;
   detail: string;
   keywords: string[];
-  /** Empty until the owner's real photos are committed. */
+  /** Only this vehicle's own files. Empty means the photo area is not ready. */
   photos: string[];
-  photosReady: false;
-  /** False while photos are missing. Do not describe the page as ready to launch. */
-  readyForLaunch: false;
+  photosReady: boolean;
+  /** False while this vehicle's own photos are missing. */
+  readyForLaunch: boolean;
   /** Pages may display these rates. They are not sent to LINE. */
   rates: FleetRate[];
   sections: FleetSection[];
@@ -119,20 +119,25 @@ const toyota: PublicFleetProfile = {
   cardSummary: "TOYOTA 中巴，含司機 21 座、最多 20 位乘客，建議不要坐滿。台北至九份 10 小時 9,000 元。",
   detail: "TOYOTA 中巴依客人的行程安排，不把參考景點當成固定保證行程。台北一日遊價格未提供，頁面不沿用其他車種的價格。",
   keywords: ["TOYOTA 中巴", "中巴包車", "台北九份中巴"],
-  photos: [],
-  photosReady: false,
-  readyForLaunch: false,
+  photos: [
+    "/fleet/toyota-midibus-side.webp",
+    "/fleet/toyota-midibus-interior-front.webp",
+    "/fleet/toyota-midibus-interior-rear.webp",
+    "/fleet/toyota-midibus-front.webp",
+  ],
+  photosReady: true,
+  readyForLaunch: true,
   rates: toyotaRates,
   lineAutoQuote: false,
   sections: [
     {
       heading: "車型",
       lines: [
-        PHOTO_GAP,
+        "實車照片四張：側面全車、正面、內裝往前、內裝往後。只用於這台中巴。",
+        "車身標示為昱境通運公司。本頁不把它說成雲陞自有車輛。",
         "車種：TOYOTA 中巴。具體型號未提供。",
         "含司機共 21 座，最多 20 位乘客。建議不要坐滿。",
         "行李容量依實際情況確認。",
-        "頁面不把這台車標成公司自有車輛。",
       ],
     },
     {
@@ -167,7 +172,7 @@ const profiles = [mercedes, toyota];
 export function publicFleetProfiles(): PublicFleetProfile[] {
   return profiles.map((profile) => ({
     ...profile,
-    photos: [],
+    photos: [...profile.photos],
     rates: profile.rates.map((rate) => ({ ...rate })),
     sections: profile.sections.map((section) => ({ ...section, lines: [...section.lines] })),
   }));
