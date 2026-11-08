@@ -50,6 +50,21 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     setMessage("已儲存正式報價。");
   }
 
+  async function fillCheckedFare() {
+    if (!quote) return;
+    setMessage("");
+    setError("");
+    const response = await fetch(`/api/admin/quotes/${params.id}/draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vehicleHint: quote.recommendedVehicle || "" }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || "草稿產生失敗");
+    setQuote(data.quote);
+    setMessage("已寫入後台草稿，尚未送給客人。待確認項目留在草稿裡，沒有猜成總價。");
+  }
+
   async function sendQuote() {
     setMessage("");
     setError("");
@@ -99,6 +114,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
           <textarea value={quote.quoteDraftText || ""} onChange={(event) => setQuote({ ...quote, quoteDraftText: event.target.value })} rows={16} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 font-mono text-sm focus:outline-none focus:border-amber-500" />
 
           <div className="flex flex-wrap gap-3">
+            <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>
             <button onClick={() => saveQuote().catch((err) => setError(err instanceof Error ? err.message : "儲存失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">儲存正式報價</button>
             <button onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500">送出給 LINE</button>
           </div>

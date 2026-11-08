@@ -18,6 +18,29 @@ type Order = {
   net_profit: number;
 };
 
+type HealthFlag = { name: string; set: boolean };
+type HealthFeature = {
+  ready?: boolean;
+  line?: boolean;
+  email?: boolean;
+  livePublish?: boolean;
+  env?: HealthFlag[];
+  optional?: string[];
+  notUsed?: string[];
+  lineEither?: string[];
+  emailOptional?: string[];
+};
+
+const featureLabels: Record<string, string> = {
+  copywriting: "文案",
+  imageUpload: "圖片上傳",
+  facebookPage: "Facebook 粉專",
+  instagramLogin: "Instagram 登入",
+  x: "X 發文",
+  scheduler: "排程",
+  inquiryNotify: "詢價通知",
+};
+
 const initialSummary: Summary = {
   inquiries: 0,
   quotes: 0,
@@ -35,6 +58,8 @@ export default function AdminPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [summary, setSummary] = useState<Summary>(initialSummary);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [health, setHealth] = useState<Record<string, HealthFeature> | null>(null);
+  const [healthError, setHealthError] = useState("");
 
   async function fetchDashboard(nextToken: string) {
     setLoadError("");
@@ -49,6 +74,19 @@ export default function AdminPage() {
       setOrders(data.details);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "登入成功，但資料讀取失敗");
+    }
+    try {
+      const healthResponse = await fetch("/api/admin/health", {
+        headers: { Authorization: `Bearer ${nextToken}` },
+        cache: "no-store",
+      });
+      const healthData = await healthResponse.json();
+      if (!healthResponse.ok || !healthData.success) throw new Error(healthData.error || "設定狀態讀取失敗");
+      setHealth(healthData.features);
+      setHealthError("");
+    } catch (error) {
+      setHealth(null);
+      setHealthError(error instanceof Error ? error.message : "設定狀態讀取失敗");
     }
   }
 
@@ -154,6 +192,8 @@ export default function AdminPage() {
         <Metric label="待發／已發" value={`${summary.operationsQueued}／${summary.operationsPublished}`} success />
       </div>
 
+      <SettingsStatus health={health} error={healthError} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4 gap-3">
@@ -185,6 +225,12 @@ export default function AdminPage() {
             <p className="text-xs text-slate-500 mt-2">行程管理、即時訂單、會員明細、系統級推播。</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
+            <button type="button" onClick={() => window.location.assign("/admin/inquiries")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              網站詢價
+            </button>
+            <button type="button" onClick={() => window.location.assign("/admin/quotes")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              報價草稿
+            </button>
             <button type="button" onClick={openOperations} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               營運發布
             </button>
@@ -200,6 +246,38 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SettingsStatus({ health, error }: { health: Record<string, HealthFeature> | null; error: string }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div>
+        <p className="text-xs text-slate-500 uppercase tracking-wider">settings</p>
+        <h2 className="text-base font-medium text-slate-200 mt-1">外部設定狀態</h2>
+        <p className="text-xs text-slate-500 mt-2">只顯示名稱有沒有填。未填就是未設定，不會當成已可用。這裡不能送出、發文或開啟正式發布。</p>
+      </div>
+      {error ? <div className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{error}</div> : null}
+      {health ? Object.entries(health).map(([key, feature]) => {
+        const skip = new Set([...(feature.optional || []), ...(feature.notUsed || []), ...(feature.emailOptional || [])]);
+        const either = feature.lineEither || [];
+        const eitherReady = either.some((name) => feature.env?.some((item) => item.name === name && item.set));
+        const missing = (feature.env || []).filter((item) => !item.set && !skip.has(item.name) && !(either.includes(item.name) && eitherReady));
+        const eitherMissing = either.length > 0 && !eitherReady;
+        const ready = feature.ready ?? ((feature.line || feature.email) ? true : false);
+        return (
+          <div key={key} className="border border-slate-800 rounded-xl p-3">
+            <p className="text-sm text-slate-200">{featureLabels[key] || key}：{ready ? "已設定" : "未完成"}{key === "scheduler" ? `；正式發布開關${feature.livePublish ? "已打開" : "未打開"}` : ""}{key === "inquiryNotify" ? `；LINE ${feature.line ? "已設定" : "未設定"}，Email ${feature.email ? "已設定" : "未設定"}` : ""}</p>
+            {eitherMissing ? <p className="text-xs text-amber-300 mt-1">擇一即可：LINE_ADMIN_USER_ID 或 ADMIN_LINE_USER_ID</p> : null}
+            {missing.filter((item) => !either.includes(item.name)).length ? <p className="text-xs text-amber-300 mt-1">未填：{missing.filter((item) => !either.includes(item.name)).map((item) => item.name).join("、")}</p> : null}
+            {key === "imageUpload" ? <p className="text-xs text-slate-500 mt-1">可省略：R2_ENDPOINT。位址可由 R2_ACCOUNT_ID 組成。</p> : null}
+            {key === "inquiryNotify" ? <p className="text-xs text-slate-500 mt-1">可省略：SMTP_PORT（預設 587）、INQUIRY_TO_EMAIL 與 INQUIRY_FROM_EMAIL（未填時用 SMTP_USER）。</p> : null}
+            {feature.notUsed?.length ? <p className="text-xs text-slate-500 mt-1">不採用：{feature.notUsed.join("、")}。X 發文要用使用者授權的四組金鑰，不能用 app-only bearer。</p> : null}
+            {key === "instagramLogin" ? <p className="text-xs text-slate-500 mt-1">帳號 token 在完成一次 Instagram 登入後寫入系統，不必另外貼進環境變數。</p> : null}
+          </div>
+        );
+      }) : <p className="text-xs text-slate-600">尚未讀到設定狀態。</p>}
     </div>
   );
 }

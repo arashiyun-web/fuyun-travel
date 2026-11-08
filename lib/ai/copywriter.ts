@@ -2,15 +2,16 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export class CopywriterUnavailableError extends Error {
   constructor() {
-    super("尚未設定文案供應商：請設定 ANTHROPIC_API_KEY 與 AI_MODEL_NAME，或 OPENAI_API_KEY 與 OPENAI_MODEL。");
+    super("尚未設定文案供應商：請設定 GEMINI_API_KEY 與 GEMINI_MODEL，或 ANTHROPIC_API_KEY 與 AI_MODEL_NAME，或 OPENAI_API_KEY 與 OPENAI_MODEL。免費額度與是否永久免費都不保證。");
     this.name = "CopywriterUnavailableError";
   }
 }
 
-export type CopyProvider = "anthropic" | "openai";
+export type CopyProvider = "gemini" | "anthropic" | "openai";
 
-/** Which configured provider will be used. Throws when neither pair is complete. */
+/** Gemini wins when its pair is set, so the owner can switch to it. Otherwise Anthropic, then OpenAI. */
 export function selectedCopyProvider(): CopyProvider {
+  if (process.env.GEMINI_API_KEY?.trim() && process.env.GEMINI_MODEL?.trim()) return "gemini";
   if (process.env.ANTHROPIC_API_KEY?.trim() && process.env.AI_MODEL_NAME?.trim()) return "anthropic";
   if (process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_MODEL?.trim()) return "openai";
   throw new CopywriterUnavailableError();
@@ -18,6 +19,25 @@ export function selectedCopyProvider(): CopyProvider {
 
 export async function generateCopy(input: { system?: string; user: string }): Promise<string> {
   const provider = selectedCopyProvider();
+  if (provider === "gemini") {
+    const model = process.env.GEMINI_MODEL!.trim();
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY!.trim(),
+      },
+      body: JSON.stringify({
+        systemInstruction: input.system ? { parts: [{ text: input.system }] } : undefined,
+        contents: [{ role: "user", parts: [{ text: input.user }] }],
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
+    if (!response.ok) throw new Error(data.error?.message || `Gemini 回應 ${response.status}`);
+    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() || "";
+    if (!text) throw new Error("文案供應商沒有回傳內容");
+    return text;
+  }
   if (provider === "anthropic") {
     const client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
