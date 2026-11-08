@@ -71,15 +71,30 @@ test("worker auth accepts CRON_SECRET and OPERATIONS_CRON_TOKEN, and rejects a w
 
 test("health report is booleans and names only", () => {
   const health = jiti("@/lib/admin/publishingHealth");
+  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.AI_MODEL_NAME;
   process.env.OPENAI_API_KEY = "secret-value";
   process.env.OPENAI_MODEL = "gpt-test";
   process.env.X_BEARER_TOKEN = "bearer-secret";
-  const report = JSON.stringify(health.publishingHealth());
-  assert.equal(report.includes("secret-value"), false);
-  assert.equal(report.includes("bearer-secret"), false);
-  assert.match(report, /"name":"OPENAI_API_KEY","set":true/);
-  assert.match(report, /"name":"GEMINI_API_KEY"/);
-  assert.match(report, /"notUsed":\["X_BEARER_TOKEN"\]/);
-  assert.match(report, /"optional":\["R2_ENDPOINT"\]/);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "false";
+  process.env.GEMINI_API_KEY = "false";
+  process.env.GEMINI_MODEL = "false";
+  const report = health.publishingHealth();
+  const serialized = JSON.stringify(report);
+  assert.equal(serialized.includes("secret-value"), false);
+  assert.equal(serialized.includes("bearer-secret"), false);
+  assert.equal(report.scheduler.livePublish, false);
+  assert.equal(report.copywriting.selected, "openai");
+  assert.deepEqual(report.copywriting.missing, []);
+  assert.equal(report.copywriting.functionalCheck, "not_tested");
+  assert.equal(report.copywriting.authorizationCheck, "not_tested");
+  assert.equal(report.x.authorizationCheck, "not_tested");
+  assert.match(serialized, /"name":"OPENAI_API_KEY","set":true/);
+  assert.match(serialized, /"name":"GEMINI_API_KEY","set":false/);
+  assert.match(serialized, /"notUsed":\["X_BEARER_TOKEN"\]/);
+  assert.match(serialized, /"optional":\["R2_ENDPOINT"\]/);
   delete process.env.X_BEARER_TOKEN;
+  delete process.env.OPERATIONS_LIVE_PUBLISH_ENABLED;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_MODEL;
 });

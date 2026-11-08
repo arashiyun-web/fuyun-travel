@@ -8,41 +8,67 @@ import { createRequire } from "node:module";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const draft = createRequire(import.meta.url)("jiti")(fileURLToPath(import.meta.url), { alias: { "@": root }, interopDefault: true })("@/lib/fleetQuoteDraft");
 
-test("matched van and midibus fares come from the checked rate book", () => {
-  const van = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士小車", hours: 10, passengerCount: 6 });
+test("a single checked trip can confirm the catalog fare and its own terms", () => {
+  const van = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份老街", vehicleHint: "賓士小車", hours: 10, passengerCount: 6 });
   assert.equal(van.amountTwd, 7000);
   assert.equal(van.sendsToCustomer, false);
-  assert.match(van.text, /7000 元/);
-  assert.match(van.text, /待確認/);
+  assert.match(van.text, /這筆車資可確認/);
+  assert.match(van.known.join("\n"), /含油資、過路費、停車費/);
+  assert.equal(van.pending.join("\n").includes("兒童"), false);
+  assert.equal(van.pending.join("\n").includes("住宿"), false);
+  assert.match(van.pending.join("\n"), /訂金/);
   assert.equal(van.text.includes("30%"), false);
   assert.equal(van.text.includes("昱境"), false);
 
-  const bus = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份老街", vehicleHint: "中巴", remark: "10小時" });
+  const bus = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "中巴", remark: "10小時", passengerCount: 12 });
   assert.equal(bus.amountTwd, 9000);
-  assert.match(bus.pending.join("\n"), /住宿補貼：待確認/);
+  assert.match(bus.known.join("\n"), /含駕駛薪資、過橋過路費、油資/);
+  assert.match(bus.known.join("\n"), /不含門票/);
+  assert.equal(bus.pending.join("\n").includes("住宿"), false);
+  assert.equal(bus.pending.join("\n").includes("一日遊價格未提供"), false);
+  assert.equal(bus.text.includes("7000"), false);
 });
 
-test("unknown route, wrong hours, and coach do not invent a fare", () => {
-  const other = draft.buildFleetQuoteDraft({ pickup: "高雄", destination: "墾丁", vehicleHint: "賓士", hours: 10 });
-  assert.equal(other.amountTwd, null);
-  assert.match(other.text, /沒有已核對車資/);
+test("missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare", () => {
+  const missingHours = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士", passengerCount: 4 });
+  assert.equal(missingHours.amountTwd, null);
+  assert.match(missingHours.text, /僅供參考/);
+  assert.match(missingHours.text, /不是可確認金額/);
+  assert.equal(missingHours.text.includes("這筆車資可確認"), false);
 
-  const long = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "小車", hours: 12 });
-  assert.equal(long.amountTwd, null);
-  assert.match(long.text, /不套用該車資/);
+  const multi = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份、野柳", vehicleHint: "賓士", hours: 10, passengerCount: 4 });
+  assert.equal(multi.amountTwd, null);
+  assert.equal(multi.text.includes("7000"), false);
+  assert.match(multi.text, /多點/);
 
-  const coach = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "42人座大巴", hours: 10 });
+  const via = draft.buildFleetQuoteDraft({ pickup: "高雄經台北", destination: "九份", vehicleHint: "中巴", hours: 10, passengerCount: 10 });
+  assert.equal(via.amountTwd, null);
+  assert.equal(via.text.includes("9000"), false);
+  assert.equal(via.text.includes("7000"), false);
+
+  const overload = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "賓士小車", hours: 10, passengerCount: 21 });
+  assert.equal(overload.amountTwd, null);
+  assert.equal(overload.text.includes("7000"), false);
+  assert.match(overload.text, /不改顯示小車價格/);
+
+  const coach = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "42人座大巴", hours: 10, passengerCount: 30 });
   assert.equal(coach.amountTwd, null);
+  assert.equal(coach.text.includes("7000"), false);
+  assert.equal(coach.text.includes("9000"), false);
   assert.equal(coach.text.includes("14000"), false);
-  assert.equal(coach.text.includes("14,000"), false);
 });
 
 test("draft routes do not send LINE", () => {
   const quoteRoute = readFileSync(path.join(root, "app/api/admin/quotes/[id]/draft/route.ts"), "utf8");
   const inquiryRoute = readFileSync(path.join(root, "app/api/admin/inquiries/[id]/draft/route.ts"), "utf8");
   const sendRoute = readFileSync(path.join(root, "app/api/admin/quotes/[id]/send/route.ts"), "utf8");
+  const generateRoute = readFileSync(path.join(root, "app/api/social/generate/route.ts"), "utf8");
   assert.equal(quoteRoute.includes("pushLineText"), false);
   assert.equal(inquiryRoute.includes("pushLineText"), false);
   assert.equal(inquiryRoute.includes("prisma.inquiry.update"), false);
   assert.match(sendRoute, /pushLineText/);
+  assert.match(generateRoute, /createContentDraft/);
+  assert.match(generateRoute, /publishBlocked: true/);
+  assert.equal(generateRoute.includes("pushLineText"), false);
+  assert.equal(generateRoute.includes("/api/social/publish"), false);
 });

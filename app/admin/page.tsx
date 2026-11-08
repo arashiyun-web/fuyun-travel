@@ -24,6 +24,11 @@ type HealthFeature = {
   line?: boolean;
   email?: boolean;
   livePublish?: boolean;
+  selected?: string | null;
+  missing?: string[];
+  unselected?: boolean;
+  functionalCheck?: string;
+  authorizationCheck?: string;
   env?: HealthFlag[];
   optional?: string[];
   notUsed?: string[];
@@ -60,6 +65,7 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [health, setHealth] = useState<Record<string, HealthFeature> | null>(null);
   const [healthError, setHealthError] = useState("");
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
 
   async function fetchDashboard(nextToken: string) {
     setLoadError("");
@@ -72,6 +78,7 @@ export default function AdminPage() {
       if (!response.ok || !data.success) throw new Error(data.error || "讀取失敗");
       setSummary(data.summary);
       setOrders(data.details);
+      setSummaryLoaded(true);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "登入成功，但資料讀取失敗");
     }
@@ -186,10 +193,10 @@ export default function AdminPage() {
   return (
     <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5 bg-slate-900 p-6 rounded-2xl border border-slate-800">
-        <Metric label="詢價筆數" value={String(summary.inquiries)} />
-        <Metric label="報價筆數" value={String(summary.quotes)} muted />
-        <Metric label="發布工作" value={String(summary.operationsJobs)} highlight />
-        <Metric label="待發／已發" value={`${summary.operationsQueued}／${summary.operationsPublished}`} success />
+        <Metric label="詢價筆數" value={summaryLoaded ? String(summary.inquiries) : "讀取中"} />
+        <Metric label="報價筆數" value={summaryLoaded ? String(summary.quotes) : "讀取中"} muted />
+        <Metric label="發布工作" value={summaryLoaded ? String(summary.operationsJobs) : "讀取中"} highlight />
+        <Metric label="待發／已發" value={summaryLoaded ? `${summary.operationsQueued}／${summary.operationsPublished}` : "讀取中"} success />
       </div>
 
       <SettingsStatus health={health} error={healthError} />
@@ -201,14 +208,16 @@ export default function AdminPage() {
             <button type="button" onClick={() => void logout()} className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:border-red-500/60 hover:text-red-300 transition-all">登出</button>
           </div>
           {loadError ? <div className="mb-4 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{loadError}</div> : null}
-          {orders.length ? orders.map((order) => (
+          {!summaryLoaded && !loadError ? <div className="text-center py-12 text-xs text-slate-500 tracking-wide">讀取中，數字還沒回來。</div> : null}
+          {summaryLoaded && orders.length ? orders.map((order) => (
             <div key={order.order_id} className="p-4 rounded-xl border bg-slate-950 border-slate-800 mb-3">
               <div className="flex justify-between items-center">
                 <span className="font-mono font-bold text-amber-400">{order.order_id}</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">{order.order_status} 筆</span>
               </div>
             </div>
-          )) : <div className="text-center py-12 text-xs text-slate-600 tracking-wide">目前沒有發布工作。</div>}
+          )) : null}
+          {summaryLoaded && orders.length === 0 ? <div className="text-center py-12 text-xs text-slate-600 tracking-wide">目前沒有發布工作。</div> : null}
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
@@ -230,6 +239,9 @@ export default function AdminPage() {
             </button>
             <button type="button" onClick={() => window.location.assign("/admin/quotes")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               報價草稿
+            </button>
+            <button type="button" onClick={() => window.location.assign("/admin/members")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              會員
             </button>
             <button type="button" onClick={openOperations} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               營運發布
@@ -260,21 +272,17 @@ function SettingsStatus({ health, error }: { health: Record<string, HealthFeatur
       </div>
       {error ? <div className="p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{error}</div> : null}
       {health ? Object.entries(health).map(([key, feature]) => {
-        const skip = new Set([...(feature.optional || []), ...(feature.notUsed || []), ...(feature.emailOptional || [])]);
-        const either = feature.lineEither || [];
-        const eitherReady = either.some((name) => feature.env?.some((item) => item.name === name && item.set));
-        const missing = (feature.env || []).filter((item) => !item.set && !skip.has(item.name) && !(either.includes(item.name) && eitherReady));
-        const eitherMissing = either.length > 0 && !eitherReady;
-        const ready = feature.ready ?? ((feature.line || feature.email) ? true : false);
+        const ready = Boolean(feature.ready);
         return (
           <div key={key} className="border border-slate-800 rounded-xl p-3">
-            <p className="text-sm text-slate-200">{featureLabels[key] || key}：{ready ? "已設定" : "未完成"}{key === "scheduler" ? `；正式發布開關${feature.livePublish ? "已打開" : "未打開"}` : ""}{key === "inquiryNotify" ? `；LINE ${feature.line ? "已設定" : "未設定"}，Email ${feature.email ? "已設定" : "未設定"}` : ""}</p>
-            {eitherMissing ? <p className="text-xs text-amber-300 mt-1">擇一即可：LINE_ADMIN_USER_ID 或 ADMIN_LINE_USER_ID</p> : null}
-            {missing.filter((item) => !either.includes(item.name)).length ? <p className="text-xs text-amber-300 mt-1">未填：{missing.filter((item) => !either.includes(item.name)).map((item) => item.name).join("、")}</p> : null}
+            <p className="text-sm text-slate-200">{featureLabels[key] || key}：{ready ? "名稱已填" : "名稱未完成"}{key === "scheduler" ? `；正式發布開關${feature.livePublish ? "已打開" : "未打開"}` : ""}{feature.selected ? `；使用 ${feature.selected}` : ""}</p>
+            <p className="text-xs text-slate-500 mt-1">功能實測：{feature.functionalCheck === "not_tested" ? "未實測" : feature.functionalCheck || "未實測"}。授權狀態：{feature.authorizationCheck === "not_tested" ? "未實測" : feature.authorizationCheck || "未實測"}。名稱有填不代表已經測過或已授權。</p>
+            {feature.unselected ? <p className="text-xs text-amber-300 mt-1">尚未選擇文案供應商。填上一對即可，另外兩家未填不用列成缺項。</p> : null}
+            {feature.missing?.length ? <p className="text-xs text-amber-300 mt-1">未填：{feature.missing.join("、")}</p> : null}
             {key === "imageUpload" ? <p className="text-xs text-slate-500 mt-1">可省略：R2_ENDPOINT。位址可由 R2_ACCOUNT_ID 組成。</p> : null}
-            {key === "inquiryNotify" ? <p className="text-xs text-slate-500 mt-1">可省略：SMTP_PORT（預設 587）、INQUIRY_TO_EMAIL 與 INQUIRY_FROM_EMAIL（未填時用 SMTP_USER）。</p> : null}
-            {feature.notUsed?.length ? <p className="text-xs text-slate-500 mt-1">不採用：{feature.notUsed.join("、")}。X 發文要用使用者授權的四組金鑰，不能用 app-only bearer。</p> : null}
-            {key === "instagramLogin" ? <p className="text-xs text-slate-500 mt-1">帳號 token 在完成一次 Instagram 登入後寫入系統，不必另外貼進環境變數。</p> : null}
+            {key === "inquiryNotify" ? <p className="text-xs text-slate-500 mt-1">LINE 收件人擇一。寄信可省略 SMTP_PORT、INQUIRY_TO_EMAIL、INQUIRY_FROM_EMAIL。</p> : null}
+            {feature.notUsed?.length ? <p className="text-xs text-slate-500 mt-1">不採用：{feature.notUsed.join("、")}。X 發文要使用者可寫入的四組金鑰，不能用 app-only bearer。金鑰存在也不代表寫入授權已測過。</p> : null}
+            {key === "instagramLogin" ? <p className="text-xs text-slate-500 mt-1">帳號 token 在完成一次 Instagram 登入後寫入系統。登入與否要另外看授權狀態，這裡沒有代測。</p> : null}
           </div>
         );
       }) : <p className="text-xs text-slate-600">尚未讀到設定狀態。</p>}

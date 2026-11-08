@@ -17,26 +17,47 @@ export function selectedCopyProvider(): CopyProvider {
   throw new CopywriterUnavailableError();
 }
 
-export async function generateCopy(input: { system?: string; user: string }): Promise<string> {
+const GEMINI_TIMEOUT_MS = 20_000;
+
+export async function generateCopy(
+  input: { system?: string; user: string },
+  options?: { fetchImpl?: typeof fetch; timeoutMs?: number },
+): Promise<string> {
   const provider = selectedCopyProvider();
   if (provider === "gemini") {
     const model = process.env.GEMINI_MODEL!.trim();
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GEMINI_API_KEY!.trim(),
-      },
-      body: JSON.stringify({
-        systemInstruction: input.system ? { parts: [{ text: input.system }] } : undefined,
-        contents: [{ role: "user", parts: [{ text: input.user }] }],
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
-    if (!response.ok) throw new Error(data.error?.message || `Gemini 回應 ${response.status}`);
-    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() || "";
-    if (!text) throw new Error("文案供應商沒有回傳內容");
-    return text;
+    const apiKey = process.env.GEMINI_API_KEY!.trim();
+    const fetchImpl = options?.fetchImpl || fetch;
+    const controller = new AbortController();
+    const timeoutMs = options?.timeoutMs ?? GEMINI_TIMEOUT_MS;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: input.system ? { parts: [{ text: input.system }] } : undefined,
+          contents: [{ role: "user", parts: [{ text: input.user }] }],
+        }),
+        signal: controller.signal,
+      });
+      const data = (await response.json().catch(() => ({}))) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
+      if (!response.ok) {
+        const message = data.error?.message || `Gemini 回應 ${response.status}`;
+        throw new Error(message.includes(apiKey) ? `Gemini 回應 ${response.status}` : message);
+      }
+      const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() || "";
+      if (!text) throw new Error("文案供應商沒有回傳內容");
+      return text;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw new Error("Gemini 逾時，沒有取得文案");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
   if (provider === "anthropic") {
     const client = new Anthropic({
