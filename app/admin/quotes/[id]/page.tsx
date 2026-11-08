@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
 
-type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; source: string };
+type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; minAmountTwd?: number | null; maxAmountTwd?: number | null; source: string };
 type Decision = { decision: "" | "amount" | "not_applicable"; amount: string; quantity: string; reason: string };
 type OrderView = {
   status: string;
@@ -133,6 +133,12 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     try {
       const items = orderView.items.map((item) => {
         const decision = decisions[item.key] || { decision: "", amount: "", quantity: "", reason: "" };
+        if (decision.decision === "amount" && typeof item.minAmountTwd === "number" && typeof item.maxAmountTwd === "number") {
+          const amount = Number(decision.amount);
+          if (!Number.isInteger(amount) || amount < item.minAmountTwd || amount > item.maxAmountTwd) {
+            throw new Error(`「${item.label}」已核對是 ${item.minAmountTwd}–${item.maxAmountTwd} 元，不能填這個範圍以外。`);
+          }
+        }
         return {
           key: item.key,
           decision: decision.decision,
@@ -225,13 +231,13 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
             return (
               <div key={item.key} className="border border-slate-800 rounded-xl p-3 space-y-2">
                 <p className="text-sm text-slate-200">{item.label}{item.role === "payment" ? "（訂金，不計入車資總額）" : ""}</p>
-                <p className="text-xs text-slate-500">{item.source}{item.unitAmountTwd != null ? ` 已知每${item.quantityLabel} ${item.unitAmountTwd} 元。` : " 沒有固定單價，不自動帶入。"}</p>
+                <p className="text-xs text-slate-500">{item.source}{item.unitAmountTwd != null ? ` 已知每${item.quantityLabel} ${item.unitAmountTwd} 元。` : typeof item.minAmountTwd === "number" && typeof item.maxAmountTwd === "number" ? ` 已核對範圍 ${item.minAmountTwd}–${item.maxAmountTwd} 元。` : " 沒有固定單價，不自動帶入。"}</p>
                 <div className="flex flex-wrap gap-3 text-xs text-slate-300">
                   <label><input type="radio" name={item.key} checked={decision.decision === "amount"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "amount" } })} /> {item.role === "payment" ? "記下訂金" : "填入金額"}</label>
                   <label><input type="radio" name={item.key} checked={decision.decision === "not_applicable"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "not_applicable" } })} /> 本趟不適用</label>
                 </div>
                 {decision.decision === "amount" && item.quantityLabel ? <input value={decision.quantity} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, quantity: event.target.value } })} placeholder={`${item.quantityLabel}數`} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
-                {decision.decision === "amount" ? <input value={decision.amount} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, amount: event.target.value } })} placeholder="整數金額" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
+                {decision.decision === "amount" ? <input type="number" min={typeof item.minAmountTwd === "number" ? item.minAmountTwd : 0} max={typeof item.maxAmountTwd === "number" ? item.maxAmountTwd : undefined} value={decision.amount} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, amount: event.target.value } })} placeholder={typeof item.minAmountTwd === "number" && typeof item.maxAmountTwd === "number" ? `${item.minAmountTwd}–${item.maxAmountTwd}` : "整數金額"} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
                 {decision.decision === "not_applicable" ? <input value={decision.reason} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, reason: event.target.value } })} placeholder="具體原因，空白不算" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
               </div>
             );

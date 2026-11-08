@@ -45,6 +45,9 @@ export type CatalogFee = {
   /** Null when no unit rate was given. Never invent one. */
   unitAmountTwd: number | null;
   quantityLabel: "晚" | "餐" | "小時" | "次" | null;
+  /** Inclusive checked range. Absent when the catalog did not give one. */
+  minAmountTwd?: number | null;
+  maxAmountTwd?: number | null;
   source: string;
 };
 
@@ -235,7 +238,7 @@ const quoteBook: FleetQuoteRecord[] = [
       { id: "tax", label: "稅金", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
       { id: "meals", label: "司機餐點", role: "surcharge", unitAmountTwd: 200, quantityLabel: "餐", source: "司機餐點由客人負責，或每餐補貼 200 元。" },
       { id: "driver-lodging", label: "司機住宿補貼", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "遠程無法當天往返需安排司機住宿。住宿補貼金額未提供，不得沿用小車每晚 1500 元。" },
-      { id: "night", label: "22:00–06:30 加價", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "22:00–06:30 依行程加 500–2000 元，不是單一固定價。" },
+      { id: "night", label: "22:00–06:30 加價", role: "surcharge", unitAmountTwd: null, quantityLabel: null, minAmountTwd: 500, maxAmountTwd: 2000, source: "22:00–06:30 依行程加 500–2000 元，不是單一固定價。" },
       { id: "overtime", label: "超時", role: "surcharge", unitAmountTwd: 800, quantityLabel: "小時", source: "台北、新北超時每小時 800 元。不足 1 小時以 1 小時計。時間包含報到、行駛、等待待命。" },
       { id: "pickup-sign", label: "接機舉牌", role: "included", unitAmountTwd: null, quantityLabel: null, source: "接機舉牌免費。送機超過約定出發時間，每 30 分鐘加 500 元。接送機等待超過 45 分鐘可以終止。" },
       { id: "dropoff-wait", label: "送機超過約定出發時間", role: "surcharge", unitAmountTwd: 500, quantityLabel: "次", source: "接機舉牌免費。送機超過約定出發時間，每 30 分鐘加 500 元。接送機等待超過 45 分鐘可以終止。" },

@@ -150,6 +150,9 @@ function pricedAmount(item: ReviewItem, decision: StaffDecision): number | strin
     const expected = item.unitAmountTwd * decision.quantity;
     if (decision.amountTwd !== expected) return `「${item.label}」已知每${item.quantityLabel} ${item.unitAmountTwd} 元，金額必須是 ${expected}。`;
   }
+  if (typeof item.minAmountTwd === "number" && typeof item.maxAmountTwd === "number" && (decision.amountTwd < item.minAmountTwd || decision.amountTwd > item.maxAmountTwd)) {
+    return `「${item.label}」已核對是 ${item.minAmountTwd}–${item.maxAmountTwd} 元，不能填這個範圍以外。`;
+  }
   return decision.amountTwd;
 }
 

@@ -202,6 +202,76 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     assert.equal(busPricedBody.order.status, "staff_priced");
     assert.equal(busPricedBody.customerAccepted, false);
     assert.equal(busPricedBody.paid, false);
+    const night = busItems.find((item) => item.id === "night");
+    assert.equal(night.minAmountTwd, 500);
+    assert.equal(night.maxAmountTwd, 2000);
+    async function priceNight(amount) {
+      const row = await prisma.charterQuote.create({
+        data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北", destination: "九份", passengerCount: 12, remark: "10小時", recommendedVehicle: "中巴" },
+      });
+      assert.equal((await callOrder(row.id)).status, 200);
+      const response = await callPrice(row.id, {
+        items: busItems.map((item) => item.id === "night"
+          ? { key: item.key, decision: "amount", amountTwd: amount }
+          : { key: item.key, decision: "not_applicable", reason: "本趟沒有這項費用" }),
+        totalAmountTwd: 9000 + amount,
+      });
+      const body = await response.json();
+      const stored = await prisma.charterOrder.findUnique({ where: { quoteId: row.id } });
+      return { response, body, stored };
+    }
+    for (const amount of [0, 1, 499, 2001]) {
+      const result = await priceNight(amount);
+      assert.equal(result.response.status, 409, String(amount));
+      assert.match(result.body.error, /500–2000/);
+      assert.equal(result.stored.status, "pending_confirmation");
+      assert.equal(result.stored.totalAmountTwd, null);
+    }
+    for (const amount of [500, 2000]) {
+      const result = await priceNight(amount);
+      assert.equal(result.response.status, 200, String(amount));
+      assert.equal(result.body.order.status, "staff_priced");
+      assert.equal(result.stored.totalAmountTwd, 9000 + amount);
+    }
+    const nightSkipped = await priceNight(0);
+    assert.equal(nightSkipped.response.status, 409);
+    const nightFree = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北", destination: "九份", passengerCount: 12, remark: "10小時", recommendedVehicle: "中巴" },
+    });
+    assert.equal((await callOrder(nightFree.id)).status, 200);
+    const nightNa = await callPrice(nightFree.id, {
+      items: busItems.map((item) => ({ key: item.key, decision: "not_applicable", reason: item.id === "night" ? "本趟不經過 22:00–06:30" : "本趟沒有這項費用" })),
+      totalAmountTwd: 9000,
+    });
+    const nightNaBody = await nightNa.json();
+    assert.equal(nightNa.status, 200);
+    assert.equal(nightNaBody.order.status, "staff_priced");
+    assert.equal(nightNaBody.order.totalAmountTwd, 9000);
+
+    const lodgingQuote = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
+    });
+    assert.equal((await callOrder(lodgingQuote.id)).status, 200);
+    const lodgingItems = draftLib.reviewItems(draftLib.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", remark: "10小時", vehicleHint: "賓士小車", passengerCount: 6 }));
+    const lodgingBody = (nights, amount, total) => ({
+      items: lodgingItems.map((item) => {
+        if (item.id === "lodging") return { key: item.key, decision: "amount", quantity: nights, amountTwd: amount };
+        if (item.id === "deposit") return { key: item.key, decision: "amount", amountTwd: 0 };
+        return { key: item.key, decision: "not_applicable", reason: "本趟沒有這項費用" };
+      }),
+      totalAmountTwd: total,
+    });
+    const lodgingWrong = await callPrice(lodgingQuote.id, lodgingBody(2, 2000, 9000));
+    const lodgingWrongBody = await lodgingWrong.json();
+    assert.equal(lodgingWrong.status, 409);
+    assert.match(lodgingWrongBody.error, /1500/);
+    assert.equal((await prisma.charterOrder.findUnique({ where: { quoteId: lodgingQuote.id } })).status, "pending_confirmation");
+    const lodgingRight = await callPrice(lodgingQuote.id, lodgingBody(2, 3000, 10000));
+    const lodgingRightBody = await lodgingRight.json();
+    assert.equal(lodgingRight.status, 200);
+    assert.equal(lodgingRightBody.order.totalAmountTwd, 10000);
+    assert.equal(lodgingRightBody.order.reviewJson.depositAmountTwd, 0);
+    assert.equal(lodgingRightBody.order.reviewJson.surchargeTwd, 3000);
 
     const parallelQuote = await prisma.charterQuote.create({
       data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
