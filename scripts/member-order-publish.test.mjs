@@ -116,15 +116,41 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     assert.equal(createdBody.order.totalAmountTwd, null);
     assert.equal(createdBody.order.status, "pending_confirmation");
     assert.equal(createdBody.sendsToCustomer, false);
-    const confirmBase = await orderRoute.POST(new Request(`http://127.0.0.1/api/admin/quotes/${quote.id}/order`, {
+    const priceRoute = jiti("@/app/api/admin/quotes/[id]/order/staff-price/route.ts");
+    const draftLib = jiti("@/lib/fleetQuoteDraft");
+    const callPrice = (id, body) => priceRoute.POST(new Request(`http://127.0.0.1/api/admin/quotes/${id}/order/staff-price`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ confirmCompleteQuote: true, totalAmountTwd: 7000 }),
-    }), { params: { id: quote.id } });
-    const confirmBaseBody = await confirmBase.json();
-    assert.equal(confirmBase.status, 409);
-    assert.match(confirmBaseBody.error, /訂金|總價|確認/);
+      body: JSON.stringify(body),
+    }), { params: { id } });
+    const vanDraft = draftLib.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", remark: "10小時", vehicleHint: "賓士小車", passengerCount: 6 });
+    const vanItems = draftLib.reviewItems(vanDraft);
+    assert.ok(vanItems.length > 0);
+    const blank = await callPrice(quote.id, { items: vanItems.map((item) => ({ key: item.key, decision: "not_applicable", reason: "  " })), totalAmountTwd: 7000 });
+    assert.equal(blank.status, 409);
     assert.equal((await prisma.charterOrder.findUnique({ where: { quoteId: quote.id } })).status, "pending_confirmation");
+    const missing = await callPrice(quote.id, { items: [], totalAmountTwd: 7000 });
+    assert.equal(missing.status, 409);
+    const deposit = 200;
+    const priced = await callPrice(quote.id, {
+      items: vanItems.map((item) => ({ key: item.key, decision: "amount", amountTwd: deposit })),
+      totalAmountTwd: 7000 + deposit * vanItems.length,
+    });
+    const pricedBody = await priced.json();
+    assert.equal(priced.status, 200);
+    assert.equal(pricedBody.updated, true);
+    assert.equal(pricedBody.order.status, "staff_priced");
+    assert.equal(pricedBody.customerAccepted, false);
+    assert.equal(pricedBody.paid, false);
+    assert.equal(pricedBody.sendsToCustomer, false);
+    assert.equal(pricedBody.order.totalAmountTwd, 7000 + deposit * vanItems.length);
+    const rewrite = await callPrice(quote.id, { items: vanItems.map((item) => ({ key: item.key, decision: "amount", amountTwd: 1 })), totalAmountTwd: 1 });
+    const rewriteBody = await rewrite.json();
+    assert.equal(rewrite.status, 200);
+    assert.equal(rewriteBody.updated, false);
+    const storedOrder = await prisma.charterOrder.findUnique({ where: { quoteId: quote.id } });
+    if (!storedOrder || storedOrder.totalAmountTwd == null) throw new Error(`stored ${JSON.stringify(storedOrder)} body ${JSON.stringify(pricedBody.order)}`);
+    assert.equal(storedOrder.totalAmountTwd, 7000 + deposit * vanItems.length);
     const again = await callOrder(quote.id);
     const againBody = await again.json();
     assert.equal(again.status, 200);
@@ -146,21 +172,27 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     const midibus = await prisma.charterQuote.create({
       data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北", destination: "九份", passengerCount: 12, remark: "10小時", recommendedVehicle: "中巴" },
     });
-    const midibusConfirm = await orderRoute.POST(new Request(`http://127.0.0.1/api/admin/quotes/${midibus.id}/order`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ confirmCompleteQuote: true, totalAmountTwd: 12000 }),
-    }), { params: { id: midibus.id } });
-    const midibusConfirmBody = await midibusConfirm.json();
-    assert.equal(midibusConfirm.status, 409);
-    assert.match(midibusConfirmBody.error, /餐|停車|稅/);
-    assert.equal(await prisma.charterOrder.count({ where: { quoteId: midibus.id } }), 0);
     const midibusPending = await callOrder(midibus.id);
     const midibusPendingBody = await midibusPending.json();
     assert.equal(midibusPending.status, 200);
     assert.equal(midibusPendingBody.order.status, "pending_confirmation");
     assert.equal(midibusPendingBody.order.baseAmountTwd, 9000);
     assert.equal(midibusPendingBody.order.totalAmountTwd, null);
+    const busDraft = draftLib.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", remark: "10小時", vehicleHint: "中巴", passengerCount: 12 });
+    const busItems = draftLib.reviewItems(busDraft);
+    assert.match(busItems.map((item) => item.label).join("\n"), /餐點|停車|稅/);
+    const busSkipped = await callPrice(midibus.id, { items: busItems.slice(0, Math.max(0, busItems.length - 1)).map((item) => ({ key: item.key, decision: "not_applicable", reason: "本趟由客人自理" })), totalAmountTwd: 9000 });
+    assert.equal(busSkipped.status, 409);
+    assert.equal((await prisma.charterOrder.findUnique({ where: { quoteId: midibus.id } })).status, "pending_confirmation");
+    const busPriced = await callPrice(midibus.id, {
+      items: busItems.map((item) => ({ key: item.key, decision: "not_applicable", reason: "本趟由客人自理，不另計" })),
+      totalAmountTwd: 9000,
+    });
+    const busPricedBody = await busPriced.json();
+    assert.equal(busPriced.status, 200);
+    assert.equal(busPricedBody.order.status, "staff_priced");
+    assert.equal(busPricedBody.customerAccepted, false);
+    assert.equal(busPricedBody.paid, false);
 
     const parallelQuote = await prisma.charterQuote.create({
       data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
@@ -178,13 +210,31 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     const rollbackQuote = await prisma.charterQuote.create({
       data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
     });
-    const rolled = await ordersLib.convertConfirmedQuote(rollbackQuote.id, {}, {
+    const rolled = await ordersLib.convertConfirmedQuote(rollbackQuote.id, {
       beforeQuoteUpdate: async (tx) => { await tx.charterQuote.delete({ where: { id: rollbackQuote.id } }); },
     });
     assert.equal(rolled.ok, false);
     assert.equal(rolled.status, 409);
     assert.equal(await prisma.charterOrder.count({ where: { quoteId: rollbackQuote.id } }), 0);
     assert.ok(await prisma.charterQuote.findUnique({ where: { id: rollbackQuote.id } }));
+
+    const raced = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
+    });
+    let releaseLock;
+    const lockHeld = new Promise((resolve) => { releaseLock = resolve; });
+    const holder = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM charter_quotes WHERE id = ${raced.id} FOR UPDATE`;
+      releaseLock();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await tx.charterQuote.update({ where: { id: raced.id }, data: { passengerCount: 10 } });
+    });
+    await lockHeld;
+    const racedOrder = await ordersLib.convertConfirmedQuote(raced.id);
+    await holder;
+    assert.equal(racedOrder.ok, false);
+    assert.equal(racedOrder.status, 409);
+    assert.equal(await prisma.charterOrder.count({ where: { quoteId: raced.id } }), 0);
     await prisma.$disconnect();
     await assertPublishFlow();
   } finally {

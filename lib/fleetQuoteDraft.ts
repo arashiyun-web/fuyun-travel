@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { confirmedVehicleRate, fleetQuoteRecord, type FleetRateId } from "@/lib/fleetCatalog";
 
 export type QuoteDraftInput = {
@@ -40,6 +41,21 @@ export function capacityFor(slug: string, count: number | null): CapacityState {
     return "pending";
   }
   return "pending";
+}
+
+export type ReviewItem = { key: string; label: string; kind: "pending" | "exclusion" };
+
+export function reviewItemKey(label: string) {
+  return createHash("sha256").update(label).digest("hex").slice(0, 16);
+}
+
+/** Lines a person must price or explicitly mark inapplicable before an internal total can be saved. */
+export function reviewItems(draft: Pick<FleetQuoteDraft, "known" | "pending">): ReviewItem[] {
+  const items: ReviewItem[] = draft.pending.map((label) => ({ key: reviewItemKey(label), label, kind: "pending" }));
+  for (const label of draft.known) {
+    if (/不含|餐點|稅金|實報實銷/.test(label)) items.push({ key: reviewItemKey(label), label, kind: "exclusion" });
+  }
+  return items;
 }
 
 export function orderConfirmationBlock(draft: Pick<FleetQuoteDraft, "amountTwd" | "known" | "pending" | "capacity">) {

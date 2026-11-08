@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/adminAuth";
+import { exactTrue } from "@/lib/liveSwitch";
 import { diagnoseInstagramAuthorization } from "@/lib/social/insta-diag";
 
 export const runtime = "nodejs";
@@ -14,6 +15,6 @@ export async function GET(request: Request) {
     state: result.state,
     expiresAt: result.expiresAt ?? null,
     fields: result.config.fields.map((field) => ({ field: field.field, status: field.status, note: field.note })),
-    livePublishEnabled: process.env.OPERATIONS_LIVE_PUBLISH_ENABLED === "true",
+    livePublishEnabled: exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED),
   });
 }

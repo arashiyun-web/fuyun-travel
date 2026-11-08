@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
 
+type ReviewItem = { key: string; label: string; kind: string };
+type Decision = { decision: "" | "amount" | "not_applicable"; amount: string; reason: string };
+type OrderView = {
+  status: string;
+  baseAmountTwd: number;
+  totalAmountTwd: number | null;
+  stale: boolean;
+  items: ReviewItem[];
+};
+
 type Quote = {
   id: string;
   tripDate: string | null;
@@ -23,6 +33,10 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [orderBusy, setOrderBusy] = useState(false);
+  const [pricingBusy, setPricingBusy] = useState(false);
+  const [orderView, setOrderView] = useState<OrderView | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [totalInput, setTotalInput] = useState("");
 
   async function loadQuote() {
     const response = await fetch(`/api/admin/quotes/${params.id}`, { cache: "no-store" });
@@ -66,6 +80,30 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     setMessage("已寫入後台草稿，尚未送給客人。待確認項目留在草稿裡，沒有猜成總價。");
   }
 
+  async function loadOrder() {
+    const response = await fetch(`/api/admin/quotes/${params.id}/order`, { cache: "no-store" });
+    const data = await response.json();
+    if (response.status === 404) {
+      setOrderView(null);
+      return;
+    }
+    if (!response.ok || !data.success) throw new Error(data.error || "訂單讀取失敗");
+    setOrderView({
+      status: data.order.status,
+      baseAmountTwd: data.baseAmountTwd,
+      totalAmountTwd: data.totalAmountTwd,
+      stale: Boolean(data.stale),
+      items: data.items || [],
+    });
+    setDecisions((current) => {
+      const next = { ...current };
+      for (const item of data.items || []) {
+        if (!next[item.key]) next[item.key] = { decision: "", amount: "", reason: "" };
+      }
+      return next;
+    });
+  }
+
   async function makeOrder() {
     if (!quote || orderBusy) return;
     setOrderBusy(true);
@@ -77,8 +115,39 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
       if (!response.ok || !data.success) throw new Error(data.error || "轉成訂單失敗");
       setMessage(data.created ? "已記下待確認訂單。這只是基本車資，不是總價，也還沒送給客人。" : "這筆報價已經有待確認訂單，沒有再新增一筆。");
       await loadQuote();
+      await loadOrder();
     } finally {
       setOrderBusy(false);
+    }
+  }
+
+  async function saveStaffPrice() {
+    if (!orderView || pricingBusy || orderView.stale || orderView.status === "staff_priced") return;
+    setPricingBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const items = orderView.items.map((item) => {
+        const decision = decisions[item.key] || { decision: "", amount: "", reason: "" };
+        return {
+          key: item.key,
+          decision: decision.decision,
+          amountTwd: decision.decision === "amount" && decision.amount.trim() !== "" ? Number(decision.amount) : undefined,
+          reason: decision.reason,
+        };
+      });
+      const response = await fetch(`/api/admin/quotes/${params.id}/order/staff-price`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, totalAmountTwd: totalInput.trim() === "" ? undefined : Number(totalInput) }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "內部核定失敗");
+      setMessage(data.updated ? "已存成內部核定。這不是客人已同意，也不是已付款，沒有送出訊息。" : "這筆訂單已經內部核定，金額沒有再改。");
+      await loadOrder();
+      await loadQuote();
+    } finally {
+      setPricingBusy(false);
     }
   }
 
@@ -94,7 +163,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   }
 
   useEffect(() => {
-    loadQuote().catch((err) => setError(err instanceof Error ? err.message : "讀取失敗"));
+    loadQuote().then(() => loadOrder()).catch((err) => setError(err instanceof Error ? err.message : "讀取失敗"));
   }, []);
 
   if (error && !quote) return <div className="p-6 text-red-300">{error}</div>;
@@ -138,6 +207,31 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {orderView ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <h2 className="text-base font-medium text-amber-400">內部核定</h2>
+          <p className="text-xs text-slate-500">狀態：{orderView.status === "staff_priced" ? "內部已核定。這不是客人已同意，也不是已付款。" : "待確認。尚未內部核定。"} 基本車資 {orderView.baseAmountTwd} 元。總價 {orderView.totalAmountTwd == null ? "尚未填入" : `${orderView.totalAmountTwd} 元`}。不會送出訊息，也不會改已核對的車資表。</p>
+          {orderView.stale ? <p className="text-sm text-amber-300">報價已變更，不能用這份訂單核定。請先處理版本衝突。</p> : null}
+          {orderView.items.map((item) => {
+            const decision = decisions[item.key] || { decision: "", amount: "", reason: "" };
+            return (
+              <div key={item.key} className="border border-slate-800 rounded-xl p-3 space-y-2">
+                <p className="text-sm text-slate-200">{item.label}</p>
+                <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                  <label><input type="radio" name={item.key} checked={decision.decision === "amount"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "amount" } })} /> 填入金額</label>
+                  <label><input type="radio" name={item.key} checked={decision.decision === "not_applicable"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "not_applicable" } })} /> 本趟不適用</label>
+                </div>
+                {decision.decision === "amount" ? <input value={decision.amount} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, amount: event.target.value } })} placeholder="整數金額" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
+                {decision.decision === "not_applicable" ? <input value={decision.reason} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, reason: event.target.value } })} placeholder="原因，空白不算" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
+              </div>
+            );
+          })}
+          <label className="block text-xs text-slate-400">人員填入的總價（基本車資加附加費）</label>
+          <input value={totalInput} onChange={(event) => setTotalInput(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200" />
+          <button type="button" disabled={pricingBusy || orderView.stale || orderView.status === "staff_priced"} onClick={() => saveStaffPrice().catch((err) => setError(err instanceof Error ? err.message : "內部核定失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">儲存內部核定</button>
+        </div>
+      ) : null}
     </div>
   );
 }

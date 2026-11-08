@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/adminAuth";
 import { FACEBOOK_GROUP_URL, resolveInstagramAccountId } from "@/lib/operations/shared";
 import { diagnoseInstagramAuthorization } from "@/lib/social/insta-diag";
+import { exactTrue } from "@/lib/liveSwitch";
 import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 /** What the deployment will actually do with approved, due jobs. Names/states only, never secret values. */
 export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  const live = process.env.OPERATIONS_LIVE_PUBLISH_ENABLED === "true";
+  const live = exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED);
   const instagram = await diagnoseInstagramAuthorization().catch(() => null);
   return NextResponse.json({
     success: true,

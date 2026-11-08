@@ -92,6 +92,10 @@ test("health report is booleans and names only", () => {
   assert.equal(health.publishingHealth().scheduler.livePublish, false);
   process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "true";
   assert.equal(health.publishingHealth().scheduler.livePublish, true);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = " true ";
+  assert.equal(health.publishingHealth().scheduler.livePublish, false);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "true ";
+  assert.equal(health.publishingHealth().scheduler.livePublish, false);
   process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "false";
   assert.equal(report.copywriting.selected, "openai");
   assert.deepEqual(report.copywriting.missing, []);

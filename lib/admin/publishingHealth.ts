@@ -1,3 +1,5 @@
+import { exactTrue } from "@/lib/liveSwitch";
+
 export type EnvFlag = { name: string; set: boolean };
 export type CheckState = "not_tested";
 
@@ -11,9 +13,9 @@ function flag(name: string): EnvFlag {
   return { name, set: Boolean(value) && !/^false$/i.test(value) };
 }
 
-/** Same rule as publishing: only the exact string true turns a switch on. */
+/** Only the exact characters true. Leading or trailing spaces stay off. */
 export function envEnabled(name: string) {
-  return raw(name) === "true";
+  return exactTrue(process.env[name]);
 }
 
 const COPY_PAIRS = [
