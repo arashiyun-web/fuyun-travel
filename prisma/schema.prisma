@@ -26,6 +26,20 @@ model CharterQuote {
   @@map("charter_quotes")
 }
 
+/// Passenger charter order created from a confirmed quote. Not a dispatch or driver record.
+model CharterOrder {
+  id           String   @id @default(cuid())
+  quoteId      String   @unique @map("quote_id")
+  lineUid      String   @map("line_uid")
+  amountTwd    Int      @map("amount_twd")
+  vehicleLabel String   @map("vehicle_label")
+  routeLabel   String   @map("route_label")
+  status       String   @default("confirmed")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("charter_orders")
+}
+
 model AiConversation {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now()) @map("created_at")
