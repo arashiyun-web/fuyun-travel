@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { Prisma } from "@prisma/client";
-import { buildFleetQuoteDraft, reviewItems, type FleetQuoteDraft, type ReviewItem } from "@/lib/fleetQuoteDraft";
+import { buildFleetQuoteDraft, reviewItems, vehicleFees, type FleetQuoteDraft, type ReviewItem } from "@/lib/fleetQuoteDraft";
 import { prisma } from "@/lib/prisma";
 
 export class CharterOrderUnavailableError extends Error {
@@ -31,6 +31,7 @@ export type StaffDecision = {
   key?: unknown;
   decision?: unknown;
   amountTwd?: unknown;
+  quantity?: unknown;
   reason?: unknown;
 };
 
@@ -138,6 +139,20 @@ export function describeOrder(order: { baseAmountTwd: number; totalAmountTwd: nu
   };
 }
 
+function pricedAmount(item: ReviewItem, decision: StaffDecision): number | string {
+  if (typeof decision.amountTwd !== "number" || !Number.isInteger(decision.amountTwd) || decision.amountTwd < 0) {
+    return `「${item.label}」要由人員填入零或正整數，空白不算。`;
+  }
+  if (item.unitAmountTwd != null && item.quantityLabel) {
+    if (typeof decision.quantity !== "number" || !Number.isInteger(decision.quantity) || decision.quantity < 1) {
+      return `「${item.label}」要填${item.quantityLabel}數。不自行假設晚數、餐數或小時。`;
+    }
+    const expected = item.unitAmountTwd * decision.quantity;
+    if (decision.amountTwd !== expected) return `「${item.label}」已知每${item.quantityLabel} ${item.unitAmountTwd} 元，金額必須是 ${expected}。`;
+  }
+  return decision.amountTwd;
+}
+
 function cleanReason(value: unknown) {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -146,7 +161,7 @@ function cleanReason(value: unknown) {
 }
 
 /** Saves an internal staff total. Does not mean the guest agreed or paid, and does not send anything. */
-export async function priceStaffOrder(quoteId: string, input: { items?: unknown; totalAmountTwd?: unknown }) {
+export async function priceStaffOrder(quoteId: string, input: { items?: unknown; totalAmountTwd?: unknown }, hooks?: ConvertHooks) {
   try {
     const outcome = await prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM charter_quotes WHERE id = ${quoteId} FOR UPDATE`;
@@ -171,21 +186,23 @@ export async function priceStaffOrder(quoteId: string, input: { items?: unknown;
         byKey.set(decision.key, decision);
       }
       if (decisions.length !== required.length) return { refused: "還有未處理的條件，不能核定。" };
-      const stored: Array<{ key: string; label: string; decision: "amount" | "not_applicable"; amountTwd: number | null; reason: string | null }> = [];
+      const stored: Array<{ key: string; label: string; role: string; decision: "amount" | "not_applicable"; amountTwd: number | null; quantity: number | null; reason: string | null }> = [];
       let surcharge = 0;
+      let depositAmountTwd: number | null = null;
       for (const item of required) {
         const decision = byKey.get(item.key);
         if (!decision) return { refused: `尚未處理：${item.label}` };
         if (decision.decision === "amount") {
-          if (typeof decision.amountTwd !== "number" || !Number.isInteger(decision.amountTwd) || decision.amountTwd < 0) {
-            return { refused: `「${item.label}」要由人員填入零或正整數，空白不算。` };
-          }
-          surcharge += decision.amountTwd;
-          stored.push({ key: item.key, label: item.label, decision: "amount", amountTwd: decision.amountTwd, reason: null });
+          const priced = pricedAmount(item, decision);
+          if (typeof priced !== "number") return { refused: priced };
+          if (item.role === "payment") depositAmountTwd = priced;
+          else surcharge += priced;
+          const quantity = item.quantityLabel && item.unitAmountTwd != null ? decision.quantity as number : null;
+          stored.push({ key: item.key, label: item.label, role: item.role, decision: "amount", amountTwd: priced, quantity, reason: null });
         } else if (decision.decision === "not_applicable") {
           const reason = cleanReason(decision.reason);
-          if (reason.length < 2) return { refused: `「${item.label}」標成不適用時，要寫下原因。空白不算。` };
-          stored.push({ key: item.key, label: item.label, decision: "not_applicable", amountTwd: null, reason });
+          if (reason.length < 2) return { refused: `「${item.label}」標成不適用時，要寫下具體原因。空白不算。` };
+          stored.push({ key: item.key, label: item.label, role: item.role, decision: "not_applicable", amountTwd: null, quantity: null, reason });
         } else {
           return { refused: `「${item.label}」還沒選擇填金額或不適用。` };
         }
@@ -195,17 +212,18 @@ export async function priceStaffOrder(quoteId: string, input: { items?: unknown;
       }
       const expected = order.baseAmountTwd + surcharge;
       if (input.totalAmountTwd !== expected) {
-        return { refused: `總價必須等於基本車資 ${order.baseAmountTwd} 加人員填入的附加費 ${surcharge}。` };
+        return { refused: `總價必須等於基本車資 ${order.baseAmountTwd} 加影響總價的附加費 ${surcharge}。訂金不計入。` };
       }
       const updated = await tx.charterOrder.updateMany({
         where: { id: order.id, status: PENDING, quoteFingerprint: order.quoteFingerprint },
         data: {
           status: STAFF_PRICED,
           totalAmountTwd: expected,
-          reviewJson: { items: stored, baseAmountTwd: order.baseAmountTwd, surchargeTwd: surcharge, totalAmountTwd: expected, customerAccepted: false, paid: false },
+          reviewJson: { items: stored, baseAmountTwd: order.baseAmountTwd, surchargeTwd: surcharge, depositAmountTwd, totalAmountTwd: expected, customerAccepted: false, paid: false },
         },
       });
       if (updated.count !== 1) throw new OrderWriteRolledBack();
+      if (hooks?.beforeQuoteUpdate) await hooks.beforeQuoteUpdate(tx);
       const quoteUpdated = await tx.charterQuote.updateMany({ where: { id: quoteId }, data: { quoteStatus: "STAFF_PRICED" } });
       if (quoteUpdated.count !== 1) throw new OrderWriteRolledBack();
       const saved = await tx.charterOrder.findUnique({ where: { id: order.id } });
@@ -235,6 +253,8 @@ export async function readOrderForQuote(quoteId: string) {
     order,
     draft,
     items: reviewItems(draft),
+    included: vehicleFees(draft.vehicleSlug).filter((fee) => fee.role === "included"),
+    terms: vehicleFees(draft.vehicleSlug).filter((fee) => fee.role === "term"),
     stale: order.quoteFingerprint !== quoteFingerprint(quote),
     customerAccepted: false as const,
     paid: false as const,

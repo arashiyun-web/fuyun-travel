@@ -1,5 +1,4 @@
-import { createHash } from "crypto";
-import { confirmedVehicleRate, fleetQuoteRecord, type FleetRateId } from "@/lib/fleetCatalog";
+import { confirmedVehicleRate, fleetQuoteRecord, type CatalogFee, type FleetRateId } from "@/lib/fleetCatalog";
 
 export type QuoteDraftInput = {
   pickup?: string | null;
@@ -43,19 +42,18 @@ export function capacityFor(slug: string, count: number | null): CapacityState {
   return "pending";
 }
 
-export type ReviewItem = { key: string; label: string; kind: "pending" | "exclusion" };
+export type ReviewItem = CatalogFee & { key: string };
 
-export function reviewItemKey(label: string) {
-  return createHash("sha256").update(label).digest("hex").slice(0, 16);
+export function vehicleFees(slug: string | null): CatalogFee[] {
+  if (!slug) return [];
+  return fleetQuoteRecord(slug)?.fees || [];
 }
 
-/** Lines a person must price or explicitly mark inapplicable before an internal total can be saved. */
-export function reviewItems(draft: Pick<FleetQuoteDraft, "known" | "pending">): ReviewItem[] {
-  const items: ReviewItem[] = draft.pending.map((label) => ({ key: reviewItemKey(label), label, kind: "pending" }));
-  for (const label of draft.known) {
-    if (/不含|餐點|稅金|實報實銷/.test(label)) items.push({ key: reviewItemKey(label), label, kind: "exclusion" });
-  }
-  return items;
+/** Surcharges and the deposit. Included package items and clauses are not priced again. */
+export function reviewItems(draft: Pick<FleetQuoteDraft, "vehicleSlug">): ReviewItem[] {
+  return vehicleFees(draft.vehicleSlug)
+    .filter((fee) => fee.role === "surcharge" || fee.role === "payment")
+    .map((fee) => ({ ...fee, key: fee.id }));
 }
 
 export function orderConfirmationBlock(draft: Pick<FleetQuoteDraft, "amountTwd" | "known" | "pending" | "capacity">) {

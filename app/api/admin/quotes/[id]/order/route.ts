@@ -33,6 +33,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       success: true,
       order: result.order,
       items: result.items,
+      included: result.included,
+      terms: result.terms,
       stale: result.stale,
       baseAmountTwd: result.order.baseAmountTwd,
       totalAmountTwd: result.order.totalAmountTwd,

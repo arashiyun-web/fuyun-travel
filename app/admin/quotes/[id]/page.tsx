@@ -4,14 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
 
-type ReviewItem = { key: string; label: string; kind: string };
-type Decision = { decision: "" | "amount" | "not_applicable"; amount: string; reason: string };
+type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; source: string };
+type Decision = { decision: "" | "amount" | "not_applicable"; amount: string; quantity: string; reason: string };
 type OrderView = {
   status: string;
   baseAmountTwd: number;
   totalAmountTwd: number | null;
   stale: boolean;
   items: ReviewItem[];
+  included: { id: string; label: string; source: string }[];
+  terms: { id: string; label: string; source: string }[];
 };
 
 type Quote = {
@@ -94,11 +96,13 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
       totalAmountTwd: data.totalAmountTwd,
       stale: Boolean(data.stale),
       items: data.items || [],
+      included: data.included || [],
+      terms: data.terms || [],
     });
     setDecisions((current) => {
       const next = { ...current };
       for (const item of data.items || []) {
-        if (!next[item.key]) next[item.key] = { decision: "", amount: "", reason: "" };
+        if (!next[item.key]) next[item.key] = { decision: "", amount: "", quantity: "", reason: "" };
       }
       return next;
     });
@@ -128,11 +132,12 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     setError("");
     try {
       const items = orderView.items.map((item) => {
-        const decision = decisions[item.key] || { decision: "", amount: "", reason: "" };
+        const decision = decisions[item.key] || { decision: "", amount: "", quantity: "", reason: "" };
         return {
           key: item.key,
           decision: decision.decision,
           amountTwd: decision.decision === "amount" && decision.amount.trim() !== "" ? Number(decision.amount) : undefined,
+          quantity: decision.decision === "amount" && decision.quantity.trim() !== "" ? Number(decision.quantity) : undefined,
           reason: decision.reason,
         };
       });
@@ -211,23 +216,27 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
       {orderView ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
           <h2 className="text-base font-medium text-amber-400">內部核定</h2>
-          <p className="text-xs text-slate-500">狀態：{orderView.status === "staff_priced" ? "內部已核定。這不是客人已同意，也不是已付款。" : "待確認。尚未內部核定。"} 基本車資 {orderView.baseAmountTwd} 元。總價 {orderView.totalAmountTwd == null ? "尚未填入" : `${orderView.totalAmountTwd} 元`}。不會送出訊息，也不會改已核對的車資表。</p>
+          <p className="text-xs text-slate-500">狀態：{orderView.status === "staff_priced" ? "內部已核定。這不是客人已同意，也不是已付款。" : "待確認。尚未內部核定。"} 基本車資 {orderView.baseAmountTwd} 元。車資總價 {orderView.totalAmountTwd == null ? "尚未填入" : `${orderView.totalAmountTwd} 元`}。訂金不計入總價。不會送出訊息，也不會改已核對的車資表。</p>
+          {orderView.included.length ? <p className="text-xs text-slate-400">已含在基本車資、不另加：{orderView.included.map((item) => item.label).join("、")}</p> : null}
+          {orderView.terms.length ? <p className="text-xs text-slate-400">條款，不是加價：{orderView.terms.map((item) => item.label).join("、")}</p> : null}
           {orderView.stale ? <p className="text-sm text-amber-300">報價已變更，不能用這份訂單核定。請先處理版本衝突。</p> : null}
           {orderView.items.map((item) => {
-            const decision = decisions[item.key] || { decision: "", amount: "", reason: "" };
+            const decision = decisions[item.key] || { decision: "", amount: "", quantity: "", reason: "" };
             return (
               <div key={item.key} className="border border-slate-800 rounded-xl p-3 space-y-2">
-                <p className="text-sm text-slate-200">{item.label}</p>
+                <p className="text-sm text-slate-200">{item.label}{item.role === "payment" ? "（訂金，不計入車資總額）" : ""}</p>
+                <p className="text-xs text-slate-500">{item.source}{item.unitAmountTwd != null ? ` 已知每${item.quantityLabel} ${item.unitAmountTwd} 元。` : " 沒有固定單價，不自動帶入。"}</p>
                 <div className="flex flex-wrap gap-3 text-xs text-slate-300">
-                  <label><input type="radio" name={item.key} checked={decision.decision === "amount"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "amount" } })} /> 填入金額</label>
+                  <label><input type="radio" name={item.key} checked={decision.decision === "amount"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "amount" } })} /> {item.role === "payment" ? "記下訂金" : "填入金額"}</label>
                   <label><input type="radio" name={item.key} checked={decision.decision === "not_applicable"} onChange={() => setDecisions({ ...decisions, [item.key]: { ...decision, decision: "not_applicable" } })} /> 本趟不適用</label>
                 </div>
+                {decision.decision === "amount" && item.quantityLabel ? <input value={decision.quantity} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, quantity: event.target.value } })} placeholder={`${item.quantityLabel}數`} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
                 {decision.decision === "amount" ? <input value={decision.amount} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, amount: event.target.value } })} placeholder="整數金額" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
-                {decision.decision === "not_applicable" ? <input value={decision.reason} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, reason: event.target.value } })} placeholder="原因，空白不算" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
+                {decision.decision === "not_applicable" ? <input value={decision.reason} onChange={(event) => setDecisions({ ...decisions, [item.key]: { ...decision, reason: event.target.value } })} placeholder="具體原因，空白不算" className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200" /> : null}
               </div>
             );
           })}
-          <label className="block text-xs text-slate-400">人員填入的總價（基本車資加附加費）</label>
+          <label className="block text-xs text-slate-400">人員填入的車資總價（基本車資加附加費，不含訂金）</label>
           <input value={totalInput} onChange={(event) => setTotalInput(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200" />
           <button type="button" disabled={pricingBusy || orderView.stale || orderView.status === "staff_priced"} onClick={() => saveStaffPrice().catch((err) => setError(err instanceof Error ? err.message : "內部核定失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">儲存內部核定</button>
         </div>
