@@ -153,7 +153,8 @@ test("login, read, save a draft, and reload it on an isolated database", { timeo
     const reloadedBody = await reloaded.json();
     assert.equal(reloaded.status, 200);
     assert.match(reloadedBody.quote.quoteDraftText, /7000 元/);
-    assert.match(reloadedBody.quote.quoteDraftText, /這筆車資可確認/);
+    assert.match(reloadedBody.quote.quoteDraftText, /基本車資/);
+    assert.match(reloadedBody.quote.quoteDraftText, /不是總價/);
 
     const members = await fetch(`${origin}/api/admin/members`, { headers: { cookie: session } });
     const membersBody = await members.json();

@@ -84,6 +84,15 @@ test("health report is booleans and names only", () => {
   assert.equal(serialized.includes("secret-value"), false);
   assert.equal(serialized.includes("bearer-secret"), false);
   assert.equal(report.scheduler.livePublish, false);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "yes";
+  assert.equal(health.publishingHealth().scheduler.livePublish, false);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "1";
+  assert.equal(health.publishingHealth().scheduler.livePublish, false);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "TRUE";
+  assert.equal(health.publishingHealth().scheduler.livePublish, false);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "true";
+  assert.equal(health.publishingHealth().scheduler.livePublish, true);
+  process.env.OPERATIONS_LIVE_PUBLISH_ENABLED = "false";
   assert.equal(report.copywriting.selected, "openai");
   assert.deepEqual(report.copywriting.missing, []);
   assert.equal(report.copywriting.functionalCheck, "not_tested");

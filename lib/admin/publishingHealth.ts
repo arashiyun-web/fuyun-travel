@@ -11,9 +11,9 @@ function flag(name: string): EnvFlag {
   return { name, set: Boolean(value) && !/^false$/i.test(value) };
 }
 
-/** Boolean switches are on only for true, 1, or yes. */
+/** Same rule as publishing: only the exact string true turns a switch on. */
 export function envEnabled(name: string) {
-  return /^(?:true|1|yes)$/i.test(raw(name));
+  return raw(name) === "true";
 }
 
 const COPY_PAIRS = [

@@ -112,8 +112,19 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     const createdBody = await created.json();
     assert.equal(created.status, 200);
     assert.equal(createdBody.created, true);
-    assert.equal(createdBody.order.amountTwd, 7000);
+    assert.equal(createdBody.order.baseAmountTwd, 7000);
+    assert.equal(createdBody.order.totalAmountTwd, null);
+    assert.equal(createdBody.order.status, "pending_confirmation");
     assert.equal(createdBody.sendsToCustomer, false);
+    const confirmBase = await orderRoute.POST(new Request(`http://127.0.0.1/api/admin/quotes/${quote.id}/order`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ confirmCompleteQuote: true, totalAmountTwd: 7000 }),
+    }), { params: { id: quote.id } });
+    const confirmBaseBody = await confirmBase.json();
+    assert.equal(confirmBase.status, 409);
+    assert.match(confirmBaseBody.error, /訂金|總價|確認/);
+    assert.equal((await prisma.charterOrder.findUnique({ where: { quoteId: quote.id } })).status, "pending_confirmation");
     const again = await callOrder(quote.id);
     const againBody = await again.json();
     assert.equal(again.status, 200);
@@ -124,6 +135,56 @@ test("LINE identity creates one member, and a confirmed quote becomes one passen
     const blockedBody = await blocked.json();
     assert.equal(blocked.status, 409);
     assert.equal(await prisma.charterOrder.count(), 1);
+
+    const vanTen = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 10, remark: "10小時", recommendedVehicle: "賓士小車" },
+    });
+    const vanTenOrder = await callOrder(vanTen.id);
+    assert.equal(vanTenOrder.status, 409);
+    assert.equal(await prisma.charterOrder.count({ where: { quoteId: vanTen.id } }), 0);
+
+    const midibus = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北", destination: "九份", passengerCount: 12, remark: "10小時", recommendedVehicle: "中巴" },
+    });
+    const midibusConfirm = await orderRoute.POST(new Request(`http://127.0.0.1/api/admin/quotes/${midibus.id}/order`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ confirmCompleteQuote: true, totalAmountTwd: 12000 }),
+    }), { params: { id: midibus.id } });
+    const midibusConfirmBody = await midibusConfirm.json();
+    assert.equal(midibusConfirm.status, 409);
+    assert.match(midibusConfirmBody.error, /餐|停車|稅/);
+    assert.equal(await prisma.charterOrder.count({ where: { quoteId: midibus.id } }), 0);
+    const midibusPending = await callOrder(midibus.id);
+    const midibusPendingBody = await midibusPending.json();
+    assert.equal(midibusPending.status, 200);
+    assert.equal(midibusPendingBody.order.status, "pending_confirmation");
+    assert.equal(midibusPendingBody.order.baseAmountTwd, 9000);
+    assert.equal(midibusPendingBody.order.totalAmountTwd, null);
+
+    const parallelQuote = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
+    });
+    const ordersLib = jiti("@/lib/charterOrder");
+    const [first, second] = await Promise.all([
+      ordersLib.convertConfirmedQuote(parallelQuote.id),
+      ordersLib.convertConfirmedQuote(parallelQuote.id),
+    ]);
+    assert.equal(first.ok && second.ok, true);
+    assert.equal(first.order.id, second.order.id);
+    assert.equal([first.created, second.created].filter(Boolean).length, 1);
+    assert.equal(await prisma.charterOrder.count({ where: { quoteId: parallelQuote.id } }), 1);
+
+    const rollbackQuote = await prisma.charterQuote.create({
+      data: { lineUserId: "Udm000000000000000000000000000", pickup: "台北車站", destination: "九份", passengerCount: 6, remark: "10小時", recommendedVehicle: "賓士小車" },
+    });
+    const rolled = await ordersLib.convertConfirmedQuote(rollbackQuote.id, {}, {
+      beforeQuoteUpdate: async (tx) => { await tx.charterQuote.delete({ where: { id: rollbackQuote.id } }); },
+    });
+    assert.equal(rolled.ok, false);
+    assert.equal(rolled.status, 409);
+    assert.equal(await prisma.charterOrder.count({ where: { quoteId: rollbackQuote.id } }), 0);
+    assert.ok(await prisma.charterQuote.findUnique({ where: { id: rollbackQuote.id } }));
     await prisma.$disconnect();
     await assertPublishFlow();
   } finally {

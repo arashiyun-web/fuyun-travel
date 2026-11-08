@@ -22,6 +22,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [orderBusy, setOrderBusy] = useState(false);
 
   async function loadQuote() {
     const response = await fetch(`/api/admin/quotes/${params.id}`, { cache: "no-store" });
@@ -66,14 +67,19 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   }
 
   async function makeOrder() {
-    if (!quote) return;
+    if (!quote || orderBusy) return;
+    setOrderBusy(true);
     setMessage("");
     setError("");
-    const response = await fetch(`/api/admin/quotes/${params.id}/order`, { method: "POST" });
-    const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.error || "轉成訂單失敗");
-    setMessage(data.created ? "已轉成旅客包車訂單，尚未送給客人。" : "這筆報價已經有訂單，沒有再新增一筆。");
-    await loadQuote();
+    try {
+      const response = await fetch(`/api/admin/quotes/${params.id}/order`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "轉成訂單失敗");
+      setMessage(data.created ? "已記下待確認訂單。這只是基本車資，不是總價，也還沒送給客人。" : "這筆報價已經有待確認訂單，沒有再新增一筆。");
+      await loadQuote();
+    } finally {
+      setOrderBusy(false);
+    }
   }
 
   async function sendQuote() {
@@ -126,7 +132,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
 
           <div className="flex flex-wrap gap-3">
             <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>
-            <button onClick={() => makeOrder().catch((err) => setError(err instanceof Error ? err.message : "轉成訂單失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">轉成旅客訂單</button>
+            <button type="button" disabled={orderBusy} onClick={() => makeOrder().catch((err) => setError(err instanceof Error ? err.message : "轉成訂單失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">記下待確認訂單</button>
             <button onClick={() => saveQuote().catch((err) => setError(err instanceof Error ? err.message : "儲存失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">儲存正式報價</button>
             <button onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500">送出給 LINE</button>
           </div>

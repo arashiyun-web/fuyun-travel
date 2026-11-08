@@ -9,15 +9,48 @@ export type QuoteDraftInput = {
   hours?: number | null;
 };
 
+export type CapacityState = "clear" | "pending" | "over" | "not_applicable";
+
 export type FleetQuoteDraft = {
   text: string;
   vehicleSlug: string | null;
   vehicleLabel: string | null;
+  /** Package fare only. Null when the trip, hours, or seat count is not clear. Never a customer total. */
   amountTwd: number | null;
+  totalAmountTwd: null;
+  capacity: CapacityState;
   pending: string[];
   known: string[];
   sendsToCustomer: false;
 };
+
+/** Nine-seat vans do not have a confirmed passenger count, because the driver may occupy one seat. */
+export function capacityFor(slug: string, count: number | null): CapacityState {
+  if (slug === "mercedes-van") {
+    if (count == null) return "pending";
+    if (count > 9) return "over";
+    if (count === 9) return "pending";
+    if (count >= 1 && count <= 8) return "clear";
+    return "pending";
+  }
+  if (slug === "toyota-midibus") {
+    if (count == null) return "pending";
+    if (count > 20) return "over";
+    if (count >= 1 && count <= 20) return "clear";
+    return "pending";
+  }
+  return "pending";
+}
+
+export function orderConfirmationBlock(draft: Pick<FleetQuoteDraft, "amountTwd" | "known" | "pending" | "capacity">) {
+  if (draft.capacity !== "clear") return "人數還沒核對到這台車已知可載的範圍，不能確認金額或訂單。";
+  if (draft.amountTwd == null) return "沒有可沿用的基本車資。";
+  const text = [...draft.known, ...draft.pending].join("\n");
+  if (draft.pending.length > 0 || /不含|餐點|稅金|實報實銷/.test(text)) {
+    return "餐費、停車、稅金、訂金或其他未定項目還沒合成完整總價，不能標成客人已確認。";
+  }
+  return null;
+}
 
 const VEHICLES = [
   { slug: "mercedes-van", label: "九人座賓士小車", hints: ["賓士", "九人座", "小車", "mercedes"] },
@@ -100,33 +133,51 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
   const remark = (input.remark || "").trim();
   const hint = `${input.vehicleHint || ""} ${remark}`;
   const coach = explicitCoach(hint);
-  const overloaded = typeof input.passengerCount === "number" && input.passengerCount > 20;
-  const vehicles = coach || overloaded ? [] : matchedVehicle(hint);
+  const count = typeof input.passengerCount === "number" && Number.isInteger(input.passengerCount) ? input.passengerCount : null;
+  const vehicles = coach ? [] : matchedVehicle(hint);
   const route = matchedRoute(pickup, destination, remark);
   const hours = statedHours(input);
   const vehicle = vehicles.length === 1 ? vehicles[0] : null;
+  const capacity: CapacityState = vehicle ? capacityFor(vehicle.slug, count) : "not_applicable";
   const context = tripContext(`${pickup} ${destination} ${remark}`);
-  const blocked = coach || overloaded || !route;
+  const blocked = coach || !route;
   const record = vehicle && !blocked ? fleetQuoteRecord(vehicle.slug) : null;
   const applicable = (record?.conditions || []).filter((line) => termApplies(line, route, context));
   const known = applicable.filter((line) => !isPending(line));
   const pending = applicable.filter((line) => isPending(line));
+  if (vehicle?.slug === "mercedes-van" && capacity === "pending") {
+    pending.unshift(count === 9
+      ? "人數 9。九人座是否包含司機未確認，不把 9 人當成已經可載。"
+      : "未填人數，或人數不在已能確定的範圍。九人座是否包含司機未確認，不猜可載 9 人。");
+  }
+  if (vehicle?.slug === "toyota-midibus" && capacity === "pending") {
+    pending.unshift("未填人數，不能核對是否超過中巴最多 20 位乘客。");
+  }
+  if (capacity === "over") {
+    pending.unshift(vehicle?.slug === "mercedes-van"
+      ? "人數超過九個座位。九人座是否包含司機未確認，也不把超過 9 的人數當成可載。"
+      : "人數超過中巴最多 20 位乘客。沒有已核對的更大車資，不改顯示小車價格。");
+  }
 
   let amount: number | null = null;
-  let fareLine = "已核對車資：沒有可確認金額。";
+  let fareLine = "基本車資：沒有可確認金額。";
   if (coach) {
     fareLine = "已指明 42 人座。沒有已核對車資，不改顯示小車或中巴價格。";
-  } else if (overloaded) {
-    fareLine = "人數超過中巴最多 20 位乘客。沒有已核對的更大車資，不改顯示小車價格。";
   } else if (!route) {
     fareLine = "這不是已核對的台北單點行程（台北一日，或台北至九份）。多點、經由其他縣市或跨區長途都不套用車資。";
+  } else if (capacity === "over") {
+    fareLine = pending[0] || "人數超過已知座位，不確認基本車資。";
+  } else if (capacity === "pending") {
+    fareLine = "人數邊界還沒核對，不確認基本車資。";
   } else if (!vehicle) {
     const lines = vehicles.length === 0
       ? ["未指定單一車型，不選定小車或中巴價格。"]
       : VEHICLES.map((item) => {
-          const value = hours === 10 ? confirmedVehicleRate(item.slug, route) : null;
-          const shown = hours === 10 ? (value === null ? "待確認" : `${value} 元，尚未替你選定`) : "時數不是 10 小時，不套用";
-          return `${item.label}：${shown}`;
+          const itemCapacity = capacityFor(item.slug, count);
+          if (hours !== 10) return `${item.label}：時數不是 10 小時，不套用`;
+          if (itemCapacity !== "clear") return `${item.label}：人數未核對到可載範圍，不套用`;
+          const value = confirmedVehicleRate(item.slug, route);
+          return `${item.label}：${value === null ? "待確認" : `基本車資 ${value} 元，尚未替你選定，也不是總價`}`;
         });
     fareLine = lines.join("\n");
   } else if (hours === null) {
@@ -143,7 +194,7 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
     if (value === null) fareLine = `${label}：待確認`;
     else {
       amount = value;
-      fareLine = `${label}：${value} 元`;
+      fareLine = `${label}：基本車資 ${value} 元。這不是總價。`;
     }
   }
 
@@ -160,7 +211,7 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
     "",
     "車資",
     fareLine,
-    amount === null ? "目前沒有可確認車資。" : "這筆車資可確認。附加費沒有加進去。",
+    amount === null ? "目前沒有可確認的基本車資，也沒有總價。" : "上面是基本車資，不是總價。附加費沒有加進去，也還沒變成客人已確認的訂單。",
     "",
     conditionTitle,
     ...(known.length ? known.map((line) => `- ${line}`) : ["- 沒有要列入的已知條件。"]),
@@ -176,6 +227,8 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
     vehicleSlug: vehicle?.slug || null,
     vehicleLabel: vehicle?.label || null,
     amountTwd: amount,
+    totalAmountTwd: null,
+    capacity,
     pending,
     known,
     sendsToCustomer: false,
