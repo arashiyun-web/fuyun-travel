@@ -17,6 +17,7 @@ import {
   defaultSubmission,
   dueStatusesFor,
   executeJob,
+  jobRunSucceeded,
   getImageContentType,
   jobApprovalHash,
   makePlatformCaptions,
@@ -411,6 +412,10 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
       approvalHash: claimed.approvalHash || "",
       images: images.map((image) => ({ key: image.storageKey || "", sha256: image.sha256, contentType: image.mimeType, alt: image.originalName })),
     }, websitePublishDeps()),
+    postizContent: {
+      contentId: claimed.contentId,
+      approval: { status: claimed.content.approvalStatus, approvedBy: claimed.content.approvedBy, approvedAt: claimed.content.approvedAt },
+    },
   });
   const plan = nextAttemptPlan(result, claimed.attempts);
 
@@ -435,7 +440,7 @@ export async function runJob(jobId: string, mode: RunMode = "dry-run", statuses:
   });
   await addEvent(prisma, { type: "job_result", contentId: claimed.contentId, jobId, platform: claimed.platform, detail: plan.error || plan.status });
   const job = await prisma.operationsJob.findUnique({ where: { jobId } });
-  return { success: plan.status === "dry_run_verified" || plan.status === "published", status: plan.status, job: job ? toDraft(job) : null, content: await getContentRecord(claimed.contentId) };
+  return { success: jobRunSucceeded(plan.status), status: plan.status, job: job ? toDraft(job) : null, content: await getContentRecord(claimed.contentId) };
 }
 
 export async function runDueJobs(mode: RunMode) {

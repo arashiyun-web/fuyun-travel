@@ -1,5 +1,7 @@
 import { createHash } from "crypto";
 import { exactTrue } from "@/lib/liveSwitch";
+import { defaultHandoffStore } from "@/lib/postiz/dbStore";
+import { handoffApprovedPiece, type HandoffResult, type HandoffStore } from "@/lib/postiz/handoff";
 import { isPostizSocialPlatform, publishOutlet } from "@/lib/postiz/config";
 import { publishToFacebook } from "@/lib/social/publishers";
 import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";
@@ -38,6 +40,10 @@ export function dueStatusesFor(mode: RunMode): JobStatus[] {
  * query only returns jobs whose scheduledAt has passed) and handed to a person after MAX_AUTO_ATTEMPTS.
  * scheduledAt undefined = leave the stored value unchanged.
  */
+export function jobRunSucceeded(status: JobStatus) {
+  return status === "dry_run_verified" || status === "published" || status === "postiz_draft";
+}
+
 export function nextAttemptPlan(result: JobResult, attempts: number, now = Date.now()): { status: JobStatus; scheduledAt?: Date | null; error?: string } {
   if (result.status !== "retryable_failed") return { status: result.status, error: result.error };
   if (attempts >= MAX_AUTO_ATTEMPTS) {
@@ -268,10 +274,42 @@ export type ExecuteDeps = {
   approvedInstagramAccount?: string;
   /** Publish the approved website version as a public /travel article and read it back (database store only). */
   publishWebsite?: () => Promise<WebsitePublishResult>;
+  /** Approved content handed to the Postiz outlet. Production callers always set this from the claimed row. */
+  postizContent?: { contentId: string; approval: { status: string; approvedBy?: string | null; approvedAt?: string | Date | null } };
+  /** Test seam. Production uses the Prisma handoff store. */
+  handoffStore?: HandoffStore;
+  fetchImpl?: typeof fetch;
   /** Test seams. */
   instagramClient?: () => Promise<InstagramClient & { accountId: string }>;
   sleep?: (ms: number) => Promise<void>;
 };
+
+function postizJobStatus(result: HandoffResult): JobStatus {
+  if (result.state === "draft_created") return "postiz_draft";
+  if (result.state === "需要人工確認") return "manual_required";
+  if (result.error?.includes("設定未完成") || result.error?.includes("交接表尚未建立") || result.error?.includes("資料庫尚未就緒") || result.error?.includes("無法寫入")) return "queued";
+  return "manual_required";
+}
+
+/** Social platforms on the Postiz outlet never call the native publishers. */
+async function deliverPostizDraft(job: PlatformDraft, deps: ExecuteDeps): Promise<JobResult> {
+  if (!deps.postizContent) {
+    return { status: "manual_required", verification: "pending", error: "未完成：沒有核准內容可送 Postiz。" };
+  }
+  const urls = (await deps.publicImageUrls?.()) || [];
+  const imageUrl = (job.imageUrl && job.imageUrl.startsWith("https://") ? job.imageUrl : urls.find((url) => url.startsWith("https://"))) || null;
+  const result = await handoffApprovedPiece({
+    contentId: deps.postizContent.contentId,
+    platform: job.platform,
+    caption: job.caption,
+    imageUrl,
+    approval: deps.postizContent.approval,
+  }, deps.handoffStore ?? defaultHandoffStore(), { fetchImpl: deps.fetchImpl });
+  if (result.state === "draft_created") {
+    return { status: "postiz_draft", verification: "pending", externalId: result.postizPostId || undefined, error: "已建立 Postiz 草稿，尚未對外發布。" };
+  }
+  return { status: postizJobStatus(result), verification: "pending", error: result.error || "未完成" };
+}
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -334,12 +372,12 @@ async function submitInstagramV2Job(job: PlatformDraft, deps: ExecuteDeps) {
 /** Decide and (in live mode) perform the external action for one already-claimed job. */
 export async function executeJob(job: PlatformDraft, mode: RunMode, deps: ExecuteDeps): Promise<JobResult> {
   const factCheck = job.factCheck as FactCheck | undefined;
+  if (isPostizSocialPlatform(job.platform) && publishOutlet() === "postiz") {
+    return deliverPostizDraft(job, deps);
+  }
   if (mode === "dry-run") {
     // dry_run_verified is not terminal: it stays claimable and is due again for a live run (dueStatusesFor).
     return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布；正式發布開關啟用後會重新排入。` };
-  }
-  if (isPostizSocialPlatform(job.platform) && publishOutlet() === "postiz") {
-    return { status: "manual_required", verification: "pending", error: "發布出口是 Postiz，原生 worker 不發這篇。" };
   }
   if (!exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED)) {
     return { status: "manual_required", verification: "pending", error: "正式發布總開關未啟用；已保留草稿與工作結果。" };

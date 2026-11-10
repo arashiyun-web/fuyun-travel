@@ -3,6 +3,7 @@ import { verifyAdminRequest } from "@/lib/adminAuth";
 import { FACEBOOK_GROUP_URL, resolveInstagramAccountId } from "@/lib/operations/shared";
 import { diagnoseInstagramAuthorization } from "@/lib/social/insta-diag";
 import { exactTrue } from "@/lib/liveSwitch";
+import { publishOutlet } from "@/lib/postiz/config";
 import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -27,5 +28,6 @@ export async function GET(request: Request) {
       mediaOriginSet: Boolean(process.env.INSTAGRAM_LOGIN_MEDIA_ORIGIN?.trim()),
     },
     facebookGroup: { automatic: false, target: FACEBOOK_GROUP_URL, reason: "Meta 已移除社團發文 API；需老闆在社團正常介面發布後回填網址。" },
+    publishOutlet: publishOutlet() || "未完成",
   });
 }

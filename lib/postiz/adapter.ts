@@ -21,6 +21,22 @@ function withoutKey(message: string, apiKey: string) {
   return apiKey ? message.split(apiKey).join("[redacted]") : message;
 }
 
+/** The request may have reached Postiz. Callers must not send it again. */
+export class PostizUncertainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PostizUncertainError";
+  }
+}
+
+/** Postiz answered with a failure, so this attempt did not create a draft. */
+export class PostizRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PostizRejectedError";
+  }
+}
+
 /** Creates a Postiz draft. The request type is always draft, never now or schedule. */
 export async function createPostizDraft(input: PostizDraftInput, options?: { fetchImpl?: typeof fetch; timeoutMs?: number }) {
   const fetchImpl = options?.fetchImpl || fetch;
@@ -52,15 +68,17 @@ export async function createPostizDraft(input: PostizDraftInput, options?: { fet
     const payload = await response.json().catch(() => null) as { postId?: string; error?: string }[] | { message?: string } | null;
     if (!response.ok) {
       const raw = Array.isArray(payload) ? "" : payload?.message || `Postiz 回應 ${response.status}`;
-      throw new Error(withoutKey(raw, input.apiKey));
+      throw new PostizRejectedError(withoutKey(raw, input.apiKey));
     }
     const postId = Array.isArray(payload) ? payload[0]?.postId : "";
-    if (!postId) throw new Error("Postiz 沒有回傳草稿編號");
+    if (!postId) throw new PostizUncertainError("Postiz 沒有回傳草稿編號");
     return { postId };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw new Error("Postiz 逾時，沒有建立草稿");
-    if (error instanceof Error) throw new Error(withoutKey(error.message, input.apiKey));
-    throw new Error("Postiz 沒有建立草稿");
+    if (error instanceof PostizRejectedError) throw error;
+    if (error instanceof PostizUncertainError) throw new PostizUncertainError(withoutKey(error.message, input.apiKey));
+    if (error instanceof Error && error.name === "AbortError") throw new PostizUncertainError("Postiz 逾時，沒有建立草稿");
+    if (error instanceof Error) throw new PostizUncertainError(withoutKey(error.message, input.apiKey));
+    throw new PostizUncertainError("Postiz 沒有建立草稿");
   } finally {
     clearTimeout(timer);
   }
