@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
   if (!process.env.R2_PUBLIC_URL?.trim()) {
-    return NextResponse.json({ error: "R2_PUBLIC_URL 未設定，無法產生可公開抓取的圖片網址。" }, { status: 503 });
+    return NextResponse.json({ error: "新圖片的公開儲存網址尚待核准，暫停上傳。請先使用已發布素材的既有圖片。" }, { status: 503 });
   }
 
   let formData: FormData;

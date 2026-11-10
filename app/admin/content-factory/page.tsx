@@ -2,11 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./ContentFactory.module.css";
+import { applyChannelEdits, editableChannelText } from "@/lib/content-factory/editor";
 import type { ContentFactoryInput, GeneratedContent } from "@/lib/content-factory/types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type InputMode = "brief" | "fb";
+
+interface PublishedSource {
+  id: string;
+  title: string;
+  description: string;
+  image_urls: string[];
+  cover_image_url: string;
+}
 
 interface UploadedImage {
   url: string;
@@ -20,6 +29,7 @@ const CHANNELS = [
   { key: "seo_article",  label: "SEO 長文" },
   { key: "facebook",     label: "Facebook 貼文" },
   { key: "instagram",    label: "Instagram" },
+  { key: "x",            label: "X" },
   { key: "line_oa",      label: "LINE OA 推播" },
   { key: "edm",          label: "EDM 電子報" },
   { key: "extras",       label: "加值內容" },
@@ -57,6 +67,8 @@ function channelText(content: GeneratedContent, key: ChannelKey): string {
         "",
         (content.instagram?.hashtags || []).join(" "),
       ].join("\n");
+    case "x":
+      return content.x?.body || "";
     case "line_oa":
       return content.line_oa || "";
     case "edm":
@@ -82,6 +94,10 @@ function channelText(content: GeneratedContent, key: ChannelKey): string {
 
 export default function ContentFactoryPage() {
   const [token, setToken] = useState("");
+  const [sources, setSources] = useState<PublishedSource[]>([]);
+  const [sourceId, setSourceId] = useState("");
+  const [sourceError, setSourceError] = useState("");
+  const [uploadError, setUploadError] = useState("");
   const [mode, setMode] = useState<InputMode>("brief");
 
   // 簡述模式欄位
@@ -124,12 +140,26 @@ export default function ContentFactoryPage() {
     setToken(saved);
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    fetch("/api/content-factory/sources", { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "素材載入失敗");
+        setSources(data.sources || []);
+      })
+      .catch((error) => { if (!controller.signal.aborted) setSourceError(error instanceof Error ? error.message : "素材載入失敗"); });
+    return () => controller.abort();
+  }, [token]);
+
   // ── Image upload ──────────────────────────────────────────────────────────
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploading(true);
+    setUploadError("");
     const urls: string[] = [];
     for (const file of files) {
       const fd = new FormData();
@@ -141,9 +171,10 @@ export default function ContentFactoryPage() {
           body: fd,
         });
         const data = await res.json();
-        if (data.url) urls.push(data.url);
-      } catch {
-        // skip individual failures
+        if (!res.ok || !data.url) throw new Error(data.error || "圖片上傳失敗");
+        urls.push(data.url);
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "圖片上傳失敗");
       }
     }
     setImages((prev) => {
@@ -177,7 +208,7 @@ export default function ContentFactoryPage() {
 
   // ── Generate ──────────────────────────────────────────────────────────────
 
-  async function handleGenerate() {
+  async function handleGenerate(featuredSpotId?: string) {
     setGenError("");
     setGenRaw("");
     setResult(null);
@@ -186,12 +217,12 @@ export default function ContentFactoryPage() {
     setSaveWarning("");
 
     const userNotes = mode === "fb" ? fbText : briefDesc;
-    if (!userNotes.trim()) {
+    if (!featuredSpotId && !userNotes.trim()) {
       setGenError("請先輸入行程描述或 FB 原文。");
       return;
     }
 
-    const payload: ContentFactoryInput = {
+    const payload: Partial<ContentFactoryInput> = featuredSpotId ? { featured_spot_id: featuredSpotId } : {
       trip_title: mode === "brief" ? briefTitle : "",
       days,
       season,
@@ -222,11 +253,8 @@ export default function ContentFactoryPage() {
       }
       setResult(data.generated as GeneratedContent);
       setResultInput(data.input as ContentFactoryInput);
-      const notes = [
-        data.operationsContentId ? `已建立營運草稿 ${data.operationsContentId}。請到營運後台核准，由排程發布。` : "",
-        data.operationsError ? String(data.operationsError) : "",
-      ].filter(Boolean);
-      if (notes.length) setSaveWarning(notes.join(" "));
+      setSavedId(data.draftId);
+      setSaveWarning("文案已存為草稿，請人工檢查各平台內容。");
       setEditedChannels({});
       setActiveChannel("geo_summary");
     } catch (err) {
@@ -240,16 +268,17 @@ export default function ContentFactoryPage() {
 
   function getChannelValue(key: ChannelKey): string {
     if (editedChannels[key] !== undefined) return editedChannels[key]!;
-    return result ? channelText(result, key) : "";
+    return result ? editableChannelText(result, key) : "";
   }
 
   function handleChannelEdit(key: ChannelKey, value: string) {
     setEditedChannels((prev) => ({ ...prev, [key]: value }));
+    setSavedId("");
   }
 
   async function copyChannel(key: ChannelKey) {
     try {
-      await navigator.clipboard.writeText(getChannelValue(key));
+      if (result) await navigator.clipboard.writeText(channelText(applyChannelEdits(result, editedChannels), key));
     } catch {
       // clipboard not available
     }
@@ -269,7 +298,7 @@ export default function ContentFactoryPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ input: resultInput, output: result }),
+        body: JSON.stringify({ input: resultInput, output: applyChannelEdits(result, editedChannels) }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -318,6 +347,32 @@ export default function ContentFactoryPage() {
       {/* Input Section */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
         <h2 className="text-sm font-medium text-slate-300 uppercase tracking-wider">輸入來源</h2>
+
+        <div className="space-y-3">
+          <label htmlFor="featured-source" className="text-xs text-slate-400 block">選一篇已發布的「這裡真好玩」</label>
+          <select id="featured-source" value={sourceId} onChange={(event) => setSourceId(event.target.value)} disabled={generating}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200">
+            <option value="">請選擇素材</option>
+            {sources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
+          </select>
+          {sourceError && <p role="alert" className="text-xs text-red-400">{sourceError}</p>}
+          {!sourceError && sources.length === 0 && <p className="text-xs text-slate-500">目前沒有可選素材，可使用下方行程簡述。</p>}
+          {sources.filter((source) => source.id === sourceId).map((source) => (
+            <div key={source.id} className="space-y-2">
+              <p className="text-xs text-slate-400 whitespace-pre-wrap">{source.description}</p>
+              <div className="flex gap-2 flex-wrap">
+                {/* Existing authorized image hosts vary; keep the source URL without an optimization fetch. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {source.image_urls.map((url) => <img key={url} src={url} alt={`${source.title} 素材`} width={96} height={72} className="object-cover rounded-lg" />)}
+              </div>
+              {!source.image_urls.length && <p className="text-xs text-yellow-500">素材沒有可用的公開圖片；文案仍可存為草稿。</p>}
+            </div>
+          ))}
+          <button type="button" onClick={() => handleGenerate(sourceId)} disabled={!sourceId || generating}
+            className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold disabled:opacity-50">
+            {generating ? "AI 生成中…" : "一鍵生成各平台草稿"}
+          </button>
+        </div>
 
         {/* Mode toggle */}
         <div className="flex gap-2">
@@ -422,6 +477,7 @@ export default function ContentFactoryPage() {
             )}
           </div>
 
+          {uploadError && <p role="alert" className="text-xs text-red-400 mt-2">{uploadError}</p>}
           {!hasCover && images.length === 0 && (
             <p className="text-xs text-yellow-500 mt-2">
               ⚠ 未上傳封面圖片 — 草稿可儲存，但不可進入 ready 狀態。
@@ -458,7 +514,7 @@ export default function ContentFactoryPage() {
         <div className="flex items-center gap-4 pt-2 flex-wrap">
           <button
             type="button"
-            onClick={handleGenerate}
+            onClick={() => handleGenerate()}
             disabled={generating}
             className="px-6 py-3 rounded-xl text-sm font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -466,7 +522,7 @@ export default function ContentFactoryPage() {
           </button>
           {generating ? (
             <p className="text-xs text-slate-400">
-              本機 LLM 生成中，預計等待約 <span className="text-amber-400 font-medium">1–2 分鐘</span>，請勿關閉頁面。
+              AI 文案生成中，預計等待約 <span className="text-amber-400 font-medium">1–2 分鐘</span>，請勿關閉頁面。
             </p>
           ) : !price ? (
             <p className="text-xs text-slate-500">價格未填 → CTA 自動導向 LINE 詢價</p>
@@ -580,6 +636,7 @@ export default function ContentFactoryPage() {
                     複製
                   </button>
                 </div>
+                <p className="text-xs text-slate-500">編輯主文；複製時保留原有資訊表、FAQ、標籤與主旨。加值內容可編輯商家短評。</p>
                 <textarea
                   value={getChannelValue(key)}
                   onChange={(e) => handleChannelEdit(key, e.target.value)}

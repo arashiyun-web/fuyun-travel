@@ -7,6 +7,10 @@
     {
       "path": "/api/content-sync/weekly-pull",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/ops/friday-highlights-reminder",
+      "schedule": "0 1 * * 5"
     }
   ]
 }

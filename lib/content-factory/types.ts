@@ -10,6 +10,7 @@ export interface ParsedTrip {
 }
 
 export interface ContentFactoryInput extends ParsedTrip {
+  featured_spot_id?: string;
   image_urls: string[];
   cover_image_url: string;
 }
@@ -63,6 +64,7 @@ export interface GeneratedContent {
   seo_article: SeoArticle;
   instagram: { caption: string; hashtags: string[] };
   facebook: FacebookContent;
+  x?: { body: string };
   line_oa: string;
   edm: EdmContent;
   extras: Extras;
