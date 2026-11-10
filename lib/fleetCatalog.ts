@@ -37,12 +37,27 @@ export type PublicFleetProfile = {
   lineAutoQuote: false;
 };
 
+export type CatalogFee = {
+  id: string;
+  label: string;
+  /** included is already inside the package fare. payment is a deposit, not part of the fare. term is not a price. */
+  role: "included" | "surcharge" | "payment" | "term";
+  /** Null when no unit rate was given. Never invent one. */
+  unitAmountTwd: number | null;
+  quantityLabel: "晚" | "餐" | "小時" | "次" | null;
+  /** Inclusive checked range. Absent when the catalog did not give one. */
+  minAmountTwd?: number | null;
+  maxAmountTwd?: number | null;
+  source: string;
+};
+
 export type FleetQuoteRecord = {
   slug: string;
   lineAutoQuote: false;
   rates: FleetRate[];
   /** Verified commercial conditions. Not rendered on /fleet. */
   conditions: string[];
+  fees: CatalogFee[];
 };
 
 const mercedesRates: FleetRate[] = [
@@ -184,13 +199,24 @@ const quoteBook: FleetQuoteRecord[] = [
       "行李最多 7 個 29 吋箱，依乘車人數與實車確認，坐滿時不保證仍可放入。",
       "九人座（老闆 11/7 確認）；可載乘客數含不含司機待確認，不自行推算。",
     ],
+    fees: [
+      { id: "running", label: "油資、過路費、停車費", role: "included", unitAmountTwd: null, quantityLabel: null, source: "含油資、過路費、停車費。" },
+      { id: "sign", label: "機場航廈接機舉牌", role: "surcharge", unitAmountTwd: 100, quantityLabel: "次", source: "機場航廈接機，舉牌加 100 元。" },
+      { id: "lodging", label: "司機住宿", role: "surcharge", unitAmountTwd: 1500, quantityLabel: "晚", source: "司機住宿由客人安排，或每晚補貼 1500 元。" },
+      { id: "overtime", label: "超時", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "超過約定時間半小時以上才計超時；半小時 300 元、1 小時 500 元。不足該段或跨段如何進位未寫死，不得自動計費。" },
+      { id: "deposit", label: "訂金", role: "payment", unitAmountTwd: null, quantityLabel: null, source: "需要訂金。金額與取消規則未定。" },
+      { id: "cancellation", label: "取消規則", role: "term", unitAmountTwd: null, quantityLabel: null, source: "需要訂金。金額與取消規則未定。" },
+      { id: "child-seat", label: "兒童安全座椅", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "可安排兒童安全座椅，是否收費未知。" },
+      { id: "night", label: "晚上 23 點後加價", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "晚上 23 點後加價，金額未定。" },
+    ],
   },
   {
     slug: "toyota-midibus",
     lineAutoQuote: false,
     rates: toyotaRates,
     conditions: [
-      "台北至九份，用車 10 小時 9000 元。台北一日遊價格未提供。",
+      "台北至九份，用車 10 小時 9000 元。",
+      "台北一日遊價格未提供。",
       "含駕駛薪資、過橋過路費、油資、法定乘客意外險。",
       "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。",
       "司機餐點由客人負責，或每餐補貼 200 元。",
@@ -201,6 +227,23 @@ const quoteBook: FleetQuoteRecord[] = [
       "兒童座椅須由客人自備。",
       "遠程無法當天往返需安排司機住宿。住宿補貼金額未提供，不得沿用小車每晚 1500 元。",
       "含司機 21 座，最多 20 位乘客，建議不要坐滿。",
+    ],
+    fees: [
+      { id: "running", label: "駕駛薪資、過橋過路費、油資、法定乘客意外險", role: "included", unitAmountTwd: null, quantityLabel: null, source: "含駕駛薪資、過橋過路費、油資、法定乘客意外險。" },
+      { id: "tickets", label: "門票", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "shuttle", label: "接駁車費", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "parking", label: "停車費", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "overnight-parking", label: "過夜停車費", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "guest-lodging", label: "訂車方食宿", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "tax", label: "稅金", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "不含門票、接駁車費、停車費與過夜停車費（實報實銷）、訂車方食宿、稅金。" },
+      { id: "meals", label: "司機餐點", role: "surcharge", unitAmountTwd: 200, quantityLabel: "餐", source: "司機餐點由客人負責，或每餐補貼 200 元。" },
+      { id: "driver-lodging", label: "司機住宿補貼", role: "surcharge", unitAmountTwd: null, quantityLabel: null, source: "遠程無法當天往返需安排司機住宿。住宿補貼金額未提供，不得沿用小車每晚 1500 元。" },
+      { id: "night", label: "22:00–06:30 加價", role: "surcharge", unitAmountTwd: null, quantityLabel: null, minAmountTwd: 500, maxAmountTwd: 2000, source: "22:00–06:30 依行程加 500–2000 元，不是單一固定價。" },
+      { id: "overtime", label: "超時", role: "surcharge", unitAmountTwd: 800, quantityLabel: "小時", source: "台北、新北超時每小時 800 元。不足 1 小時以 1 小時計。時間包含報到、行駛、等待待命。" },
+      { id: "pickup-sign", label: "接機舉牌", role: "included", unitAmountTwd: null, quantityLabel: null, source: "接機舉牌免費。送機超過約定出發時間，每 30 分鐘加 500 元。接送機等待超過 45 分鐘可以終止。" },
+      { id: "dropoff-wait", label: "送機超過約定出發時間", role: "surcharge", unitAmountTwd: 500, quantityLabel: "次", source: "接機舉牌免費。送機超過約定出發時間，每 30 分鐘加 500 元。接送機等待超過 45 分鐘可以終止。" },
+      { id: "child-seat", label: "兒童座椅", role: "term", unitAmountTwd: null, quantityLabel: null, source: "兒童座椅須由客人自備。" },
+      { id: "flight-change", label: "班機更改", role: "term", unitAmountTwd: null, quantityLabel: null, source: "班機更改請盡快通知，可能另派車或取消。提前降落盡量配合。" },
     ],
   },
 ];
@@ -219,7 +262,7 @@ export function publicFleetProfiles(): PublicFleetProfile[] {
 export function fleetQuoteRecord(slug: string) {
   const record = quoteBook.find((item) => item.slug === slug);
   if (!record) return null;
-  return { ...record, rates: record.rates.map((rate) => ({ ...rate })), conditions: [...record.conditions] };
+  return { ...record, rates: record.rates.map((rate) => ({ ...rate })), conditions: [...record.conditions], fees: record.fees.map((fee) => ({ ...fee })) };
 }
 
 export function publicFleetProfile(slug: string) {

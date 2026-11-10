@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { relayGroupEvents } from "@/lib/line/groupRelay";
 import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClaim, type Claim, type WebhookEventStore } from "@/lib/line/webhookEvents";
+import { lineMemberUid, rememberLineMember } from "@/lib/members/lineMember";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -542,6 +543,13 @@ export async function POST(request: Request) {
   let failed = 0;
 
   for (const event of payload.events || []) {
+    const source = event.source as { type?: string; userId?: string } | undefined;
+    const memberUid = lineMemberUid(source);
+    if (memberUid && (event.type === "follow" || event.type === "message")) {
+      await rememberLineMember(memberUid).catch((error) => {
+        console.error("line member upsert skipped", { handlerVersion: HANDLER_VERSION, error: String(error).slice(0, 120) });
+      });
+    }
     const message = event.message as { type?: string; text?: string } | undefined;
     if (event.type !== "message" || message?.type !== "text" || !message.text || !event.replyToken) continue;
 

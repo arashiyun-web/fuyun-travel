@@ -26,6 +26,23 @@ model CharterQuote {
   @@map("charter_quotes")
 }
 
+/// Passenger charter order. Base fare is not a customer-confirmed total.
+model CharterOrder {
+  id             String   @id @default(cuid())
+  quoteId        String   @unique @map("quote_id")
+  lineUid        String   @map("line_uid")
+  baseAmountTwd    Int      @map("base_amount_twd")
+  totalAmountTwd   Int?     @map("total_amount_twd")
+  vehicleLabel     String   @map("vehicle_label")
+  routeLabel       String   @map("route_label")
+  quoteFingerprint String   @map("quote_fingerprint")
+  reviewJson       Json?    @map("review_json")
+  status           String   @default("pending_confirmation")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("charter_orders")
+}
+
 model AiConversation {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now()) @map("created_at")

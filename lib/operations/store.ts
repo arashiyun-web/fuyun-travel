@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { exactTrue } from "@/lib/liveSwitch";
 import { OPERATIONS_OWNER_APPROVER, hasExplicitOwnerApproval, hasOwnerApprovalEvent, reviseCaptionsAfterApproval } from "./approvalGate";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
@@ -499,7 +500,7 @@ export async function withdrawWebsiteJob(jobId: string, by: string) {
   return db.withdrawWebsiteJob(jobId, by);
 }
 
-export async function runDueJobs(mode: RunMode = process.env.OPERATIONS_LIVE_PUBLISH_ENABLED === "true" ? "live" : "dry-run") {
+export async function runDueJobs(mode: RunMode = exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED) ? "live" : "dry-run") {
   if (backend() === "database") return db.runDueJobs(mode);
   await fileRecoverExpired();
   const statuses = dueStatusesFor(mode);

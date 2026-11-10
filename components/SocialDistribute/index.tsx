@@ -256,6 +256,7 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
   const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<GeneratedItem[]>([]);
+  const [notice, setNotice] = useState("");
   const [status, setStatus] = useState<Record<string, string>>({});
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<SocialProfile[]>([]);
@@ -407,12 +408,11 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
         },
         body: JSON.stringify({ text, location, imageBase64 }),
       });
-      const data: { success?: boolean; items?: GeneratedItem[]; error?: string } = await response.json();
+      const data: { success?: boolean; items?: GeneratedItem[]; error?: string; operationsContentId?: string; warning?: string } = await response.json();
 
       if (data.success && data.items) {
         setItems(data.items);
-        const contentId = (data as { operationsContentId?: string }).operationsContentId;
-        if (contentId) alert(`已建立營運草稿 ${contentId}。請到營運後台核准，不會在這裡直接發文。`);
+        if (data.operationsContentId) setNotice(`${data.warning || "草稿已進審核。"} 編號 ${data.operationsContentId}`);
       } else {
         alert(`生成失敗：${data.error || "未知錯誤"}`);
       }
@@ -832,6 +832,7 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
           <button type="button" onClick={handleGenerate} disabled={loading} className={styles.generateBtn}>
             {loading ? "生成中..." : "一鍵生成各平台版本"}
           </button>
+          {notice ? <p className={styles.noImage}>{notice} <a href="/admin/operations">到營運後台審核</a></p> : null}
         </div>
       </section>
 
@@ -840,9 +841,7 @@ export default function SocialDistribute({ connections }: SocialDistributeProps)
           <article key={item.platform} className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.platformName}>{item.label}</span>
-              <span className={item.autoPost ? styles.autoTag : styles.manualTag}>
-                {item.autoPost ? "排程發布" : "人工送出"}
-              </span>
+              <span className={styles.manualTag}>待核准，未發文</span>
             </div>
 
             {imageSource(item) ? (

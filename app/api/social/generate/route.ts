@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { CopywriterUnavailableError, generateCopy } from "@/lib/ai/copywriter";
-import { verifyAdminToken } from "@/lib/adminAuth";
+import { verifyAdminMutationRequest } from "@/lib/adminAuth";
 import { createContentDraft } from "@/lib/operations/store";
 import { uploadToR2 } from "@/lib/storage/r2";
 import type { OperationsPlatform } from "@/lib/operations/types";
@@ -10,12 +10,12 @@ export const dynamic = "force-dynamic";
 const PLATFORMS: OperationsPlatform[] = ["website", "facebook_group", "facebook_page", "instagram", "x"];
 
 function isAuthorized(request: NextRequest) {
-  return Boolean(verifyAdminToken(request.headers.get("authorization")));
+  return Boolean(verifyAdminMutationRequest(request));
 }
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "請先到 /admin 登入管理員。" }, { status: 401 });
   }
 
   let body: { text?: unknown; location?: unknown; imageBase64?: unknown };
@@ -51,9 +51,6 @@ export async function POST(request: NextRequest) {
   const base64 = body.imageBase64.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64, "base64");
   const url = await uploadToR2(`social/${Date.now().toString(36)}/post.jpg`, buffer, "image/jpeg");
-  if (!url) {
-    return NextResponse.json({ error: "圖片需要 R2_PUBLIC_URL 與 R2 帳號設定，否則無法交給粉專或 Instagram 抓取。" }, { status: 503 });
-  }
 
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -69,11 +66,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       operationsContentId: content.id,
+      approvalStatus: content.approval.status,
+      publishBlocked: true,
+      warning: url ? "草稿已進營運審核。這裡不會發文，正式發布開關也沒有打開。" : "圖片公開網址未設定。草稿已進營運審核，不能交給粉專或 Instagram 抓取，也不會發文。",
       items: PLATFORMS.map((platform) => ({
         platform,
         label: platform,
         caption: content.platforms[platform].caption,
-        autoPost: platform !== "facebook_group",
+        autoPost: false,
         imageUrl: url,
         imageDataUrl: null,
       })),

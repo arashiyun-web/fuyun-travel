@@ -28,6 +28,8 @@ export function verifyAdminMutation(request: Request) {
   return Boolean(verifyAdminMutationRequest(request)) || automationBearer(request);
 }
 
+export const ADMIN_LOGIN_MESSAGE = "請先到 /admin 登入管理員。";
+
 export function unauthorized() {
-  return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  return NextResponse.json({ success: false, error: ADMIN_LOGIN_MESSAGE }, { status: 401 });
 }
