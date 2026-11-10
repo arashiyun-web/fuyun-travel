@@ -29,6 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/itineraries",
     "/reviews",
     "/featured-trips",
+    "/highlights",
     "/ai-trip-planner",
     "/contact",
     "/contact/inquiry",

@@ -46,6 +46,43 @@ export function absoluteUrl(path = "/") {
   return `${SITE.url}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+// 實際存在的語言入口頁（各自只有 app/<locale>/page.tsx，底下沒有巢狀路由）。
+// hreflang 只能指向這份清單裡的網址；新增語言入口頁時才在這裡加一筆，
+// 不要用「locale + 任意 path」拼網址，那些翻譯頁並不存在。
+export const LOCALE_ENTRIES = [
+  { hreflang: "zh", path: "/zh" },
+  { hreflang: "zh-Hant", path: "/zh-tw" },
+  { hreflang: "en", path: "/en" },
+  { hreflang: "ja", path: "/ja" },
+  { hreflang: "ko", path: "/ko" },
+  { hreflang: "ms", path: "/ms" },
+  { hreflang: "vi", path: "/vi" },
+  { hreflang: "th", path: "/th" },
+] as const;
+
+export const LOCALE_ENTRY_PATHS: readonly string[] = LOCALE_ENTRIES.map((entry) => entry.path);
+
+function normalizePath(path: string) {
+  const withSlash = path.startsWith("/") ? path : `/${path}`;
+  return withSlash.replace(/\/+$/, "") || "/";
+}
+
+// 首頁與語言入口頁共用同一組 alternates（互相列出）；
+// 其餘中文頁沒有翻譯版，只宣告自己。
+type LanguageAlternates = NonNullable<NonNullable<Metadata["alternates"]>["languages"]>;
+
+function languageAlternates(path: string): LanguageAlternates {
+  const normalized = normalizePath(path);
+  if (normalized === "/" || LOCALE_ENTRY_PATHS.includes(normalized)) {
+    const languages: LanguageAlternates = {};
+    for (const entry of LOCALE_ENTRIES) languages[entry.hreflang] = absoluteUrl(entry.path);
+    languages["x-default"] = absoluteUrl("/");
+    return languages;
+  }
+  const self = absoluteUrl(path);
+  return { "zh-Hant": self, "x-default": self };
+}
+
 export function pageMeta(args: {
   title: string;
   description?: string;
@@ -64,15 +101,7 @@ export function pageMeta(args: {
     description,
     alternates: {
       canonical: url,
-      languages: {
-        "zh-Hant": absoluteUrl(`/zh-tw${path === "/" ? "" : path}`),
-        en: absoluteUrl(`/en${path === "/" ? "" : path}`),
-        ja: absoluteUrl(`/ja${path === "/" ? "" : path}`),
-        ko: absoluteUrl(`/ko${path === "/" ? "" : path}`),
-        ms: absoluteUrl(`/ms${path === "/" ? "" : path}`),
-        vi: absoluteUrl(`/vi${path === "/" ? "" : path}`),
-        th: absoluteUrl(`/th${path === "/" ? "" : path}`),
-      },
+      languages: languageAlternates(path),
     },
     openGraph: {
       title: fullTitle,
