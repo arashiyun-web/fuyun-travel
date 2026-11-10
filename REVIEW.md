@@ -1,50 +1,64 @@
-# 浮雲網站 Step 2 — 本地實作完成
+# 浮雲網站 Step 3 — 本地離線實作與驗證
 
-狀態：**PASS（本地離線驗證）**。正式套用、部署與真實通知均未執行。
+狀態：completed（本地程式、離線驗證）；正式部署、供應商連線與 Telegram 啟用均為 planned，未執行。
 
-分支：`cursor/step2-charter-migration-inquiry-notify`，從 `f9806b6e03a8350e00b5dfa826a4c1aeb44a9c0c` 建立。啟動參數採操作端已核實的 SessionConfiguredEvent，完整欄位及本輪 session id 見 START-RECEIPT.json。上一輪誤判 FAIL 的七份交付檔完整旁置在 codex-attempt1-false-fail/，原提交仍保留於舊分支。
+分支：`cursor/step3-one-click-drafts-friday-remind`。起始 HEAD：`93867fa7fbbbabc920b69974dfc1f85641da836b`，與任務指定一致。啟動收據留在工作根 `START-RECEIPT.json`，本輪不檢查 sqlite／/proc 模型身分；啟動模型與 high 參數由操作端依 SessionConfiguredEvent 核對。這不是正式站／正式資料庫驗收。
 
-## 實作
+## 一鍵草稿
 
-- charter_orders 正式 migration：`prisma/migrations/202611080002_charter_orders/migration.sql`。CREATE TABLE / UNIQUE INDEX 均 IF NOT EXISTS；主鍵隨 CREATE TABLE 條件建立。只有新增，不修改其他表、欄位型別或資料。舊 pending SQL 留為純註解指標，沒有第二份可執行 SQL。
-- F2：移除自由文本的路線及時數推測。必須由人員明選 `taipei-day-10h` 或 `taipei-jiufen-10h`，並輸入通過驗證的正整數時數；只有已核對的 10 小時、車型與可載人數才給基本車資。否定句、多點敘述及「10小時」文字本身不授權金額。沒有結構化核對資料的舊詢價維持 unknown/null，待人員補問或核對。
-- F3：沿用 CharterQuote.quoteOptions，保存 `fleetFare: { version, rateId, hours, source }`；舊 object 的其他 key 保留，舊 array 保存為 legacyOptions。草稿產生、重讀、轉單及內部核價共用保存輸入；金額不從可編輯草稿文字讀取。pickup/destination/remark 快照改變會使保存核對失效，rate/hours 也納入訂單 fingerprint。後台報價頁提供無預選值的路線與時數控制項。
-- 詢價通知：`INQUIRY_NOTIFY_ENABLED` 透過既有 exactTrue，只有精確 `true` 開啟，預設關閉。寫入前 fallback LINE、寫入後確認 LINE 與 Email 全部受控。Email 與 LINE 清單逗號分隔、去空白與重複值，每位收件人獨立 catch。LINE_ADMIN_USER_ID 缺少時保留 ADMIN_LINE_USER_ID 後備。缺通道設定或寄送失敗不影響詢價保存及成功回應；無 import-time throw。
-- 保留原有兩階段 LINE 語意：成功詢價時，每位 LINE 收件人在「寫入前備援」及「已保存確認」各一次；每位 Email 收件人一次。測試逐階段核對每位收件人，沒有合併成一個逗號字串交給 LINE。
-- 後台詢價沿用現有 status 欄位與 PATCH：新詢價／已報價／已確認／已取消。verifyAdminMutation 透過既有登入驗證及同源檢查保護寫入；測試覆蓋有效 bearer、有效同源 cookie、匿名及有效跨來源 cookie。
-- 詢價通知日誌只含設定存在的布林，移除通知及此路由其他 catch 的原始例外內容，避免秘密隨例外寫入日誌。
+在 `/admin/content-factory` 選擇一篇已發布的「這裡真好玩」，可預覽標題、說明及既有公開圖片，再點「一鍵生成各平台草稿」。新 GET `/api/content-factory/sources` 需既有 admin bearer 驗證，只查 `featured_spots.status=published`。選擇框列出全部已發布素材；沒有素材或載入失敗會顯示狀態，仍可使用既有行程簡述。
 
-沒有 Inquiry/CharterQuote schema 變更；未修改公開頁、CSS、LineButton、Footer、表單外觀、OPERATIONS_LIVE_PUBLISH_ENABLED 邏輯或 yun_erp。
+POST `/api/content-factory/generate` 接受 `featured_spot_id`；伺服器重新以 id＋published 查原資料，忽略客戶端夾帶的標題／說明／圖片。被撤下、未發布或不存在的素材為 404；格式錯誤／空素材為 400；讀取失敗為 503。來源 id 與實際素材快照存於現有 input_json，無新增欄位。
 
-## 驗證
+供應商優先序維持 Gemini → Anthropic → OpenAI（各自完整名稱對）；缺少設定由既有 CopywriterUnavailableError 回 503，沒有原文假生成或寫入。上游錯誤為 502；模型 JSON 經 nested validation／預設值正規化，缺主要平台內容或不合法集合型別一律 502、零寫入。不回傳／記錄原始供應商或資料庫例外。無價格時沿用既有 JSON-LD offers 移除邏輯。
 
-- Node v22.22.3：`node scripts/test-step2-offline.mjs` → **141 tests，140 pass，0 fail，0 cancelled，1 skip**。完整 TAP：evidence/step2/offline-suite.txt。
-- 唯一 skip 是原有 Instagram 選用資料庫測試，未提供其資料庫設定。
-- 七個需 PostgreSQL／sudo／破壞式重建測試庫或 Windows PowerShell 的 integration/platform 檔案未執行；完整檔名與理由在 runner 及 TAP 首行。沒有宣稱它們通過。
-- 新增 13 項業務／migration 測試。保留 RED 證據；mock nodemailer、pushLineText、Prisma persistence，實際執行 route、fare builder、轉單及登入驗證。未使用真實 SMTP、LINE API 或資料庫連線。
-- Migration 在 PGlite 內嵌 PostgreSQL 執行兩次，確認既有資料、11 個欄位、主鍵與唯一索引保留；pending 指標為空操作。@electric-sql/pglite 0.5.16 僅 devDependency，不影響正式 runtime。
-- Runner 僅傳遞允許的非秘密環境項目，封鎖 .env/.env.*/auth.json 讀取與外部 socket。測試中的通道／身分設定均為記憶體內的 synthetic fixtures。
-- Prisma Client 用 /tmp 的 schema 副本產生，不載入專案秘密檔。`tsc --noEmit --incremental false` 通過。
-- 變更範圍 ESLint：0 errors，1 項既有報價頁 useEffect dependencies warning；該 hook 在起始 HEAD 已存在，未擴大重構。
-- `git diff --check` 通過（.gitattributes 僅將原始測試輸出的空白格式排除；原始日誌逐位元保留，程式與文件仍檢查）。未執行 Next build 或真人瀏覽器流程，不把型別／route 測試宣稱為瀏覽器端到端測試。
-- 修正兩個既有離線測試問題：過時的 live-switch 原始字串斷言改由既有行為測試覆蓋；R2 hung-call 測試維持 caller 存活，避免 unref timer 造成測試取消。沒有更改 publishing 或 R2 正式程式。
+保存使用現有 Prisma `contentDraft.create`，status 固定 draft；只有成功寫入後回傳 success 與非空 draftId。資料庫寫入失敗回 503。後台顯示該 id；既有 `/api/content-factory/save` GET 可讀回。output_json 保存 Facebook、Instagram、SEO／website 與其他既有渠道；X 沿用舊 operations 轉換的 Facebook 短文衍生方式（最多 280 字元），現在保存在 output_json.x 並提供後台分頁。
 
-## 獨立審查
+生成的終點統一為 content_drafts，包括手動簡述模式。原先的選用 operations 草稿轉換已移除，因此不會下載封面圖、不建立 operations job、核准或發布；這是本輪實作選擇，符合任務允許只存 content_drafts 的範圍。後續若要送 operations，仍需另外的人工核對流程。`OPERATIONS_LIVE_PUBLISH_ENABLED` 與發布引擎完全未修改。
 
-requesting-code-review 的獨立 reviewer 已讀取原始檔與差異。發現有效 cookie 測試常數錯誤及既有 catch 洩漏原始錯誤日誌；前者補有效同源／跨來源對照，後者新增會失敗的資料庫例外測試後修正，整套重新通過。完整紀錄見 evidence/step2/independent-review.md。
+編輯分頁只修改主文；儲存前將編輯值合併回結構化 output，FAQ、資訊表、hashtags、信件主旨及其他欄位保留；複製可含這些原有資訊。編輯會清除已保存提示，再另存一份 draft；沒有宣稱未保存編輯已落地。這裡仍沿用既有另存草稿 API，不做發布。
 
-## 正式套用（planned；本輪禁止執行）
+## 圖片
 
-經老闆批准正式操作後，建議由操作端對正式庫執行 `prisma migrate deploy`。本 SQL 是 IF NOT EXISTS，既有一致結構上重跑為空操作，然後 Prisma 寫入 _prisma_migrations。IF NOT EXISTS 不會自動校驗或修復不同的既有結構；本輪沒有連線確認正式 schema 或其他待套用歷史。
+已發布素材沿用既有 HTTPS 圖片（含 Blob 網址），以及 `/images/` 下的站內素材；去重並以第一張為封面。排除 HTTP、data、協定相對、帶帳密及不安全站內路徑。不抓取遠端圖片；素材無可用圖時清楚提示，但可先存文字草稿。測試只證明 URL 保存，未對真實圖源做網路可達性檢查。
 
-備用：若決定不重跑 SQL，必須先確認正式表的欄位、型別、null/default、主鍵與唯一索引已與本 migration 一致，再使用 `prisma migrate resolve --applied 202611080002_charter_orders` 只登記歷史。
+新圖上傳維持既有 fail-closed 路徑：缺 R2_PUBLIC_URL 回 503，訊息明列公開儲存待核並請先沿用素材圖片；後台會顯示上傳失敗，不再靜默跳過。本輪沒有新增 Blob 上傳實作、申請網域／帳號、設定 R2_PUBLIC_URL 或變更任何 Vercel 變數。若需新圖上傳，公開儲存路徑是待核項，沒有回傳不可公開取得的假成功網址。
 
-還原不使用 DROP：此 migration 僅建表，回退應用程式碼至本次前版本；保留既有表與資料。指定備份分支：`backup-before-step2-20261111`（`br-winter-thunder-ao8y5adv`），這是任務提供資訊，本輪未連線重驗。
+## 週五提醒與歷史
 
-舊訂單若使用之前的 fingerprint 或沒有結構化核對資料，需要人員重新核對；本輪不自動重寫舊訂單或金額。
+新增 `/api/ops/friday-highlights-reminder`，GET／POST 沿用 process-due 的 `verifyOperationsWorkerRequest`，接受既有 CRON_SECRET／OPERATIONS_CRON_TOKEN 模式（也保留該 helper 的 admin mutation 驗證）；未授權 401。vercel.json 僅新增 `0 1 * * 5` UTC＝週五 09:00 Asia/Taipei，原 `process-due: 0 6 * * 2,4` 與 `weekly-pull: 0 4 * * *` 均保留。
 
-正式啟用通知仍屬 planned：由獲授權操作端確認兩位實際收件人與 SMTP/LINE 通道，再決定是否設定 INQUIRY_NOTIFY_ENABLED=true。本輪沒有讀取或更改正式變數，也沒有自行配置任何通道。
+FRIDAY_TELEGRAM_REMIND_ENABLED 只有精確字串 true 才可能發送；預設關。關閉時不讀取提醒通道；缺 TELEGRAM_BOT_TOKEN 或 TELEGRAM_BOSS_CHAT_ID 時回 200 `{sent:false,reason}`。收件人只接受單一正整數私人 user/chat id，拒絕負數群組／channel、@名稱、清單與其他格式。不使用 Hermes／分身民 bot，也不掃描或修改既有 bot 設定。
 
-## 交付
+開關與通道齊備時只送「該整理小羽旅遊趣新貼文、送待審」，不查新貼文、不讀 Facebook、不改官網、不發社群。單次 fetch、10 秒 timeout；傳輸失敗、非 2xx 或 Telegram ok 不為 true 回 502、reason=delivery_failed，便於 cron 監看；不回傳上游本文、token、收件人或原始例外。本輪所有發送測試皆 mock，零真訊息。
 
-本地 commit 完成後，根目錄 step2.patch 為起始 HEAD 至交付 commit 的 binary diff，git-log-1.txt 與 git-status.txt 為實際最終快照。這三個 commit 後產生的交付檔保留為 untracked，程式與證據已提交。未 merge、push、部署、連正式 Neon、送測試詢價、寄信或推播；未操作受保護程序。
+歷史已用 repo 唯讀核對：2026-08-20 的 `2213009` 移除 weekly-pull，原排程為 `0 1 * * 1`（週一台北 09:00），不是週五 Telegram。commit 說明記載 Meta App 簡訊驗證卡關、社團無法用 Graph API 讀，改由老闆觸發 computer-use，避免無人值守打 Facebook API；任務將此稱為 PR #16（PR 編號依操作端提供，本輪未連 GitHub 核對）。`52fc1e1`（#47）重新加入每日 04:00 UTC weekly-pull，`20e41a1`（#48）將 process-due 改為週二四；均與本次 Telegram 提醒不同。
+
+主機 crontab 空白、systemd timers 無此提醒，以及 Vercel 缺 TELEGRAM_*、preview／development 缺文案供應商名稱，均為操作端已做的查證，本輪不再次讀取正式設定或主機服務。正式有 ANTHROPIC_API_KEY／AI_MODEL_NAME 的名稱不表示本輪已驗證其值或可用性。
+
+## 驗證與審查
+
+Node v22.22.3（主機預設 v18 不支援 strip-types，改用既有 v22，未修改系統設定）。`node scripts/test-step2-offline.mjs` 自動包含本次三個 step3 測試檔；最終 **160 tests / 159 pass / 0 fail / 0 cancelled / 1 skip**。新增 19 項，包含 PGlite 實際 INSERT 與依 draftId SELECT、各平台欄位及圖片、既有 save GET 讀回、缺供應商／錯誤模型／持久化失敗零假成功、主文編輯序列化、上傳待核、cron 授權與 mock 提醒。
+
+唯一 skip 是原有 Instagram 選用資料庫測試。七個原有 integration/platform 檔因 PostgreSQL／sudo／破壞式測試庫重建／Windows PowerShell 依賴未跑：admin-session-flow、member-order-publish、line-group-relay、line-webhook-claim、line-webhook-offline、operations-intake-cleanup、tools/vercel-ascii；沒有宣稱通過。完整名稱／理由在 runner 與原始 TAP 首行。
+
+Prisma persistence 邊界接至測試內 PGlite，表結構依現有 ContentDraft schema 建立；不宣稱此測試是 Prisma 到 Neon 的真連線或正式 migration 驗證。文案供應商與 Telegram 均 mock，guard 拒絕秘密檔讀取與外部 socket；runner 的子程序環境採非秘密 allowlist。Prisma Client 從 /tmp schema 副本產生，無連線、無環境秘密檔。首次依賴／cache 問題留原始紀錄，使用 /tmp cache 與 arm64 sharp 選用依賴解決；package.json／lock 未因此改動。
+
+`tsc --noEmit --incremental false` 通過；變更 TS/TSX 範圍 ESLint 0 errors／0 warnings。git diff --check 與凍結範圍檢查通過。未執行 Next build、真人瀏覽器或正式 LLM／Telegram E2E；驗證範圍是後台程式的型別／lint、真實 route → mock provider → 內嵌 SQL → readback，及編輯 helper 行為。
+
+使用 requesting-code-review 的獨立 reviewer 提出三項 Important：X 遺失、編輯結果未保存、模型巢狀型別會使畫面崩潰；皆先保留 RED、再修正 GREEN 並全套回歸。沒有 Critical 或待修 Minor。修後由作者以測試驗證，未宣稱 reviewer 再審。證據留在 evidence/step3/（不納入提交的大量日誌），test-summary.txt 與 review-result.json 列最終結果。
+
+## Schema、邊界與回滾
+
+新增 migration／CREATE TABLE／ADD COLUMN：**無**。未改 schema.prisma、yun_erp、正式 Neon 或任何資料庫分支；PGlite 建表只存在測試記憶體。未改公開頁 UI/CSS、highlights、LineButton、Footer、sitemap、layout/page/site SEO、hreflang／alternates、詢價通知、SMTP 或受保護程序；未改正式環境或發布開關。未 merge、push、部署。
+
+Rollback 為回退本次應用程式 commit 或讓應用程式採起始 HEAD，保留 content_drafts 現有表與所有草稿；只撤新增 cron，不變更既有兩條排程。沒有 DROP、資料清除、Neon 分支刪除或秘密復原步驟。本輪不執行 rollback。
+
+## 待核下一步（planned）
+
+1. 由操作端審查本分支與 step3.patch；正式部署另經核准。
+2. preview／本地沒有供應商名稱時預期 503；若要真生成，須另經核准配置供應商並做測試，本輪不設定或讀值。
+3. 提醒預設維持關閉。老闆先向擬用 bot 私訊，再自行從 Telegram 介面／@userinfobot 確認本人的正整數 user id；僅把該值透過核准管道設為 TELEGRAM_BOSS_CHAT_ID，配合核准 bot 的 TELEGRAM_BOT_TOKEN。程式／報告不讀出、不打印正式值，也不把 Hermes bot 當此通道。確認本人收件人與明確批准後，才由操作端設定總開關。本輪不發測試訊。
+4. 若要上傳新圖，另核准可公開的儲存路徑；目前可以既有公開素材完整走一鍵草稿流程，不因這個待核項停住。
+
+本工作根保留，程式／測試／必要文件有本地 commit；START-RECEIPT、review-result、原始 Evidence 與 step3.patch 等過程／交付檔留本地，git-log-1.txt 與 git-status.txt 是提交後快照。舊 Step2 根目錄報告已旁置 evidence/step3/prior-step2/，歷史提交仍保留。

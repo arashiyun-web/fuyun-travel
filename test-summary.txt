@@ -1,34 +1,35 @@
-PASS — local offline scope only
-Session: 01a1c790-ed82-7692-8d8f-f03db9630e52
-Branch: cursor/step2-charter-migration-inquiry-notify
-Base: f9806b6e03a8350e00b5dfa826a4c1aeb44a9c0c
-Runtime: operator-verified gpt-6.1-sol / High / OnRequest / AutoReview / workspace-write
-Node: v22.22.3
+PASS — Step 3 local offline verification only
+Branch: cursor/step3-one-click-drafts-friday-remind
+Base: 93867fa7fbbbabc920b69974dfc1f85641da836b
+Node: v22.22.3 (existing /home/arashiyun/.nvm/versions/node/v22.22.3/bin)
 
-node scripts/test-step2-offline.mjs
-  exit 0; tests 141; pass 140; fail 0; cancelled 0; skip 1
-  skip: optional Instagram database-store test; no database config supplied
-  excluded: 7 integration/platform files requiring PostgreSQL/sudo/destructive test-DB recreation/Windows; names and reasons in runner and TAP
-  evidence: evidence/step2/offline-suite.txt
+PATH=/home/arashiyun/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin node scripts/test-step2-offline.mjs
+  exit 0; tests 160; pass 159; fail 0; cancelled 0; skip 1
+  new Step3 tests: 19
+  skip: existing optional Instagram database-store test, no database configuration
+  excluded: 7 existing PostgreSQL/sudo/destructive-test-DB/Windows suites; full names and reasons in runner/TAP
+  raw TAP: evidence/step3/offline-suite.txt
 
-New regression coverage: 13 tests (F2/F3=5, inquiry=7, embedded PostgreSQL migration=1)
-  Negative hours/route prose; explicit checked 10h fare; draft → API reread → convert;
-  stale source/hour invalidation; malformed input and unauthenticated draft;
-  exactTrue variants; absent channels; two recipients per channel per phase;
-  per-recipient failure isolation; New→Quoted→Confirmed/Cancelled;
-  valid same-origin cookie vs valid cross-origin cookie; no raw exception log;
-  additive migration twice, existing row preserved, unique key remains effective.
-  RED: regression-red.txt, migration-red.txt, log-red.txt
-  GREEN: final full offline-suite.txt
+Coverage:
+  Published source list/auth; canonical source lookup; withdrawn/private/missing source rejection;
+  route → mock LLM → real PGlite INSERT → returned draftId SELECT → existing save GET;
+  Facebook, Instagram, website, derived X and image fields; draft-only status;
+  missing real provider selection returns 503 with no write; malformed input/output and query/write failure;
+  nested model shape validation/defaults; edited main text serialization preserves structured metadata;
+  upload missing public storage returns pending-approval 503 with no storage call;
+  Friday cron auth, exactTrue false variants, absent config, invalid group/list recipients;
+  one mocked Telegram send with a synthetic single private fixture, sanitized transport/upstream failures.
 
-TypeScript: tsc --noEmit --incremental false → exit 0
-Scoped ESLint: exit 0; 0 errors; 1 preexisting useEffect dependencies warning
-Whitespace: git diff --check → exit 0
-Independent code review: material log finding fixed with RED→GREEN + full suite
-No Next build or browser E2E claimed. No production schema/live delivery verification.
+tsc --noEmit --incremental false: exit 0
+ESLint changed TS/TSX with --max-warnings 0: exit 0, 0 errors / 0 warnings
+git diff --check and frozen-file diff: exit 0
+Independent read-only reviewer: 0 Critical; 3 Important findings fixed by RED→GREEN + full suite; no Minor findings.
+No Next build or browser E2E claimed. No Prisma-to-Neon or production verification claimed.
 
-Safety: sanitized test environment, credential-file reads denied, external sockets denied.
-All SMTP, LINE and Prisma route boundaries mocked; SQL uses an in-memory embedded engine.
-No .env/auth.json/real credentials read; no formal DB/website/outbound notification access.
-No migration applied to any server. No merge, push, deploy, Vercel env changes or protected service operations.
-Previous false FAIL evidence retained under codex-attempt1-false-fail/.
+Reproducibility/safety:
+  Runner allowlists nonsecret child environment, rejects .env/.env.*/auth.json reads and external sockets.
+  Provider/Telegram boundaries mocked; SQL exists only in PGlite memory.
+  Prisma Client generated from /tmp schema, engine=none, no env files or database connection.
+  Initial Node18/Prisma-cache/arm64 sharp setup failures retained as evidence; final setup and verification passed.
+  No schema changes or migrations; no live API/DB/notification, env change, merge, push, deploy or service change.
+  New images blocked pending public storage approval; existing HTTPS /images assets reused without network fetch.

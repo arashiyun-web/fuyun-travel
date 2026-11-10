@@ -3,8 +3,8 @@ import { Prisma } from "@prisma/client";
 import { CopywriterUnavailableError, generateCopy } from "@/lib/ai/copywriter";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
-import { createContentDraft } from "@/lib/operations/store";
-import type { OperationsPlatform } from "@/lib/operations/types";
+import { normalizeGeneratedContent } from "@/lib/content-factory/output";
+import { featuredSpotSource, isPublicDraftImage } from "@/lib/content-factory/sources";
 import { parseInput } from "@/lib/content-factory/parser";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/content-factory/systemPrompt";
 import { getLineOaUrl } from "@/lib/config/company";
@@ -35,9 +35,36 @@ export async function POST(request: Request) {
 
   let body: ContentFactoryInput;
   try {
-    body = await request.json();
+    const input = await request.json();
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Invalid input");
+    body = input;
   } catch {
     return NextResponse.json({ error: "JSON 格式錯誤" }, { status: 400 });
+  }
+
+  const rawBody = body as ContentFactoryInput & { featured_spot_id?: unknown };
+  if ("featured_spot_id" in rawBody) {
+    if (typeof rawBody.featured_spot_id !== "string" || !rawBody.featured_spot_id.trim()) {
+      return NextResponse.json({ error: "請選擇已發布素材。" }, { status: 400 });
+    }
+    try {
+      const spot = await prisma.featuredSpot.findFirst({ where: { id: rawBody.featured_spot_id, status: "published" } });
+      if (!spot) return NextResponse.json({ error: "素材不存在或已取消發布，請重新選擇。" }, { status: 404 });
+      const source = featuredSpotSource(spot);
+      // Resolve again at generation time. Client edits cannot impersonate published material.
+      body = { trip_title: source.title, user_notes: source.description, days: "", season: "", price: "", spots: [], target_audience: "", additional_info: "", image_urls: source.image_urls, cover_image_url: source.cover_image_url, featured_spot_id: source.id };
+    } catch {
+      return NextResponse.json({ error: "素材暫時無法讀取，請稍後重試。" }, { status: 503 });
+    }
+  }
+  for (const key of ["trip_title", "user_notes", "days", "season", "price", "target_audience", "additional_info", "cover_image_url"] as const) {
+    if (body[key] !== undefined && typeof body[key] !== "string") return NextResponse.json({ error: "素材欄位格式錯誤。" }, { status: 400 });
+  }
+  if (!body.user_notes?.trim() || (body.spots !== undefined && (!Array.isArray(body.spots) || body.spots.some((spot) => typeof spot !== "string")))) {
+    return NextResponse.json({ error: "請提供行程描述或已發布素材。" }, { status: 400 });
+  }
+  if ((body.image_urls !== undefined && (!Array.isArray(body.image_urls) || body.image_urls.some((url) => !isPublicDraftImage(url)))) || (body.cover_image_url && !isPublicDraftImage(body.cover_image_url))) {
+    return NextResponse.json({ error: "圖片須為既有 HTTPS 公開網址或 /images/ 站內素材。新圖片公開空間尚待核准。" }, { status: 400 });
   }
 
   const parsed = parseInput(body.user_notes || "", {
@@ -53,7 +80,8 @@ export async function POST(request: Request) {
   const fullInput: ContentFactoryInput = {
     ...parsed,
     image_urls: Array.isArray(body.image_urls) ? body.image_urls : [],
-    cover_image_url: body.cover_image_url || "",
+    cover_image_url: body.cover_image_url || body.image_urls?.[0] || "",
+    ...(body.featured_spot_id ? { featured_spot_id: body.featured_spot_id } : {}),
   };
 
   const lineOaUrl = getLineOaUrl() || "https://line.me/R/ti/p/@954fyicw";
@@ -68,7 +96,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
     return NextResponse.json(
-      { error: "無法連線到 LLM 服務", raw: String(err) },
+      { error: "無法連線到文案供應商，未建立草稿。" },
       { status: 502 },
     );
   }
@@ -76,17 +104,12 @@ export async function POST(request: Request) {
   const cleaned = stripFences(rawText);
   let generated: GeneratedContent;
   try {
-    generated = JSON.parse(cleaned);
+    generated = normalizeGeneratedContent(JSON.parse(cleaned));
   } catch {
     return NextResponse.json(
-      { error: "LLM 回傳的 JSON 解析失敗", raw: rawText },
+      { error: "文案供應商回傳格式錯誤，未建立草稿。" },
       { status: 502 },
     );
-  }
-
-  // Normalise json_ld: model may return an object instead of a string
-  if (generated.json_ld && typeof generated.json_ld !== "string") {
-    generated.json_ld = JSON.stringify(generated.json_ld, null, 2);
   }
 
   // Price safety lock: strip offers from json_ld when price is empty
@@ -117,46 +140,9 @@ export async function POST(request: Request) {
       coverImageUrl: fullInput.cover_image_url || null,
       status: "draft",
     },
-  }).catch((error: unknown) => {
-    console.error("content draft persist failed", error);
-    return null;
-  });
+  }).catch(() => null);
+  if (!draft) return NextResponse.json({ error: "草稿儲存失敗，請稍後重試。" }, { status: 503 });
 
-  let operationsContentId: string | null = null;
-  let operationsError = "";
-  const cover = fullInput.cover_image_url || fullInput.image_urls?.[0] || "";
-  if (!cover) {
-    operationsError = "沒有封面圖，尚未建立營運發布草稿。";
-  } else {
-    try {
-      const imageDataUrl = cover.startsWith("data:") ? cover : await fetch(cover).then(async (response) => {
-        if (!response.ok) throw new Error(`封面圖 HTTP ${response.status}`);
-        const type = (response.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
-        const bytes = Buffer.from(await response.arrayBuffer());
-        return `data:${type};base64,${bytes.toString("base64")}`;
-      });
-      const platforms: OperationsPlatform[] = ["website", "facebook_group", "facebook_page", "instagram", "x"];
-      const content = await createContentDraft({
-        title: fullInput.trip_title || generated.meta?.trip_title || "未命名行程",
-        type: "招生",
-        tripDate: new Date().toISOString().slice(0, 10),
-        body: fullInput.user_notes || generated.seo_article?.body_markdown || fullInput.trip_title,
-        selectedPlatforms: platforms,
-        images: [{ dataUrl: imageDataUrl, originalName: "cover.jpg" }],
-        captions: {
-          website: generated.seo_article?.body_markdown || fullInput.user_notes,
-          facebook_group: generated.facebook?.body || "",
-          facebook_page: generated.facebook?.body || "",
-          instagram: generated.instagram?.caption || "",
-          x: (generated.facebook?.body || fullInput.user_notes || "").slice(0, 280),
-        },
-      });
-      operationsContentId = content.id;
-    } catch (error) {
-      operationsError = error instanceof Error ? error.message : "建立營運發布草稿失敗";
-      console.error("operations draft from content factory failed", error);
-    }
-  }
-
-  return NextResponse.json({ success: true, generated, input: fullInput, draftId: draft?.id || null, operationsContentId, operationsError });
+  // Generation stops here: no approval, image fetch, operations job, or publication.
+  return NextResponse.json({ success: true, generated, input: fullInput, draftId: draft.id });
 }
