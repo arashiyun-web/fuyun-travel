@@ -117,6 +117,31 @@ test('source query and persistence failures are controlled 503, never success or
   assert.equal(r.status, 503); assert.doesNotMatch(await r.text(), /private-db-error|success":true/);
   assert.equal(await count(), n);
 });
+for (const { name, input, expectedCover } of [
+  { name: 'explicit empty cover stays empty despite an HTTPS image', input: { cover_image_url: '', image_urls: ['https://images.example.invalid/member.jpg'] }, expectedCover: '' },
+  { name: 'omitted cover falls back to the first image', input: { image_urls: ['https://images.example.invalid/member.jpg'] }, expectedCover: 'https://images.example.invalid/member.jpg' },
+  { name: 'null cover falls back to the first image', input: { cover_image_url: null, image_urls: ['https://images.example.invalid/member.jpg'] }, expectedCover: 'https://images.example.invalid/member.jpg' },
+  { name: 'explicit nonempty cover wins over the first image', input: { cover_image_url: 'https://images.example.invalid/authorized.jpg', image_urls: ['https://images.example.invalid/member.jpg'] }, expectedCover: 'https://images.example.invalid/authorized.jpg' },
+  { name: 'omitted cover without images becomes empty', input: {}, expectedCover: '' },
+  { name: 'null cover without images becomes empty', input: { cover_image_url: null, image_urls: [] }, expectedCover: '' },
+]) {
+  test(`manual generation: ${name} in response, SQL columns and saved input`, async () => {
+    const r = await generate.POST(request({ user_notes: '素材僅供重新撰寫，照片未授權作封面', ...input }));
+    assert.equal(r.status, 200);
+    const data = await r.json();
+    assert.equal(data.input.cover_image_url, expectedCover);
+    const row = (await db.query('SELECT * FROM content_drafts WHERE id=$1', [data.draftId])).rows[0];
+    assert.equal(row.cover_image_url, expectedCover);
+    assert.equal(row.input_json.cover_image_url, expectedCover);
+    assert.deepEqual(row.image_urls, input.image_urls || []);
+    assert.equal(row.status, 'draft');
+    const readback = await save.GET(new Request('http://localhost', { headers: { authorization: `Bearer ${token}` } }));
+    assert.equal(readback.status, 200);
+    assert.equal((await readback.json()).drafts.find((draft) => draft.id === data.draftId).input.cover_image_url, expectedCover);
+    assert.equal(externalCalls, 0);
+  });
+}
+
 test('manual trip generation still persists draft and rejects unsafe image paths', async () => {
   const r = await generate.POST(request({ user_notes: '公開行程素材', trip_title: '手動行程', image_urls: ['/images/fixture.jpg'], cover_image_url: '/images/fixture.jpg' }));
   assert.equal(r.status, 200); const data = await r.json(); assert.ok(data.draftId);

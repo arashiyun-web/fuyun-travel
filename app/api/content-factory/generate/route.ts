@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
   }
   for (const key of ["trip_title", "user_notes", "days", "season", "price", "target_audience", "additional_info", "cover_image_url"] as const) {
-    if (body[key] !== undefined && typeof body[key] !== "string") return NextResponse.json({ error: "素材欄位格式錯誤。" }, { status: 400 });
+    if (body[key] !== undefined && typeof body[key] !== "string" && !(key === "cover_image_url" && body[key] === null)) return NextResponse.json({ error: "素材欄位格式錯誤。" }, { status: 400 });
   }
   if (!body.user_notes?.trim() || (body.spots !== undefined && (!Array.isArray(body.spots) || body.spots.some((spot) => typeof spot !== "string")))) {
     return NextResponse.json({ error: "請提供行程描述或已發布素材。" }, { status: 400 });
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   const fullInput: ContentFactoryInput = {
     ...parsed,
     image_urls: Array.isArray(body.image_urls) ? body.image_urls : [],
-    cover_image_url: body.cover_image_url || body.image_urls?.[0] || "",
+    cover_image_url: body.cover_image_url ?? body.image_urls?.[0] ?? "",
     ...(body.featured_spot_id ? { featured_spot_id: body.featured_spot_id } : {}),
   };
 
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       inputJson: fullInput as unknown as Prisma.InputJsonValue,
       outputJson: generated as unknown as Prisma.InputJsonValue,
       imageUrls: fullInput.image_urls || [],
-      coverImageUrl: fullInput.cover_image_url || null,
+      coverImageUrl: fullInput.cover_image_url ?? "",
       status: "draft",
     },
   }).catch(() => null);
