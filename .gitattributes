@@ -1,0 +1,3 @@
+
+# Preserve byte-for-byte test output; whitespace lint applies to source files.
+evidence/step2/*.txt -whitespace

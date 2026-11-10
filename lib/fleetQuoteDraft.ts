@@ -7,6 +7,8 @@ export type QuoteDraftInput = {
   vehicleHint?: string | null;
   passengerCount?: number | null;
   hours?: number | null;
+  /** Staff-selected catalog route; never inferred from customer prose. */
+  rateId?: FleetRateId | null;
 };
 
 export type CapacityState = "clear" | "pending" | "over" | "not_applicable";
@@ -71,20 +73,6 @@ const VEHICLES = [
   { slug: "toyota-midibus", label: "TOYOTA 中巴", hints: ["中巴", "toyota"] },
 ] as const;
 
-const OTHER_PLACES = ["高雄", "台中", "台南", "新竹", "桃園", "基隆", "宜蘭", "花蓮", "台東", "嘉義", "彰化", "苗栗", "南投", "屏東", "新北", "墾丁", "澎湖", "金門", "馬祖", "野柳", "金瓜石", "十分", "平溪", "陰陽海", "東北角", "淡水", "北投", "陽明山", "阿里山", "日月潭", "清境"];
-
-function norm(value: string) {
-  return value.replace(/臺/g, "台").replace(/\s+/g, "");
-}
-
-function hasMultiStop(value: string) {
-  return value.includes("經") || value.includes("多點") || value.includes("沿途") || value.includes("順路") || /[、，,/／]/.test(value) || /和|與|及/.test(value);
-}
-
-function otherPlaces(value: string) {
-  return OTHER_PLACES.filter((place) => value.includes(place));
-}
-
 function explicitCoach(value: string) {
   return /42\s*人座|42\s*座|四十二人座|遊覽車|大巴/.test(value);
 }
@@ -95,26 +83,13 @@ function matchedVehicle(hint: string) {
   return VEHICLES.filter((vehicle) => vehicle.hints.some((item) => text.includes(item.toLowerCase())));
 }
 
-/** A confirmed fare is only a single Taipei origin and one checked destination. */
-function matchedRoute(pickup: string, destination: string, remark: string): FleetRateId | null {
-  const from = norm(pickup);
-  const to = norm(destination);
-  const whole = norm(`${pickup}${destination}${remark}`);
-  if (!from || !to) return null;
-  if (whole.includes("經") || whole.includes("多點") || from.includes("沿途") || to.includes("沿途")) return null;
-  if (hasMultiStop(from) || hasMultiStop(to)) return null;
-  if (otherPlaces(from).length || otherPlaces(to).length || otherPlaces(norm(remark)).length) return null;
-  const taipeiOrigin = from.includes("台北");
-  if (!taipeiOrigin) return null;
-  if (to.includes("九份") && !to.includes("台北")) return "taipei-jiufen-10h";
-  if (!to.includes("九份") && (to.includes("台北") || to.includes("一日"))) return "taipei-day-10h";
-  return null;
+/** Only explicit, validated structured fields can authorize a package fare. */
+export function isFleetRateId(value: unknown): value is FleetRateId {
+  return value === "taipei-day-10h" || value === "taipei-jiufen-10h";
 }
 
-function statedHours(input: QuoteDraftInput) {
-  if (typeof input.hours === "number" && Number.isFinite(input.hours)) return input.hours;
-  const match = `${input.remark || ""}`.match(/(\d+)\s*小時/);
-  return match ? Number(match[1]) : null;
+export function isFareHours(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function tripContext(text: string) {
@@ -149,8 +124,8 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
   const coach = explicitCoach(hint);
   const count = typeof input.passengerCount === "number" && Number.isInteger(input.passengerCount) ? input.passengerCount : null;
   const vehicles = coach ? [] : matchedVehicle(hint);
-  const route = matchedRoute(pickup, destination, remark);
-  const hours = statedHours(input);
+  const route = isFleetRateId(input.rateId) ? input.rateId : null;
+  const hours = isFareHours(input.hours) ? input.hours : null;
   const vehicle = vehicles.length === 1 ? vehicles[0] : null;
   const capacity: CapacityState = vehicle ? capacityFor(vehicle.slug, count) : "not_applicable";
   const context = tripContext(`${pickup} ${destination} ${remark}`);
@@ -178,7 +153,7 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
   if (coach) {
     fareLine = "已指明 42 人座。沒有已核對車資，不改顯示小車或中巴價格。";
   } else if (!route) {
-    fareLine = "這不是已核對的台北單點行程（台北一日，或台北至九份）。多點、經由其他縣市或跨區長途都不套用車資。";
+    fareLine = "尚未由人員明選已核對的單點路線（台北一日，或台北至九份）。自由文本、多點或跨區行程不自動套用車資。";
   } else if (capacity === "over") {
     fareLine = pending[0] || "人數超過已知座位，不確認基本車資。";
   } else if (capacity === "pending") {

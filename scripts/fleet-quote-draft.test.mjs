@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const draft = createRequire(import.meta.url)("jiti")(fileURLToPath(import.meta.url), { alias: { "@": root }, interopDefault: true })("@/lib/fleetQuoteDraft");
 
 test("a single checked trip can confirm the catalog fare and its own terms", () => {
-  const van = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份老街", vehicleHint: "賓士小車", hours: 10, passengerCount: 6 });
+  const van = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份老街", rateId: "taipei-jiufen-10h", vehicleHint: "賓士小車", hours: 10, passengerCount: 6 });
   assert.equal(van.amountTwd, 7000);
   assert.equal(van.totalAmountTwd, null);
   assert.equal(van.capacity, "clear");
@@ -24,7 +24,7 @@ test("a single checked trip can confirm the catalog fare and its own terms", () 
   assert.equal(van.text.includes("30%"), false);
   assert.equal(van.text.includes("昱境"), false);
 
-  const bus = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "中巴", remark: "10小時", passengerCount: 12 });
+  const bus = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "中巴", remark: "10小時", hours: 10, passengerCount: 12 });
   assert.equal(bus.amountTwd, 9000);
   assert.match(bus.text, /不是總價/);
   assert.match([...bus.known, ...bus.pending].join("\n"), /餐點|停車|稅金/);
@@ -36,7 +36,7 @@ test("a single checked trip can confirm the catalog fare and its own terms", () 
 });
 
 test("missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare", () => {
-  const missingHours = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士", passengerCount: 4 });
+  const missingHours = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "賓士", passengerCount: 4 });
   assert.equal(missingHours.amountTwd, null);
   assert.match(missingHours.text, /僅供參考/);
   assert.match(missingHours.text, /不是可確認金額/);
@@ -52,31 +52,31 @@ test("missing hours, multi-stop, via-city, overload, and a 42-seat request do no
   assert.equal(via.text.includes("9000"), false);
   assert.equal(via.text.includes("7000"), false);
 
-  const overload = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "賓士小車", hours: 10, passengerCount: 21 });
+  const overload = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "賓士小車", hours: 10, passengerCount: 21 });
   assert.equal(overload.amountTwd, null);
   assert.equal(overload.text.includes("7000"), false);
   assert.match(overload.text, /超過九個座位/);
 
-  const midibusOver = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "中巴", hours: 10, passengerCount: 21 });
+  const midibusOver = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "中巴", hours: 10, passengerCount: 21 });
   assert.equal(midibusOver.amountTwd, null);
   assert.equal(midibusOver.text.includes("9000"), false);
   assert.match(midibusOver.text, /不改顯示小車價格/);
 
-  const vanTen = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士", hours: 10, passengerCount: 10 });
+  const vanTen = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "賓士", hours: 10, passengerCount: 10 });
   assert.equal(vanTen.amountTwd, null);
   assert.equal(vanTen.text.includes("7000"), false);
 
-  const vanNine = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士", hours: 10, passengerCount: 9 });
+  const vanNine = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "賓士", hours: 10, passengerCount: 9 });
   assert.equal(vanNine.amountTwd, null);
   assert.equal(vanNine.capacity, "pending");
   assert.match(vanNine.text, /是否包含司機/);
   assert.equal(vanNine.text.includes("7000"), false);
 
-  const vanUnknown = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", vehicleHint: "賓士", hours: 10 });
+  const vanUnknown = draft.buildFleetQuoteDraft({ pickup: "台北車站", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "賓士", hours: 10 });
   assert.equal(vanUnknown.amountTwd, null);
   assert.equal(vanUnknown.capacity, "pending");
 
-  const coach = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", vehicleHint: "42人座大巴", hours: 10, passengerCount: 30 });
+  const coach = draft.buildFleetQuoteDraft({ pickup: "台北", destination: "九份", rateId: "taipei-jiufen-10h", vehicleHint: "42人座大巴", hours: 10, passengerCount: 30 });
   assert.equal(coach.amountTwd, null);
   assert.equal(coach.text.includes("7000"), false);
   assert.equal(coach.text.includes("9000"), false);

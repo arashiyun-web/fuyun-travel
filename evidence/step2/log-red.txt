@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: disabled exactTrue variants suppress all pre/post sends even with complete channels
+ok 1 - disabled exactTrue variants suppress all pre/post sends even with complete channels
+  ---
+  duration_ms: 6.321779
+  type: 'test'
+  ...
+# Subtest: enabled without channels persists successfully and logs only presence booleans
+ok 2 - enabled without channels persists successfully and logs only presence booleans
+  ---
+  duration_ms: 0.394865
+  type: 'test'
+  ...
+# Subtest: enabled sends once to each email and each LINE recipient in each pre/post stage
+ok 3 - enabled sends once to each email and each LINE recipient in each pre/post stage
+  ---
+  duration_ms: 1.152628
+  type: 'test'
+  ...
+# Subtest: legacy LINE recipient list works; missing channel token skips LINE
+ok 4 - legacy LINE recipient list works; missing channel token skips LINE
+  ---
+  duration_ms: 0.675826
+  type: 'test'
+  ...
+# Subtest: recipient failures do not block remaining recipients or inquiry success; error contents stay private
+ok 5 - recipient failures do not block remaining recipients or inquiry success; error contents stay private
+  ---
+  duration_ms: 0.399441
+  type: 'test'
+  ...
+# Subtest: authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+ok 6 - authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+  ---
+  duration_ms: 1.491765
+  type: 'test'
+  ...
+# Subtest: database failure logs do not expose raw exception contents
+not ok 7 - database failure logs do not expose raw exception contents
+  ---
+  duration_ms: 0.839458
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:110:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:117:12
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:111:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 274.723504

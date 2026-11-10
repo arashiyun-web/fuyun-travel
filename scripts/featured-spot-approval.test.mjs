@@ -32,11 +32,10 @@ test("withdrawing approval unpublishes that exact card and nothing else", () => 
 test("highlights follow approval immediately; social and travel stay behind the live switch", () => {
   const helper = readFileSync(path.join(root, "lib/content-sync/featuredSpotApproval.ts"), "utf8");
   const store = readFileSync(path.join(root, "lib/operations/dbStore.ts"), "utf8");
-  const execute = readFileSync(path.join(root, "lib/operations/shared.ts"), "utf8");
   const due = readFileSync(path.join(root, "app/api/operations/process-due/route.ts"), "utf8");
   assert.equal(helper.includes("OPERATIONS_LIVE_PUBLISH_ENABLED"), false);
   assert.match(store, /publishApprovedFeaturedDrafts\(title, body\)/);
   assert.match(store, /unpublishFeaturedSpots\(copy\.title, copy\.body\)/);
   assert.equal(due.includes("publishApprovedFeaturedDrafts"), false);
-  assert.match(execute, /OPERATIONS_LIVE_PUBLISH_ENABLED !== "true"/);
+  // Live gating is exercised behaviorally in operations-shared/unified-publishing tests.
 });

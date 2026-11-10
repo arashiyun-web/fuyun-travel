@@ -1,0 +1,1726 @@
+Excluded integration/platform suites: {"admin-session-flow.test.mjs":"requires PostgreSQL, next start and destructive DB recreation","member-order-publish.test.mjs":"requires sudo/PostgreSQL and destructive DB recreation","line-group-relay.test.mjs":"requires isolated PostgreSQL","line-webhook-claim.test.mjs":"requires isolated PostgreSQL","line-webhook-offline.test.mjs":"requires isolated PostgreSQL","operations-intake-cleanup.test.mjs":"requires isolated PostgreSQL","tools/vercel-ascii.test.mjs":"requires Windows PowerShell"}
+TAP version 13
+# (node:17) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/adminAuth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rejects every login when admin settings are missing
+ok 1 - rejects every login when admin settings are missing
+  ---
+  duration_ms: 1.419988
+  type: 'test'
+  ...
+# Subtest: accepts only the configured username and hashed password
+ok 2 - accepts only the configured username and hashed password
+  ---
+  duration_ms: 101.977685
+  type: 'test'
+  ...
+# Subtest: username tolerates surrounding whitespace from mobile autofill, but not other changes; password is exact
+ok 3 - username tolerates surrounding whitespace from mobile autofill, but not other changes; password is exact
+  ---
+  duration_ms: 72.184123
+  type: 'test'
+  ...
+# Subtest: rejects a short signing secret instead of falling back
+ok 4 - rejects a short signing secret instead of falling back
+  ---
+  duration_ms: 20.883136
+  type: 'test'
+  ...
+# Subtest: issued token and session cookie both last 90 days
+ok 5 - issued token and session cookie both last 90 days
+  ---
+  duration_ms: 30.016219
+  type: 'test'
+  ...
+# Subtest: issued token verifies; tampered token does not
+ok 6 - issued token verifies; tampered token does not
+  ---
+  duration_ms: 21.138512
+  type: 'test'
+  ...
+# Subtest: rejects legacy tokens without the version claim even with the current key
+ok 7 - rejects legacy tokens without the version claim even with the current key
+  ---
+  duration_ms: 20.89032
+  type: 'test'
+  ...
+# Subtest: rejects tokens signed with any other key (e.g. the old exposed fallback)
+ok 8 - rejects tokens signed with any other key (e.g. the old exposed fallback)
+  ---
+  duration_ms: 20.744815
+  type: 'test'
+  ...
+# Subtest: tokens stop verifying after the signing secret is rotated
+ok 9 - tokens stop verifying after the signing secret is rotated
+  ---
+  duration_ms: 20.978176
+  type: 'test'
+  ...
+# Subtest: rejects expired tokens and tokens for a different username
+ok 10 - rejects expired tokens and tokens for a different username
+  ---
+  duration_ms: 20.759679
+  type: 'test'
+  ...
+# Subtest: cookie session: valid token accepted, old-key or legacy token rejected
+ok 11 - cookie session: valid token accepted, old-key or legacy token rejected
+  ---
+  duration_ms: 21.540354
+  type: 'test'
+  ...
+# Subtest: cookie session is rejected when admin settings are missing
+ok 12 - cookie session is rejected when admin settings are missing
+  ---
+  duration_ms: 20.674398
+  type: 'test'
+  ...
+# Subtest: cookie-authenticated mutation requires same origin; bearer does not
+ok 13 - cookie-authenticated mutation requires same origin; bearer does not
+  ---
+  duration_ms: 21.368513
+  type: 'test'
+  ...
+# Subtest: sessions are revoked when any admin setting is removed (fail closed)
+ok 14 - sessions are revoked when any admin setting is removed (fail closed)
+  ---
+  duration_ms: 40.944781
+  type: 'test'
+  ...
+# Subtest: same-origin check uses the addressed host (Host / x-forwarded-host), not an internal request.url host
+ok 15 - same-origin check uses the addressed host (Host / x-forwarded-host), not an internal request.url host
+  ---
+  duration_ms: 0.400497
+  type: 'test'
+  ...
+# Subtest: only the operations owner action counts as approval
+ok 16 - only the operations owner action counts as approval
+  ---
+  duration_ms: 0.341457
+  type: 'test'
+  ...
+# Subtest: editing copy after approval returns every unsent job to pending review
+ok 17 - editing copy after approval returns every unsent job to pending review
+  ---
+  duration_ms: 0.202272
+  type: 'test'
+  ...
+# Subtest: generate, distribute, content-sync, cron and the worker never approve or publish on their own
+ok 18 - generate, distribute, content-sync, cron and the worker never approve or publish on their own
+  ---
+  duration_ms: 19.560683
+  type: 'test'
+  ...
+# Subtest: regression: round-4 recruitment hallucination is blocked
+ok 19 - regression: round-4 recruitment hallucination is blocked
+  ---
+  duration_ms: 2.921337
+  type: 'test'
+  ...
+# Subtest: unknown price: any amount without approved facts is a violation
+ok 20 - unknown price: any amount without approved facts is a violation
+  ---
+  duration_ms: 0.792978
+  type: 'test'
+  ...
+# Subtest: request to guess a price is still blocked
+ok 21 - request to guess a price is still blocked
+  ---
+  duration_ms: 0.275168
+  type: 'test'
+  ...
+# Subtest: approved per-vehicle price passes; per-person wording fails
+ok 22 - approved per-vehicle price passes; per-person wording fails
+  ---
+  duration_ms: 0.379249
+  type: 'test'
+  ...
+# Subtest: claiming meals or lodging not in approved includes fails; negated mention passes
+ok 23 - claiming meals or lodging not in approved includes fails; negated mention passes
+  ---
+  duration_ms: 0.278689
+  type: 'test'
+  ...
+# Subtest: expired or unversioned facts block and force human review
+ok 24 - expired or unversioned facts block and force human review
+  ---
+  duration_ms: 0.68797
+  type: 'test'
+  ...
+# Subtest: dates and quota must come from approved facts
+ok 25 - dates and quota must come from approved facts
+  ---
+  duration_ms: 0.333057
+  type: 'test'
+  ...
+# Subtest: composeDraft falls back to template and never auto-approves
+ok 26 - composeDraft falls back to template and never auto-approves
+  ---
+  duration_ms: 23.672023
+  type: 'test'
+  ...
+# Subtest: facts block renders missing fields as 待確認
+ok 27 - facts block renders missing fields as 待確認
+  ---
+  duration_ms: 0.362434
+  type: 'test'
+  ...
+# Subtest: approval is bound to exact content; any change invalidates it
+ok 28 - approval is bound to exact content; any change invalidates it
+  ---
+  duration_ms: 0.607826
+  type: 'test'
+  ...
+# Subtest: regression (live 2026-09-27): refusal, invented stops and overlong text fall back to template
+ok 29 - regression (live 2026-09-27): refusal, invented stops and overlong text fall back to template
+  ---
+  duration_ms: 0.365377
+  type: 'test'
+  ...
+# Subtest: collects explicit images, full_picture and Facebook attachment/sub-attachment images, deduplicated in order
+ok 30 - collects explicit images, full_picture and Facebook attachment/sub-attachment images, deduplicated in order
+  ---
+  duration_ms: 0.679426
+  type: 'test'
+  ...
+# Subtest: a legacy single full_picture still works; empty or odd payloads give no photos
+ok 31 - a legacy single full_picture still works; empty or odd payloads give no photos
+  ---
+  duration_ms: 0.072752
+  type: 'test'
+  ...
+# Subtest: only https URLs or site image paths are kept, at most 10
+ok 32 - only https URLs or site image paths are kept, at most 10
+  ---
+  duration_ms: 0.115808
+  type: 'test'
+  ...
+# Subtest: merges an admin-chosen cover with the source post's other photos (cover first, no duplicates)
+ok 33 - merges an admin-chosen cover with the source post's other photos (cover first, no duplicates)
+  ---
+  duration_ms: 0.117696
+  type: 'test'
+  ...
+# Subtest: source URL must be https (Facebook or the site); anything else is dropped
+ok 34 - source URL must be https (Facebook or the site); anything else is dropped
+  ---
+  duration_ms: 0.071648
+  type: 'test'
+  ...
+# Subtest: only a draft with the exact approved title and body is published to highlights
+ok 35 - only a draft with the exact approved title and body is published to highlights
+  ---
+  duration_ms: 0.64229
+  type: 'test'
+  ...
+# Subtest: withdrawing approval unpublishes that exact card and nothing else
+ok 36 - withdrawing approval unpublishes that exact card and nothing else
+  ---
+  duration_ms: 0.08056
+  type: 'test'
+  ...
+# Subtest: highlights follow approval immediately; social and travel stay behind the live switch
+not ok 37 - highlights follow approval immediately; social and travel stay behind the live switch
+  ---
+  duration_ms: 0.959635
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/featured-spot-approval.test.mjs:32:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /OPERATIONS_LIVE_PUBLISH_ENABLED !== "true"/. Input:
+    
+    'import { createHash } from "crypto";\n' +
+      'import { exactTrue } from "@/lib/liveSwitch";\n' +
+      'import { publishToFacebook } from "@/lib/social/publishers";\n' +
+      'import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";\n' +
+      'import { publishXPost, xCredentialsFromEnv } from "@/lib/social/xOauth";\n' +
+      'import { clearStoredInstagramLoginTokenFromEnvironment, readStoredInstagramLoginTokenFromEnvironment } from "@/lib/social/instagram-oauth";\n' +
+      'import { approvalHash, validateGenerated } from "./contentGuard";\n' +
+      'import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft } from "./types";\n' +
+      'import type { WebsitePublishResult } from "./websitePublisher";\n' +
+      '\n' +
+      '/** Logic shared by the local file store and the database store. */\n' +
+      '\n' +
+      'export const MAX_IMAGES = 6;\n' +
+      'export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;\n' +
+      'export const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;\n' +
+      'export const JOB_LEASE_MS = 5 * 60 * 1000;\n' +
+      'export const DUE_BATCH_LIMIT = 20;\n' +
+      '/** Statuses an operator may run explicitly. dry_run_verified stays runnable so a dry run never blocks the later live run. */\n' +
+      'export const CLAIMABLE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth", "manual_required", "dry_run_verified"];\n' +
+      '/**\n' +
+      ' * Statuses the worker picks up by itself. manual_required waits for a person; awaiting_auth is parked\n' +
+      ' * until the credentials change (requeueAwaitingAuth) so it cannot starve newer jobs; retryable_failed\n' +
+      ' * is only due again once its backoff time (scheduledAt) has passed.\n' +
+      ' */\n' +
+      'export const AUTO_DUE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed"];\n' +
+      'export const MAX_AUTO_ATTEMPTS = 5;\n' +
+      'export const RETRY_BASE_MS = 5 * 60 * 1000;\n' +
+      'export const RETRY_MAX_MS = 6 * 60 * 60 * 1000;\n' +
+      '\n' +
+      '/** A dry-run-verified job becomes due again only for a live run. */\n' +
+      'export function dueStatusesFor(mode: RunMode): JobStatus[] {\n' +
+      '  return mode === "live" ? [...AUTO_DUE_STATUSES, "dry_run_verified"] : AUTO_DUE_STATUSES;\n' +
+      '}\n' +
+      '\n' +
+      '/**\n' +
+      ' * Where a job goes after a run. A retryable failure is rescheduled with exponential backoff (the due\n' +
+      ' * query only returns jobs whose scheduledAt has passed) and handed to a person after MAX_AUTO_ATTEMPTS.\n' +
+      ' * scheduledAt undefined = leave the stored value unchanged.\n' +
+      ' */\n' +
+      'export function nextAttemptPlan(result: JobResult, attempts: number, now = Date.now()): { status: JobStatus; scheduledAt?: Date | null; error?: string } {\n' +
+      '  if (result.status !== "retryable_failed") return { status: result.status, error: result.error };\n' +
+      '  if (attempts >= MAX_AUTO_ATTEMPTS) {\n' +
+      '    return { status: "manual_required", scheduledAt: null, error: `${result.error ?? "發布失敗"}（已自動重試 ${attempts} 次，改由人工處理）` };\n' +
+      '  }\n' +
+      '  const delay = Math.min(RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), RETRY_MAX_MS);\n' +
+      '  return { status: "retryable_failed", scheduledAt: new Date(now + delay), error: result.error };\n' +
+      '}\n' +
+      '\n' +
+      'export type RunMode = "dry-run" | "live";\n' +
+      'export type JobSubmission = NonNullable<PlatformDraft["submission"]>;\n' +
+      'export type JobResult = { status: JobStatus; error?: string; externalId?: string; postUrl?: string; verification?: PlatformDraft["verification"] };\n' +
+      'export type FactCheck = NonNullable<PlatformDraft["factCheck"]> & { acknowledgedBy?: string | null };\n' +
+      '\n' +
+      'export class OperationsStorageUnavailableError extends Error {\n' +
+      '  constructor(public readonly diagnostic: Record<string, boolean | string>) {\n' +
+      '    super("營運資料的正式持久化尚未配置完成，已拒絕寫入以避免資料遺失");\n' +
+      '    this.name = "OperationsStorageUnavailableError";\n' +
+      '  }\n' +
+      '}\n' +
+      '\n' +
+      'export function nowIso() {\n' +
+      '  return new Date().toISOString();\n' +
+      '}\n' +
+      '\n' +
+      'export function trimText(value: string, max: number) {\n' +
+      '  return value.trim().slice(0, max);\n' +
+      '}\n' +
+      '\n' +
+      'export function safeFileExtension(mimeType: string) {\n' +
+      '  if (mimeType === "image/png") return "png";\n' +
+      '  if (mimeType === "image/webp") return "webp";\n' +
+      '  return "jpg";\n' +
+      '}\n' +
+      '\n' +
+      'export function getImageContentType(fileName: string) {\n' +
+      '  if (fileName.endsWith(".png")) return "image/png";\n' +
+      '  if (fileName.endsWith(".webp")) return "image/webp";\n' +
+      '  return "image/jpeg";\n' +
+      '}\n' +
+      '\n' +
+      'export function parseImage(dataUrl: string) {\n' +
+      '  const match = /^data:(image\\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$/.exec(dataUrl.trim());\n' +
+      '  if (!match) throw new Error("圖片格式只接受 JPEG、PNG 或 WebP");\n' +
+      '  const buffer = Buffer.from(match[2].replace(/\\s/g, ""), "base64");\n' +
+      '  if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw new Error("單張圖片不可超過 8 MB");\n' +
+      '  return { mimeType: match[1], buffer };\n' +
+      '}\n' +
+      '\n' +
+      'export function sha256Hex(buffer: Buffer | string) {\n' +
+      '  return createHash("sha256").update(buffer).digest("hex");\n' +
+      '}\n' +
+      '\n' +
+      '/** Validate intake and return parsed images plus the dedupe fingerprint. */\n' +
+      'export function prepareIntake(input: ContentIntakeInput) {\n' +
+      '  if (!input.title.trim() || !input.body.trim() || !input.tripDate.trim()) throw new Error("標題、日期與行程文字必填");\n' +
+      '  if (!input.images.length || input.images.length > MAX_IMAGES) throw new Error(`圖片數量需介於 1 到 ${MAX_IMAGES} 張`);\n' +
+      '  const platforms = Array.from(new Set(input.selectedPlatforms));\n' +
+      '  if (!platforms.length) throw new Error("至少選擇一個發布平台");\n' +
+      '  const parsedImages = input.images.map((image) => parseImage(image.dataUrl));\n' +
+      '  const totalBytes = parsedImages.reduce((total, image) => total + image.buffer.length, 0);\n' +
+      '  if (totalBytes > MAX_TOTAL_IMAGE_BYTES) throw new Error("全部圖片不可超過 20 MB");\n' +
+      '  const fingerprint = sha256Hex(JSON.stringify({\n' +
+      '    title: trimText(input.title, 120),\n' +
+      '    type: input.type,\n' +
+      '    tripDate: trimText(input.tripDate, 40),\n' +
+      '    body: trimText(input.body, 12000),\n' +
+      '    selectedPlatforms: platforms.slice().sort(),\n' +
+      '    images: parsedImages.map((image, index) => ({ sha256: sha256Hex(image.buffer), originalName: trimText(input.images[index].originalName || "", 120) })),\n' +
+      '  }));\n' +
+      '  return { platforms, parsedImages, fingerprint };\n' +
+      '}\n' +
+      '\n' +
+      'function topicTag(title: string) {\n' +
+      '  const tag = title.replace(/[^一-鿿A-Za-z0-9]/g, "").slice(0, 16);\n' +
+      '  return tag || "台灣旅遊";\n' +
+      '}\n' +
+      '\n' +
+      'export function makePlatformCaptions(input: ContentIntakeInput, contentId: string) {\n' +
+      '  const dateLine = `出遊／預定出發日期：${input.tripDate}`;\n' +
+      '  const inquiryLine = `詢價請提供內容編號：${contentId}`;\n' +
+      '  const website = [`# ${input.title}`, "", input.body, "", dateLine, inquiryLine].join("\\n");\n' +
+      '  const facebook = [`【${input.title}】`, input.type === "回顧" ? "這次實際走過的行程分享：" : "行程招生資訊：", input.body, "", dateLine, inquiryLine].join("\\n");\n' +
+      '  const instagramBase = [input.title, input.body, dateLine].join("\\n\\n");\n' +
+      '  const instagram = `${instagramBase}\\n\\n#浮雲輕鬆遊 #台灣包車 #團體旅遊 #${topicTag(input.title)}`.slice(0, 2100);\n' +
+      '  const x = [`${input.title}`, input.body, dateLine].join("\\n").slice(0, 280);\n' +
+      '  const templates = { website, facebook_group: facebook, facebook_page: facebook, instagram, x } satisfies Record<OperationsPlatform, string>;\n' +
+      '  const overrides = input.captions || {};\n' +
+      '  return {\n' +
+      '    website: overrides.website || templates.website,\n' +
+      '    facebook_group: overrides.facebook_group || templates.facebook_group,\n' +
+      '    facebook_page: overrides.facebook_page || templates.facebook_page,\n' +
+      '    instagram: overrides.instagram || templates.instagram,\n' +
+      '    x: (overrides.x || templates.x).slice(0, 280),\n' +
+      '  };\n' +
+      '}\n' +
+      '\n' +
+      'export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter"] {\n' +
+      '  if (platform === "website") return "website_article";\n' +
+      '  if (platform === "facebook_group") return "facebook_group_manual";\n' +
+      '  if (platform === "facebook_page") return "facebook_page";\n' +
+      '  if (platform === "x") return "x_oauth1";\n' +
+      '  return "instagram_login_v2";\n' +
+      '}\n' +
+      '\n' +
+      '/**\n' +
+      ' * Facebook group the manual path targets: companyConfig.facebookUrl (share link /share/g/1NPbXN8THD/)\n' +
+      ' * resolves to this group id. There is no publishing API for groups (removed with Graph API v19, 2024-04-22).\n' +
+      ' */\n' +
+      'export const FACEBOOK_GROUP_ID = "2875144269218828";\n' +
+      'export const FACEBOOK_GROUP_URL = `https://www.facebook.com/groups/${FACEBOOK_GROUP_ID}/`;\n' +
+      '\n' +
+      '/** Accounts the platforms would publish to right now. Resolved once per approval/claim. */\n' +
+      'export type ApprovalAccounts = { instagram: string; facebookPage: string };\n' +
+      '\n' +
+      '/**\n' +
+      ' * The Instagram account the publisher would use: INSTAGRAM_LOGIN_ACCOUNT_ID, otherwise the account of\n' +
+      ' * the token stored by the OAuth flow — the same order as instagramV2Client().\n' +
+      ' */\n' +
+      'export async function resolveInstagramAccountId() {\n' +
+      '  const direct = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim();\n' +
+      '  if (direct) return direct;\n' +
+      '  try {\n' +
+      '    return (await readStoredInstagramLoginTokenFromEnvironment())?.accountId?.trim() || "";\n' +
+      '  } catch {\n' +
+      '    return "";\n' +
+      '  }\n' +
+      '}\n' +
+      '\n' +
+      'export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {\n' +
+      '  return {\n' +
+      '    instagram: (await resolveInstagramAccountId()) || "unset",\n' +
+      '    facebookPage: process.env.FACEBOOK_PAGE_ID?.trim() || "unset",\n' +
+      '  };\n' +
+      '}\n' +
+      '\n' +
+      '/** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */\n' +
+      'export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {\n' +
+      '  if (platform === "instagram") return `instagram:${accounts.instagram}`;\n' +
+      '  if (platform === "facebook_group") return `facebook_group:${FACEBOOK_GROUP_ID}`;\n' +
+      '  if (platform === "facebook_page") return `facebook_page:${accounts.facebookPage}`;\n' +
+      '  if (platform === "x") return "x:oauth1-user";\n' +
+      '  return "website:fuyuntravel.com";\n' +
+      '}\n' +
+      '\n' +
+      'export function jobApprovalHash(imageSha256s: string[], job: Pick<PlatformDraft, "caption" | "platform">, accounts: ApprovalAccounts) {\n' +
+      '  return approvalHash({ text: job.caption, imageSha256s, platform: job.platform, account: platformAccount(job.platform, accounts) });\n' +
+      '}\n' +
+      '\n' +
+      '/** Captions are template output from staff input; the staff-entered trip date is the only approved date. */\n' +
+      'export function captionFactCheck(caption: string, tripDate: string): FactCheck {\n' +
+      '  return validateGenerated(caption, { version: "intake", dates: [tripDate.trim()], includes: [], excludes: [] });\n' +
+      '}\n' +
+      '\n' +
+      '/** Approval is refused while any selected platform has unacknowledged fact-check violations. */\n' +
+      'export function assertFactCheckApprovable(content: ContentRecord, acknowledgeFactWarnings: boolean) {\n' +
+      '  const failing = content.selectedPlatforms.filter((platform) => co'... 12427 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    import { createHash } from "crypto";
+    import { exactTrue } from "@/lib/liveSwitch";
+    import { publishToFacebook } from "@/lib/social/publishers";
+    import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";
+    import { publishXPost, xCredentialsFromEnv } from "@/lib/social/xOauth";
+    import { clearStoredInstagramLoginTokenFromEnvironment, readStoredInstagramLoginTokenFromEnvironment } from "@/lib/social/instagram-oauth";
+    import { approvalHash, validateGenerated } from "./contentGuard";
+    import type { ContentIntakeInput, ContentRecord, JobStatus, OperationsPlatform, PlatformDraft } from "./types";
+    import type { WebsitePublishResult } from "./websitePublisher";
+    
+    /** Logic shared by the local file store and the database store. */
+    
+    export const MAX_IMAGES = 6;
+    export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    export const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
+    export const JOB_LEASE_MS = 5 * 60 * 1000;
+    export const DUE_BATCH_LIMIT = 20;
+    /** Statuses an operator may run explicitly. dry_run_verified stays runnable so a dry run never blocks the later live run. */
+    export const CLAIMABLE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed", "awaiting_auth", "manual_required", "dry_run_verified"];
+    /**
+     * Statuses the worker picks up by itself. manual_required waits for a person; awaiting_auth is parked
+     * until the credentials change (requeueAwaitingAuth) so it cannot starve newer jobs; retryable_failed
+     * is only due again once its backoff time (scheduledAt) has passed.
+     */
+    export const AUTO_DUE_STATUSES: JobStatus[] = ["queued", "scheduled", "retryable_failed"];
+    export const MAX_AUTO_ATTEMPTS = 5;
+    export const RETRY_BASE_MS = 5 * 60 * 1000;
+    export const RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+    
+    /** A dry-run-verified job becomes due again only for a live run. */
+    export function dueStatusesFor(mode: RunMode): JobStatus[] {
+      return mode === "live" ? [...AUTO_DUE_STATUSES, "dry_run_verified"] : AUTO_DUE_STATUSES;
+    }
+    
+    /**
+     * Where a job goes after a run. A retryable failure is rescheduled with exponential backoff (the due
+     * query only returns jobs whose scheduledAt has passed) and handed to a person after MAX_AUTO_ATTEMPTS.
+     * scheduledAt undefined = leave the stored value unchanged.
+     */
+    export function nextAttemptPlan(result: JobResult, attempts: number, now = Date.now()): { status: JobStatus; scheduledAt?: Date | null; error?: string } {
+      if (result.status !== "retryable_failed") return { status: result.status, error: result.error };
+      if (attempts >= MAX_AUTO_ATTEMPTS) {
+        return { status: "manual_required", scheduledAt: null, error: `${result.error ?? "發布失敗"}（已自動重試 ${attempts} 次，改由人工處理）` };
+      }
+      const delay = Math.min(RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), RETRY_MAX_MS);
+      return { status: "retryable_failed", scheduledAt: new Date(now + delay), error: result.error };
+    }
+    
+    export type RunMode = "dry-run" | "live";
+    export type JobSubmission = NonNullable<PlatformDraft["submission"]>;
+    export type JobResult = { status: JobStatus; error?: string; externalId?: string; postUrl?: string; verification?: PlatformDraft["verification"] };
+    export type FactCheck = NonNullable<PlatformDraft["factCheck"]> & { acknowledgedBy?: string | null };
+    
+    export class OperationsStorageUnavailableError extends Error {
+      constructor(public readonly diagnostic: Record<string, boolean | string>) {
+        super("營運資料的正式持久化尚未配置完成，已拒絕寫入以避免資料遺失");
+        this.name = "OperationsStorageUnavailableError";
+      }
+    }
+    
+    export function nowIso() {
+      return new Date().toISOString();
+    }
+    
+    export function trimText(value: string, max: number) {
+      return value.trim().slice(0, max);
+    }
+    
+    export function safeFileExtension(mimeType: string) {
+      if (mimeType === "image/png") return "png";
+      if (mimeType === "image/webp") return "webp";
+      return "jpg";
+    }
+    
+    export function getImageContentType(fileName: string) {
+      if (fileName.endsWith(".png")) return "image/png";
+      if (fileName.endsWith(".webp")) return "image/webp";
+      return "image/jpeg";
+    }
+    
+    export function parseImage(dataUrl: string) {
+      const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(dataUrl.trim());
+      if (!match) throw new Error("圖片格式只接受 JPEG、PNG 或 WebP");
+      const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
+      if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw new Error("單張圖片不可超過 8 MB");
+      return { mimeType: match[1], buffer };
+    }
+    
+    export function sha256Hex(buffer: Buffer | string) {
+      return createHash("sha256").update(buffer).digest("hex");
+    }
+    
+    /** Validate intake and return parsed images plus the dedupe fingerprint. */
+    export function prepareIntake(input: ContentIntakeInput) {
+      if (!input.title.trim() || !input.body.trim() || !input.tripDate.trim()) throw new Error("標題、日期與行程文字必填");
+      if (!input.images.length || input.images.length > MAX_IMAGES) throw new Error(`圖片數量需介於 1 到 ${MAX_IMAGES} 張`);
+      const platforms = Array.from(new Set(input.selectedPlatforms));
+      if (!platforms.length) throw new Error("至少選擇一個發布平台");
+      const parsedImages = input.images.map((image) => parseImage(image.dataUrl));
+      const totalBytes = parsedImages.reduce((total, image) => total + image.buffer.length, 0);
+      if (totalBytes > MAX_TOTAL_IMAGE_BYTES) throw new Error("全部圖片不可超過 20 MB");
+      const fingerprint = sha256Hex(JSON.stringify({
+        title: trimText(input.title, 120),
+        type: input.type,
+        tripDate: trimText(input.tripDate, 40),
+        body: trimText(input.body, 12000),
+        selectedPlatforms: platforms.slice().sort(),
+        images: parsedImages.map((image, index) => ({ sha256: sha256Hex(image.buffer), originalName: trimText(input.images[index].originalName || "", 120) })),
+      }));
+      return { platforms, parsedImages, fingerprint };
+    }
+    
+    function topicTag(title: string) {
+      const tag = title.replace(/[^一-鿿A-Za-z0-9]/g, "").slice(0, 16);
+      return tag || "台灣旅遊";
+    }
+    
+    export function makePlatformCaptions(input: ContentIntakeInput, contentId: string) {
+      const dateLine = `出遊／預定出發日期：${input.tripDate}`;
+      const inquiryLine = `詢價請提供內容編號：${contentId}`;
+      const website = [`# ${input.title}`, "", input.body, "", dateLine, inquiryLine].join("\n");
+      const facebook = [`【${input.title}】`, input.type === "回顧" ? "這次實際走過的行程分享：" : "行程招生資訊：", input.body, "", dateLine, inquiryLine].join("\n");
+      const instagramBase = [input.title, input.body, dateLine].join("\n\n");
+      const instagram = `${instagramBase}\n\n#浮雲輕鬆遊 #台灣包車 #團體旅遊 #${topicTag(input.title)}`.slice(0, 2100);
+      const x = [`${input.title}`, input.body, dateLine].join("\n").slice(0, 280);
+      const templates = { website, facebook_group: facebook, facebook_page: facebook, instagram, x } satisfies Record<OperationsPlatform, string>;
+      const overrides = input.captions || {};
+      return {
+        website: overrides.website || templates.website,
+        facebook_group: overrides.facebook_group || templates.facebook_group,
+        facebook_page: overrides.facebook_page || templates.facebook_page,
+        instagram: overrides.instagram || templates.instagram,
+        x: (overrides.x || templates.x).slice(0, 280),
+      };
+    }
+    
+    export function adapterFor(platform: OperationsPlatform): PlatformDraft["adapter"] {
+      if (platform === "website") return "website_article";
+      if (platform === "facebook_group") return "facebook_group_manual";
+      if (platform === "facebook_page") return "facebook_page";
+      if (platform === "x") return "x_oauth1";
+      return "instagram_login_v2";
+    }
+    
+    /**
+     * Facebook group the manual path targets: companyConfig.facebookUrl (share link /share/g/1NPbXN8THD/)
+     * resolves to this group id. There is no publishing API for groups (removed with Graph API v19, 2024-04-22).
+     */
+    export const FACEBOOK_GROUP_ID = "2875144269218828";
+    export const FACEBOOK_GROUP_URL = `https://www.facebook.com/groups/${FACEBOOK_GROUP_ID}/`;
+    
+    /** Accounts the platforms would publish to right now. Resolved once per approval/claim. */
+    export type ApprovalAccounts = { instagram: string; facebookPage: string };
+    
+    /**
+     * The Instagram account the publisher would use: INSTAGRAM_LOGIN_ACCOUNT_ID, otherwise the account of
+     * the token stored by the OAuth flow — the same order as instagramV2Client().
+     */
+    export async function resolveInstagramAccountId() {
+      const direct = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim();
+      if (direct) return direct;
+      try {
+        return (await readStoredInstagramLoginTokenFromEnvironment())?.accountId?.trim() || "";
+      } catch {
+        return "";
+      }
+    }
+    
+    export async function resolveApprovalAccounts(): Promise<ApprovalAccounts> {
+      return {
+        instagram: (await resolveInstagramAccountId()) || "unset",
+        facebookPage: process.env.FACEBOOK_PAGE_ID?.trim() || "unset",
+      };
+    }
+    
+    /** Target account the approval is bound to; changing it (e.g. re-authorizing another Instagram account) invalidates earlier approvals. */
+    export function platformAccount(platform: OperationsPlatform, accounts: ApprovalAccounts) {
+      if (platform === "instagram") return `instagram:${accounts.instagram}`;
+      if (platform === "facebook_group") return `facebook_group:${FACEBOOK_GROUP_ID}`;
+      if (platform === "facebook_page") return `facebook_page:${accounts.facebookPage}`;
+      if (platform === "x") return "x:oauth1-user";
+      return "website:fuyuntravel.com";
+    }
+    
+    export function jobApprovalHash(imageSha256s: string[], job: Pick<PlatformDraft, "caption" | "platform">, accounts: ApprovalAccounts) {
+      return approvalHash({ text: job.caption, imageSha256s, platform: job.platform, account: platformAccount(job.platform, accounts) });
+    }
+    
+    /** Captions are template output from staff input; the staff-entered trip date is the only approved date. */
+    export function captionFactCheck(caption: string, tripDate: string): FactCheck {
+      return validateGenerated(caption, { version: "intake", dates: [tripDate.trim()], includes: [], excludes: [] });
+    }
+    
+    /** Approval is refused while any selected platform has unacknowledged fact-check violations. */
+    export function assertFactCheckApprovable(content: ContentRecord, acknowledgeFactWarnings: boolean) {
+      const failing = content.selectedPlatforms.filter((platform) => content.platforms[platform].factCheck?.ok === false);
+      if (failing.length && !acknowledgeFactWarnings) {
+        throw new Error(`內容事實檢查未通過（${failing.join("、")}）：價格、日期、名額或包含項目需有核准來源；請修改內容，或由核准人明確確認後再核准`);
+      }
+      return failing;
+    }
+    
+    /** Only real publishing moves content forward; a dry run leaves it approved and eligible for the live run. */
+    export function aggregateContentStatus(statuses: JobStatus[], current: ContentRecord["status"]): ContentRecord["status"] {
+      if (statuses.every((status) => status === "published")) return "completed";
+      if (statuses.some((status) => status === "published")) return "partial";
+      return current;
+    }
+    
+    export function defaultSubmission(): JobSubmission {
+      return { phase: "not_started", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null };
+    }
+    
+    export function validFacebookPostUrl(value: string) {
+      try {
+        const url = new URL(value);
+        return url.protocol === "https:" && ["facebook.com", "www.facebook.com", "m.facebook.com"].includes(url.hostname.toLowerCase()) &&
+          Boolean(url.pathname) && !url.username && !url.password && !url.hash;
+      } catch {
+        return false;
+      }
+    }
+    
+    export const CONTAINER_POLL_ATTEMPTS = 5;
+    export const CONTAINER_POLL_DELAY_MS = 3000;
+    
+    /** The container exists but Instagram is still processing it; the job resumes later without recreating it. */
+    export class ContainerNotReadyError extends Error {
+      constructor() {
+        super("Instagram container still processing");
+        this.name = "ContainerNotReadyError";
+      }
+    }
+    
+    type InstagramClient = Awaited<ReturnType<typeof createInstagramLoginClientV2>>;
+    
+    async function instagramV2Client(): Promise<InstagramClient & { accountId: string }> {
+      if (process.env.OPERATIONS_INSTAGRAM_V2_ENABLED !== "true") throw new InstagramV2Error("configuration");
+      const directAccountId = process.env.INSTAGRAM_LOGIN_ACCOUNT_ID?.trim() || "";
+      const directAccessToken = process.env.INSTAGRAM_LOGIN_ACCESS_TOKEN?.trim() || "";
+      let storedToken = null;
+      if (!directAccessToken) {
+        try {
+          storedToken = await readStoredInstagramLoginTokenFromEnvironment();
+        } catch {
+          throw new InstagramV2Error("configuration");
+        }
+      }
+      const accountId = directAccountId || storedToken?.accountId || "";
+      const accessToken = directAccessToken || storedToken?.accessToken || "";
+      const apiVersion = process.env.INSTAGRAM_LOGIN_API_VERSION?.trim() || "";
+      const mediaOrigin = process.env.INSTAGRAM_LOGIN_MEDIA_ORIGIN?.trim() || "";
+      if (!accountId || !accessToken || !apiVersion || !mediaOrigin) throw new InstagramV2Error("configuration");
+      return Object.assign(createInstagramLoginClientV2({ accountId, accessToken, apiVersion, mediaOrigins: [mediaOrigin] }), { accountId });
+    }
+    
+    export type ExecuteDeps = {
+      /** Persist a submission phase before each external step so a crash never causes a blind resend. */
+      markSubmission: (patch: Partial<JobSubmission>) => Promise<void>;
+      /** Resolve HTTPS image URLs Instagram can fetch (e.g. short-lived presigned URLs). */
+      instagramImageUrls: () => Promise<string[]>;
+      /** Stable https URLs from R2_PUBLIC_URL. Empty when that setting is missing. */
+      publicImageUrls?: () => Promise<string[]>;
+      /** First image bytes for publishers that upload the file themselves (X). */
+      primaryImage?: () => Promise<{ buffer: Buffer; contentType: string } | null>;
+      /** Instagram account the approval was checked against at claim time; publishing to any other account is refused. */
+      approvedInstagramAccount?: string;
+      /** Publish the approved website version as a public /travel article and read it back (database store only). */
+      publishWebsite?: () => Promise<WebsitePublishResult>;
+      /** Test seams. */
+      instagramClient?: () => Promise<InstagramClient & { accountId: string }>;
+      sleep?: (ms: number) => Promise<void>;
+    };
+    
+    const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    
+    /** Container that was fully created by an earlier attempt and can be resumed without recreating anything. */
+    function resumableContainer(job: PlatformDraft, imageCount: number) {
+      const s = job.submission;
+      if (!s || s.phase !== "container_created" || s.publishIntentAt) return null;
+      if (imageCount > 1) return s.carouselContainerId && s.containerIds.length === imageCount ? s.carouselContainerId : null;
+      return !s.carouselContainerId && s.containerIds.length === 1 ? s.containerIds[0] : null;
+    }
+    
+    async function waitForContainer(client: InstagramClient, containerId: string, sleep: (ms: number) => Promise<void>) {
+      for (let attempt = 1; ; attempt += 1) {
+        const { status } = await client.getContainerStatus(containerId);
+        if (status === "FINISHED" || status === "PUBLISHED") return;
+        if (status !== "IN_PROGRESS") throw new InstagramV2Error("unknown");
+        if (attempt >= CONTAINER_POLL_ATTEMPTS) throw new ContainerNotReadyError();
+        await sleep(CONTAINER_POLL_DELAY_MS);
+      }
+    }
+    
+    async function submitInstagramV2Job(job: PlatformDraft, deps: ExecuteDeps) {
+      const client = await (deps.instagramClient ?? instagramV2Client)();
+      if (deps.approvedInstagramAccount !== undefined && `${client.accountId}` !== deps.approvedInstagramAccount) {
+        // Credentials were switched to another account after the claim; the approval does not cover it.
+        throw new InstagramV2Error("configuration");
+      }
+      const imageUrls = (await deps.instagramImageUrls()).filter(Boolean);
+      if (!imageUrls.length || imageUrls.length > 10 || imageUrls.some((url) => !url.startsWith("https://"))) throw new InstagramV2Error("input");
+      const isCarousel = imageUrls.length > 1;
+    
+      let publishContainerId = resumableContainer(job, imageUrls.length);
+      if (!publishContainerId) {
+        await deps.markSubmission({ phase: "container_creating", containerIds: [], carouselContainerId: null, publishIntentAt: null, submittedAt: null });
+        const childContainerIds: string[] = [];
+        if (isCarousel) {
+          for (const imageUrl of imageUrls) {
+            const child = await client.createImageContainer({ imageUrl, mimeType: "image/jpeg", isCarouselItem: true });
+            childContainerIds.push(child.containerId);
+            await deps.markSubmission({ phase: "container_creating", containerIds: [...childContainerIds] });
+          }
+          const carousel = await client.createCarouselContainer({ caption: job.caption, children: childContainerIds });
+          publishContainerId = carousel.containerId;
+          await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds], carouselContainerId: publishContainerId });
+        } else {
+          const image = await client.createImageContainer({ caption: job.caption, imageUrl: imageUrls[0], mimeType: "image/jpeg" });
+          childContainerIds.push(image.containerId);
+          publishContainerId = image.containerId;
+          await deps.markSubmission({ phase: "container_created", containerIds: [...childContainerIds] });
+        }
+      }
+      await waitForContainer(client, publishContainerId, deps.sleep ?? defaultSleep);
+      await deps.markSubmission({ phase: "publish_intent", publishIntentAt: nowIso() });
+      const published = await client.publishContainer(publishContainerId);
+      await deps.markSubmission({ phase: "submitted_pending_verification", submittedAt: nowIso() });
+      const verified = await client.verifyPublishedMedia(published.mediaId, job.caption, isCarousel ? "CAROUSEL" : "IMAGE");
+      return { externalId: published.mediaId, postUrl: verified.postUrl };
+    }
+    
+    /** Decide and (in live mode) perform the external action for one already-claimed job. */
+    export async function executeJob(job: PlatformDraft, mode: RunMode, deps: ExecuteDeps): Promise<JobResult> {
+      const factCheck = job.factCheck as FactCheck | undefined;
+      if (mode === "dry-run") {
+        // dry_run_verified is not terminal: it stays claimable and is due again for a live run (dueStatusesFor).
+        return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布；正式發布開關啟用後會重新排入。` };
+      }
+      if (!exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED)) {
+        return { status: "manual_required", verification: "pending", error: "正式發布總開關未啟用；已保留草稿與工作結果。" };
+      }
+      if (factCheck && factCheck.ok === false && !factCheck.acknowledgedBy) {
+        return { status: "manual_required", verification: "pending", error: "內容事實檢查未通過且未經核准人確認；未對外發布。" };
+      }
+      if (job.platform === "facebook_group") {
+        return { status: "manual_required", verification: "pending", error: "Facebook 社團不使用粉專 API；需老闆在核對社團身份後於正常介面送出。" };
+      }
+      if (job.platform === "facebook_page") {
+        if (!process.env.FACEBOOK_PAGE_ID?.trim() || !process.env.FACEBOOK_ACCESS_TOKEN?.trim()) {
+          return { status: "awaiting_auth", verification: "pending", error: "缺少 FACEBOOK_PAGE_ID 或 FACEBOOK_ACCESS_TOKEN；未對粉專發布。" };
+        }
+        const urls = (await deps.publicImageUrls?.()) || [];
+        const imageUrl = urls.find((url) => url.startsWith("https://")) || "";
+        if (!imageUrl) {
+          return { status: "retryable_failed", verification: "failed", error: "粉專發布需要 R2_PUBLIC_URL 組成的 https 圖片網址；未對粉專發布。" };
+        }
+        const published = await publishToFacebook({ caption: job.caption, imageUrl });
+        if (!published.success || !published.postId) {
+          return { status: "retryable_failed", verification: "failed", error: published.error || "粉專發布失敗" };
+        }
+        return { status: "published", externalId: published.postId, postUrl: `https://www.facebook.com/${published.postId}`, verification: "verified" };
+      }
+      if (job.platform === "x") {
+        if (!xCredentialsFromEnv()) {
+          return { status: "awaiting_auth", verification: "pending", error: "缺少 X_API_KEY、X_API_SECRET、X_ACCESS_TOKEN 或 X_ACCESS_SECRET；未對 X 發布。" };
+        }
+        try {
+          const image = await deps.primaryImage?.();
+          const published = await publishXPost({ text: job.caption, image });
+          return { status: "published", externalId: published.id, postUrl: `https://x.com/i/status/${published.id}`, verification: "verified" };
+        } catch (error) {
+          return { status: "retryable_failed", verification: "failed", error: error instanceof Error ? error.message : "X 發布失敗" };
+        }
+      }
+      if (job.platform === "website") {
+        if (!deps.publishWebsite) return { status: "manual_required", verification: "pending", error: "此儲存模式沒有官網發布接口；未對外發布。" };
+        // Idempotent by slug: a retry updates the same article, never a second one.
+        const website = await deps.publishWebsite().catch((error: unknown) => ({ ok: false as const, reason: error instanceof Error ? error.message : "官網發布失敗" }));
+        if (!website.ok) return { status: "retryable_failed", verification: "failed", error: `官網：${website.reason}；稍後自動重試同一篇文章。` };
+        return { status: "published", externalId: website.articleId, postUrl: website.url, verification: "verified" };
+      }
+      // Keep the in-memory submission in step with what was persisted, so the error path below
+      // sees created containers and never classifies a possibly-sent job as retryable.
+      const tracked: ExecuteDeps = {
+        ...deps,
+        markSubmission: async (patch) => {
+          job.submission = { ...(job.submission || defaultSubmission()), ...patch };
+          await deps.markSubmission(patch);
+        },
+      };
+      try {
+        const published = await submitInstagramV2Job(job, tracked);
+        return { status: "published", externalId: published.externalId, postUrl: published.postUrl, verification: "verified" };
+      } catch (error) {
+        if (error instanceof ContainerNotReadyError) {
+          // Nothing was published and the container is kept; the retry resumes it (resumableContainer).
+          return { status: "retryable_failed", verification: "pending", error: "Instagram 容器仍在處理中；已保留容器，稍後自動續行，不會重建或重送。" };
+        }
+        const v2Error = error instanceof InstagramV2Error ? error : null;
+        if (v2Error?.kind === "authorization") await clearStoredInstagramLoginTokenFromEnvironment().catch(() => false);
+        if (v2Error?.kind === "configuration" || v2Error?.kind === "authorization" || v2Error?.kind === "input") {
+          return { status: "awaiting_auth", verification: "pending", error: "Instagram V2 尚未具備可用授權、公開 JPEG 圖片或正式設定；未對外重送。" };
+        }
+        if (v2Error?.mayHaveSucceeded || v2Error?.kind === "unknown" || job.submission?.containerIds.length || job.submission?.carouselContainerId) {
+          return { status: "submitted_pending_verification", verification: "pending", error: "Instagram 回應結果不明或容器已建立；已保留提交狀態，未自動重送。" };
+        }
+        return { status: "retryable_failed", verification: "failed", error: "Instagram V2 拒絕此次發布；未將其標記為成功。" };
+      }
+    }
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/featured-spot-approval.test.mjs:41:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# (node:81) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/fleetCatalog.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: known rates are structured and unknown amounts are null, never zero
+ok 38 - known rates are structured and unknown amounts are null, never zero
+  ---
+  duration_ms: 0.845554
+  type: 'test'
+  ...
+# Subtest: public intros describe the ride and do not carry quote terms
+ok 39 - public intros describe the ride and do not carry quote terms
+  ---
+  duration_ms: 0.261489
+  type: 'test'
+  ...
+# Subtest: fleet pages read the catalog, and LINE quote code does not
+ok 40 - fleet pages read the catalog, and LINE quote code does not
+  ---
+  duration_ms: 0.941219
+  type: 'test'
+  ...
+# Subtest: a single checked trip can confirm the catalog fare and its own terms
+ok 41 - a single checked trip can confirm the catalog fare and its own terms
+  ---
+  duration_ms: 1.11082
+  type: 'test'
+  ...
+# Subtest: missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare
+ok 42 - missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare
+  ---
+  duration_ms: 0.451714
+  type: 'test'
+  ...
+# Subtest: draft routes do not send LINE
+ok 43 - draft routes do not send LINE
+  ---
+  duration_ms: 0.22848
+  type: 'test'
+  ...
+# Subtest: Gemini returns text, rejects errors and empty bodies, and times out
+ok 44 - Gemini returns text, rejects errors and empty bodies, and times out
+  ---
+  duration_ms: 6.872213
+  type: 'test'
+  ...
+# file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/node_modules/sharp/dist/sharp.mjs:165
+#   throw new Error(help.join("\\n"));
+#         ^
+# Error: Could not load the "sharp" module using the linux-arm64 runtime
+# Possible solutions:
+# - Ensure optional dependencies can be installed:
+#     npm install --include=optional sharp
+# - Ensure your package manager supports multi-platform installation:
+#     See https://sharp.pixelplumbing.com/install\#cross-platform
+# - Add platform-specific dependencies:
+#     npm install --os=linux --cpu=arm64 sharp
+# - Consult the installation documentation:
+#     See https://sharp.pixelplumbing.com/install
+#     at file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/node_modules/sharp/dist/sharp.mjs:165:9
+#     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+#     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+# Node.js v22.22.3
+# Subtest: scripts/highlights-local-photos.test.mjs
+not ok 9 - scripts/highlights-local-photos.test.mjs
+  ---
+  duration_ms: 60.999785
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/highlights-local-photos.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: GET /api/inquiry checks admin auth before anything else
+ok 46 - GET /api/inquiry checks admin auth before anything else
+  ---
+  duration_ms: 0.377633
+  type: 'test'
+  ...
+# Subtest: PATCH /api/inquiry checks admin mutation auth (same-origin cookie or bearer) first
+ok 47 - PATCH /api/inquiry checks admin mutation auth (same-origin cookie or bearer) first
+  ---
+  duration_ms: 0.087905
+  type: 'test'
+  ...
+# Subtest: POST /api/inquiry stays public for the inquiry form
+ok 48 - POST /api/inquiry stays public for the inquiry form
+  ---
+  duration_ms: 0.140416
+  type: 'test'
+  ...
+# Subtest: guards come from the shared admin auth module
+ok 49 - guards come from the shared admin auth module
+  ---
+  duration_ms: 0.064881
+  type: 'test'
+  ...
+# (node:120) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-login-v2.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing Instagram credentials never fall back to Facebook; reports no secret values
+ok 50 - missing Instagram credentials never fall back to Facebook; reports no secret values
+  ---
+  duration_ms: 0.585601
+  type: 'test'
+  ...
+# Subtest: configuration present is not proof of OAuth, activation, or publishing
+ok 51 - configuration present is not proof of OAuth, activation, or publishing
+  ---
+  duration_ms: 0.196656
+  type: 'test'
+  ...
+# Subtest: only Instagram host is used; token stays in Authorization, not URL or body
+ok 52 - only Instagram host is used; token stays in Authorization, not URL or body
+  ---
+  duration_ms: 11.448771
+  type: 'test'
+  ...
+# Subtest: multi-image carousel uses JPEG child containers and a separate carousel container
+ok 53 - multi-image carousel uses JPEG child containers and a separate carousel container
+  ---
+  duration_ms: 0.639106
+  type: 'test'
+  ...
+# Subtest: non-public, unapproved-origin, non-JPEG and oversized content rejected before network
+ok 54 - non-public, unapproved-origin, non-JPEG and oversized content rejected before network
+  ---
+  duration_ms: 0.534946
+  type: 'test'
+  ...
+# Subtest: timeouts are ambiguous, sanitized, and never automatically retried
+ok 55 - timeouts are ambiguous, sanitized, and never automatically retried
+  ---
+  duration_ms: 0.12192
+  type: 'test'
+  ...
+# Subtest: HTTP 200 without valid ID, 5xx, 429 and malformed responses are not success
+ok 56 - HTTP 200 without valid ID, 5xx, 429 and malformed responses are not success
+  ---
+  duration_ms: 1.452837
+  type: 'test'
+  ...
+# Subtest: invalid/expired authorization never exposes the provider error text
+ok 57 - invalid/expired authorization never exposes the provider error text
+  ---
+  duration_ms: 0.290241
+  type: 'test'
+  ...
+# Subtest: container PUBLISHED does not itself verify a public post
+ok 58 - container PUBLISHED does not itself verify a public post
+  ---
+  duration_ms: 0.472657
+  type: 'test'
+  ...
+# Subtest: verification requires matching ID, exact approved caption, image, and Instagram permalink
+ok 59 - verification requires matching ID, exact approved caption, image, and Instagram permalink
+  ---
+  duration_ms: 0.882051
+  type: 'test'
+  ...
+# (node:128) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-oauth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: user_id larger than MAX_SAFE_INTEGER survives as the exact digit string
+ok 60 - user_id larger than MAX_SAFE_INTEGER survives as the exact digit string
+  ---
+  duration_ms: 10.034927
+  type: 'test'
+  ...
+# Subtest: malformed provider JSON is a provider error, not a crash
+ok 61 - malformed provider JSON is a provider error, not a crash
+  ---
+  duration_ms: 0.209665
+  type: 'test'
+  ...
+# Subtest: token store resolution: database by default, file only off Vercel, malformed values rejected
+ok 62 - token store resolution: database by default, file only off Vercel, malformed values rejected
+  ---
+  duration_ms: 0.376225
+  type: 'test'
+  ...
+# Subtest: file store: encrypted at rest, expiry reported, clear works
+ok 63 - file store: encrypted at rest, expiry reported, clear works
+  ---
+  duration_ms: 5.803298
+  type: 'test'
+  ...
+# Subtest: diagnostics: present-but-invalid token store is INVALID, not PASS
+ok 64 - diagnostics: present-but-invalid token store is INVALID, not PASS
+  ---
+  duration_ms: 0.61133
+  type: 'test'
+  ...
+# Subtest: authorization state: CONFIG_INCOMPLETE → NOT_AUTHORIZED → AUTHORIZED → EXPIRED → STORAGE_UNAVAILABLE
+ok 65 - authorization state: CONFIG_INCOMPLETE → NOT_AUTHORIZED → AUTHORIZED → EXPIRED → STORAGE_UNAVAILABLE
+  ---
+  duration_ms: 2.374311
+  type: 'test'
+  ...
+# Subtest: database store: shared durable token, encrypted column, clear
+ok 66 - database store: shared durable token, encrypted column, clear # SKIP
+  ---
+  duration_ms: 0.057328
+  type: 'test'
+  ...
+# (node:140) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-oauth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: OAuth state is bound to the HttpOnly cookie and rejects tampering
+ok 67 - OAuth state is bound to the HttpOnly cookie and rejects tampering
+  ---
+  duration_ms: 0.898179
+  type: 'test'
+  ...
+# Subtest: authorization URL contains only public OAuth parameters
+ok 68 - authorization URL contains only public OAuth parameters
+  ---
+  duration_ms: 0.306433
+  type: 'test'
+  ...
+# Subtest: official code exchange uses server-side secret and stores long-lived result shape
+ok 69 - official code exchange uses server-side secret and stores long-lived result shape
+  ---
+  duration_ms: 9.783197
+  type: 'test'
+  ...
+# Subtest: token store encrypts at rest and expired credentials are not returned
+ok 70 - token store encrypts at rest and expired credentials are not returned
+  ---
+  duration_ms: 6.171459
+  type: 'test'
+  ...
+# Subtest: parses the LINE ID from the site's configured URL forms
+ok 71 - parses the LINE ID from the site's configured URL forms
+  ---
+  duration_ms: 0.483025
+  type: 'test'
+  ...
+# Subtest: default account is the one the public site links to
+ok 72 - default account is the one the public site links to
+  ---
+  duration_ms: 0.106288
+  type: 'test'
+  ...
+# Subtest: oaMessage URL encodes the ID and the text exactly once
+ok 73 - oaMessage URL encodes the ID and the text exactly once
+  ---
+  duration_ms: 0.106769
+  type: 'test'
+  ...
+# Subtest: dry run is not terminal: claimable, due again for a live run, not due for another dry run
+ok 74 - dry run is not terminal: claimable, due again for a live run, not due for another dry run
+  ---
+  duration_ms: 0.520593
+  type: 'test'
+  ...
+# Subtest: awaiting_auth is parked (not auto-due); retryable_failed is due only after its backoff
+ok 75 - awaiting_auth is parked (not auto-due); retryable_failed is due only after its backoff
+  ---
+  duration_ms: 0.379458
+  type: 'test'
+  ...
+# Subtest: Instagram container still IN_PROGRESS after polling → retryable, container kept, nothing published
+ok 76 - Instagram container still IN_PROGRESS after polling → retryable, container kept, nothing published
+  ---
+  duration_ms: 0.391233
+  type: 'test'
+  ...
+# Subtest: resume: the next attempt reuses the created container and publishes once it is FINISHED
+ok 77 - resume: the next attempt reuses the created container and publishes once it is FINISHED
+  ---
+  duration_ms: 0.381425
+  type: 'test'
+  ...
+# Subtest: container ERROR stays a reconciliation case (never auto-resent)
+ok 78 - container ERROR stays a reconciliation case (never auto-resent)
+  ---
+  duration_ms: 0.115473
+  type: 'test'
+  ...
+# Subtest: publishing to an account other than the approved one is refused before any container is created
+ok 79 - publishing to an account other than the approved one is refused before any container is created
+  ---
+  duration_ms: 0.070736
+  type: 'test'
+  ...
+# Subtest: approval hash binds the Instagram account; another account yields another hash
+ok 80 - approval hash binds the Instagram account; another account yields another hash
+  ---
+  duration_ms: 0.233969
+  type: 'test'
+  ...
+# Subtest: resolveInstagramAccountId prefers the explicit env and otherwise uses the stored OAuth token account
+ok 81 - resolveInstagramAccountId prefers the explicit env and otherwise uses the stored OAuth token account
+  ---
+  duration_ms: 9.556397
+  type: 'test'
+  ...
+# Subtest: lockIsTakeable: live holder with an old creation time but fresh heartbeat is kept
+ok 82 - lockIsTakeable: live holder with an old creation time but fresh heartbeat is kept
+  ---
+  duration_ms: 2.926505
+  type: 'test'
+  ...
+# Subtest: acquireLock refuses a live worker's lock created 11 minutes ago (review scenario) and leaves it intact
+ok 83 - acquireLock refuses a live worker's lock created 11 minutes ago (review scenario) and leaves it intact
+  ---
+  duration_ms: 2.339287
+  type: 'test'
+  ...
+# Subtest: acquireLock takes over a dead holder's lock and a lock whose heartbeat stopped
+ok 84 - acquireLock takes over a dead holder's lock and a lock whose heartbeat stopped
+  ---
+  duration_ms: 2.721641
+  type: 'test'
+  ...
+# Subtest: refresh and release only touch a lock this process still owns
+ok 85 - refresh and release only touch a lock this process still owns
+  ---
+  duration_ms: 2.661752
+  type: 'test'
+  ...
+# Subtest: one-shot exit code: 0 on success, 1 on HTTP error or connection failure (review P2)
+ok 86 - one-shot exit code: 0 on success, 1 on HTTP error or connection failure (review P2)
+  ---
+  duration_ms: 167.903917
+  type: 'test'
+  ...
+# Subtest: a second worker exits 1 while a live worker holds the lock
+ok 87 - a second worker exits 1 while a live worker holds the lock
+  ---
+  duration_ms: 20.687646
+  type: 'test'
+  ...
+# Subtest: complete confirmation for GX10 and Hermes passes
+ok 88 - complete confirmation for GX10 and Hermes passes
+  ---
+  duration_ms: 0.363185
+  type: 'test'
+  ...
+# Subtest: missing record or a missing caller blocks
+ok 89 - missing record or a missing caller blocks
+  ---
+  duration_ms: 0.656082
+  type: 'test'
+  ...
+# Subtest: incomplete or unsafe entries block
+ok 90 - incomplete or unsafe entries block
+  ---
+  duration_ms: 0.106801
+  type: 'test'
+  ...
+# Subtest: readCallers: absent or malformed file blocks
+ok 91 - readCallers: absent or malformed file blocks
+  ---
+  duration_ms: 0.751218
+  type: 'test'
+  ...
+# Subtest: up to date → ok
+ok 92 - up to date → ok
+  ---
+  duration_ms: 0.385841
+  type: 'test'
+  ...
+# Subtest: exit 1 with exactly the expected pending migrations → ok
+ok 93 - exit 1 with exactly the expected pending migrations → ok
+  ---
+  duration_ms: 0.412321
+  type: 'test'
+  ...
+# Subtest: unreachable database, bad URL, missing prisma → not ok (review: status was never checked)
+ok 94 - unreachable database, bad URL, missing prisma → not ok (review: status was never checked)
+  ---
+  duration_ms: 0.099057
+  type: 'test'
+  ...
+# Subtest: failed migration, extra or missing pending migration → not ok
+ok 95 - failed migration, extra or missing pending migration → not ok
+  ---
+  duration_ms: 0.11264
+  type: 'test'
+  ...
+# Subtest: phase is required and must be pre-release or pre-deploy
+ok 96 - phase is required and must be pre-release or pre-deploy
+  ---
+  duration_ms: 0.554881
+  type: 'test'
+  ...
+# Subtest: pre-release: 10 baseline migrations and no new ones → PASS
+ok 97 - pre-release: 10 baseline migrations and no new ones → PASS
+  ---
+  duration_ms: 0.784322
+  type: 'test'
+  ...
+# Subtest: pre-release: new migrations already applied → FAIL
+ok 98 - pre-release: new migrations already applied → FAIL
+  ---
+  duration_ms: 0.161233
+  type: 'test'
+  ...
+# Subtest: pre-deploy: exactly 13 finished, the three new ones applied → PASS (review: old preflight failed here after step 4)
+ok 99 - pre-deploy: exactly 13 finished, the three new ones applied → PASS (review: old preflight failed here after step 4)
+  ---
+  duration_ms: 0.06768
+  type: 'test'
+  ...
+# Subtest: pre-deploy: not yet migrated, partial, unfinished or unexpected migration → FAIL
+ok 100 - pre-deploy: not yet migrated, partial, unfinished or unexpected migration → FAIL
+  ---
+  duration_ms: 0.078912
+  type: 'test'
+  ...
+# Subtest: backup: PENDING before the release window, real check before deploy
+ok 101 - backup: PENDING before the release window, real check before deploy
+  ---
+  duration_ms: 0.141121
+  type: 'test'
+  ...
+# Subtest: Production env names: missing is PENDING before step 5, FAIL before deploy
+ok 102 - Production env names: missing is PENDING before step 5, FAIL before deploy
+  ---
+  duration_ms: 0.108624
+  type: 'test'
+  ...
+# Subtest: exit code: PENDING allowed only in pre-release; FAIL/UNVERIFIED always block
+ok 103 - exit code: PENDING allowed only in pre-release; FAIL/UNVERIFIED always block
+  ---
+  duration_ms: 0.103377
+  type: 'test'
+  ...
+# Subtest: F2: negated hours and airport multi-stop text never authorize catalog fare
+not ok 104 - F2: negated hours and airport multi-stop text never authorize catalog fare
+  ---
+  duration_ms: 1.275316
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:33:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    7000 !== null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual: 7000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:39:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: F2: staff-selected single-route ten hours retains correct fare
+not ok 105 - F2: staff-selected single-route ten hours retains correct fare
+  ---
+  duration_ms: 0.351233
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:41:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    7000 !== null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual: 7000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:44:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+not ok 106 - F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+  ---
+  duration_ms: 2.254471
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:48:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'hours')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:54:43)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+not ok 107 - F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+  ---
+  duration_ms: 1.573957
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:69:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    200 !== 400
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 400
+  actual: 200
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:76:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: F3: unauthorized staff draft never writes
+ok 108 - F3: unauthorized staff draft never writes
+  ---
+  duration_ms: 0.445105
+  type: 'test'
+  ...
+# Subtest: disabled exactTrue variants suppress all pre/post sends even with complete channels
+not ok 109 - disabled exactTrue variants suppress all pre/post sends even with complete channels
+  ---
+  duration_ms: 3.491003
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:53:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:56:30
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:55:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: enabled without channels persists successfully and logs only presence booleans
+not ok 110 - enabled without channels persists successfully and logs only presence booleans
+  ---
+  duration_ms: 0.712003
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:60:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'string'
+    - 'boolean'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'boolean'
+  actual: 'string'
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:63:92
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:61:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: enabled sends once to each email and each LINE recipient in each pre/post stage
+not ok 111 - enabled sends once to each email and each LINE recipient in each pre/post stage
+  ---
+  duration_ms: 1.162035
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:66:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   ' one@example.invalid, two@example.invalid,one@example.invalid, '
+    -   'one@example.invalid',
+    -   'two@example.invalid'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'one@example.invalid'
+    1: 'two@example.invalid'
+  actual:
+    0: ' one@example.invalid, two@example.invalid,one@example.invalid, '
+  operator: 'deepStrictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:69:12
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:67:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: legacy LINE recipient list works; missing channel token skips LINE
+not ok 112 - legacy LINE recipient list works; missing channel token skips LINE
+  ---
+  duration_ms: 0.585682
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:79:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 4
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 4
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:81:28
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:80:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: recipient failures do not block remaining recipients or inquiry success; error contents stay private
+not ok 113 - recipient failures do not block remaining recipients or inquiry success; error contents stay private
+  ---
+  duration_ms: 1.081763
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:87:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:91:12
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:88:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+ok 114 - authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+  ---
+  duration_ms: 1.840581
+  type: 'test'
+  ...
+# Subtest: only 403 AccessDenied counts as a refusal
+ok 115 - only 403 AccessDenied counts as a refusal
+  ---
+  duration_ms: 0.699506
+  type: 'test'
+  ...
+# Subtest: NoSuchBucket is inconclusive, not a scope PASS
+ok 116 - NoSuchBucket is inconclusive, not a scope PASS
+  ---
+  duration_ms: 0.157872
+  type: 'test'
+  ...
+# Subtest: timeouts are inconclusive (SDK TimeoutError and a hung call)
+not ok 117 - timeouts are inconclusive (SDK TimeoutError and a hung call)
+  ---
+  duration_ms: 2.576344
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:20:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: connection errors are inconclusive
+not ok 118 - connection errors are inconclusive
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:27:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: credential errors are inconclusive (a wrong key is not a scoped key)
+not ok 119 - credential errors are inconclusive (a wrong key is not a scoped key)
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:35:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: AccessDenied without a 403 status is not trusted
+not ok 120 - AccessDenied without a 403 status is not trusted
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:43:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: anonymous GET: exact R2 signature-required answer is refused; others are not
+not ok 121 - anonymous GET: exact R2 signature-required answer is refused; others are not
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:47:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: public entry closed only when both management answers say so
+not ok 122 - public entry closed only when both management answers say so
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:57:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: token policy: Object Read & Write on exactly this bucket is scoped
+not ok 123 - token policy: Object Read & Write on exactly this bucket is scoped
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:77:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# Subtest: token policy: all-buckets, account-wide, other bucket, extra permission, wrong id, inactive are not scoped
+not ok 124 - token policy: all-buckets, account-wide, other bucket, extra permission, wrong id, inactive are not scoped
+  ---
+  duration_ms: 0
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/test-support/r2-scope-evidence.test.mjs:88:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:519:28)
+  ...
+# PASS POST with TRAVEL_IMPORT_API_KEY unset → 503 — 503
+# PASS GET without admin login → 401 — 401
+# PASS GET response does not reveal whether the key is set
+# PASS POST with wrong x-api-key → 401 — 401
+# PASS POST without x-api-key → 401 — 401
+# PASS GET without admin login (key set) → 401 — 401
+# Subtest: scripts/travel-import-auth.test.mjs
+ok 23 - scripts/travel-import-auth.test.mjs
+  ---
+  duration_ms: 244.428421
+  type: 'test'
+  ...
+# Subtest: copy provider prefers Gemini, then Anthropic, then OpenAI, and refuses when none is complete
+ok 126 - copy provider prefers Gemini, then Anthropic, then OpenAI, and refuses when none is complete
+  ---
+  duration_ms: 19.808524
+  type: 'test'
+  ...
+# Subtest: X OAuth 1.0a header is signed with the user token and does not echo secrets in the clear
+ok 127 - X OAuth 1.0a header is signed with the user token and does not echo secrets in the clear
+  ---
+  duration_ms: 0.939043
+  type: 'test'
+  ...
+# Subtest: worker auth accepts CRON_SECRET and OPERATIONS_CRON_TOKEN, and rejects a wrong bearer
+ok 128 - worker auth accepts CRON_SECRET and OPERATIONS_CRON_TOKEN, and rejects a wrong bearer
+  ---
+  duration_ms: 55.478249
+  type: 'test'
+  ...
+# Subtest: health report is booleans and names only
+ok 129 - health report is booleans and names only
+  ---
+  duration_ms: 19.106218
+  type: 'test'
+  ...
+# Subtest: slug is deterministic per content and valid for /travel
+ok 130 - slug is deterministic per content and valid for /travel
+  ---
+  duration_ms: 0.56341
+  type: 'test'
+  ...
+# Subtest: article body is the approved caption, only the duplicated title heading removed
+ok 131 - article body is the approved caption, only the duplicated title heading removed
+  ---
+  duration_ms: 0.074976
+  type: 'test'
+  ...
+# Subtest: publish writes one article with the approved text and permanent image paths, then verifies the public page
+ok 132 - publish writes one article with the approved text and permanent image paths, then verifies the public page
+  ---
+  duration_ms: 0.592274
+  type: 'test'
+  ...
+# Subtest: retrying the same job reuses the same article (no duplicate)
+ok 133 - retrying the same job reuses the same article (no duplicate)
+  ---
+  duration_ms: 0.211057
+  type: 'test'
+  ...
+# Subtest: not published when the public page lacks the approved text
+ok 134 - not published when the public page lacks the approved text
+  ---
+  duration_ms: 0.095056
+  type: 'test'
+  ...
+# Subtest: not published when a public image does not match the approved bytes
+ok 135 - not published when a public image does not match the approved bytes
+  ---
+  duration_ms: 0.282113
+  type: 'test'
+  ...
+# Subtest: refuses a slug owned by other content
+ok 136 - refuses a slug owned by other content
+  ---
+  duration_ms: 0.239361
+  type: 'test'
+  ...
+# Subtest: public image lookup serves only listed images of published articles
+ok 137 - public image lookup serves only listed images of published articles
+  ---
+  duration_ms: 0.098464
+  type: 'test'
+  ...
+# Subtest: executeJob: website publishes through the publisher in live mode and reports URL + article id
+ok 138 - executeJob: website publishes through the publisher in live mode and reports URL + article id
+  ---
+  duration_ms: 0.435617
+  type: 'test'
+  ...
+1..138
+# tests 138
+# suites 0
+# pass 118
+# fail 11
+# cancelled 8
+# skipped 1
+# todo 0
+# duration_ms 3609.713878

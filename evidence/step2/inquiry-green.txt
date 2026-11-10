@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: disabled exactTrue variants suppress all pre/post sends even with complete channels
+ok 1 - disabled exactTrue variants suppress all pre/post sends even with complete channels
+  ---
+  duration_ms: 5.857138
+  type: 'test'
+  ...
+# Subtest: enabled without channels persists successfully and logs only presence booleans
+ok 2 - enabled without channels persists successfully and logs only presence booleans
+  ---
+  duration_ms: 0.392033
+  type: 'test'
+  ...
+# Subtest: enabled sends once to each email and each LINE recipient in each pre/post stage
+ok 3 - enabled sends once to each email and each LINE recipient in each pre/post stage
+  ---
+  duration_ms: 1.183764
+  type: 'test'
+  ...
+# Subtest: legacy LINE recipient list works; missing channel token skips LINE
+ok 4 - legacy LINE recipient list works; missing channel token skips LINE
+  ---
+  duration_ms: 0.67973
+  type: 'test'
+  ...
+# Subtest: recipient failures do not block remaining recipients or inquiry success; error contents stay private
+ok 5 - recipient failures do not block remaining recipients or inquiry success; error contents stay private
+  ---
+  duration_ms: 0.388465
+  type: 'test'
+  ...
+# Subtest: authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+ok 6 - authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+  ---
+  duration_ms: 1.138996
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 269.74165
