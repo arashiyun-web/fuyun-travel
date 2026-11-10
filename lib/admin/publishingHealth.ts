@@ -1,4 +1,5 @@
 import { exactTrue } from "@/lib/liveSwitch";
+import { postizSettings, publishOutlet } from "@/lib/postiz/config";
 
 export type EnvFlag = { name: string; set: boolean };
 export type CheckState = "not_tested";
@@ -48,6 +49,8 @@ export function publishingHealth() {
   const lineNotify = flag("LINE_CHANNEL_ACCESS_TOKEN").set && (flag("LINE_ADMIN_USER_ID").set || flag("ADMIN_LINE_USER_ID").set);
   const email = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every((name) => flag(name).set) && (flag("INQUIRY_TO_EMAIL").set || flag("SMTP_USER").set);
   const checks = { functionalCheck: "not_tested" as CheckState, authorizationCheck: "not_tested" as CheckState };
+  const outlet = publishOutlet();
+  const postiz = postizSettings();
   return {
     copywriting: {
       ready: Boolean(copy.selected),
@@ -90,6 +93,13 @@ export function publishingHealth() {
       missing: flag("CRON_SECRET").set || flag("OPERATIONS_CRON_TOKEN").set ? [] : ["CRON_SECRET"],
       ...checks,
       env: [flag("CRON_SECRET"), flag("OPERATIONS_CRON_TOKEN"), flag("OPERATIONS_LIVE_PUBLISH_ENABLED"), flag("OPERATIONS_PERSISTENCE_MODE")],
+    },
+    postiz: {
+      ready: outlet === "postiz" ? postiz.ready : outlet === "native",
+      outlet: outlet || "未完成",
+      missing: outlet === "postiz" ? postiz.missing : outlet ? [] : ["PUBLISH_OUTLET"],
+      ...checks,
+      env: [flag("PUBLISH_OUTLET"), flag("POSTIZ_API_URL"), flag("POSTIZ_API_KEY"), flag("POSTIZ_FACEBOOK_INTEGRATION_ID"), flag("POSTIZ_INSTAGRAM_INTEGRATION_ID"), flag("POSTIZ_X_INTEGRATION_ID")],
     },
     inquiryNotify: {
       line: lineNotify,

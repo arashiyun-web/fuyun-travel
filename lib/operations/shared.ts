@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { exactTrue } from "@/lib/liveSwitch";
+import { isPostizSocialPlatform, publishOutlet } from "@/lib/postiz/config";
 import { publishToFacebook } from "@/lib/social/publishers";
 import { createInstagramLoginClientV2, InstagramV2Error } from "@/lib/social/instagram-login-v2";
 import { publishXPost, xCredentialsFromEnv } from "@/lib/social/xOauth";
@@ -336,6 +337,9 @@ export async function executeJob(job: PlatformDraft, mode: RunMode, deps: Execut
   if (mode === "dry-run") {
     // dry_run_verified is not terminal: it stays claimable and is due again for a live run (dueStatusesFor).
     return { status: "dry_run_verified", verification: "verified", error: `乾跑完成：${job.platform} adapter=${job.adapter}，未對外發布；正式發布開關啟用後會重新排入。` };
+  }
+  if (isPostizSocialPlatform(job.platform) && publishOutlet() === "postiz") {
+    return { status: "manual_required", verification: "pending", error: "發布出口是 Postiz，原生 worker 不發這篇。" };
   }
   if (!exactTrue(process.env.OPERATIONS_LIVE_PUBLISH_ENABLED)) {
     return { status: "manual_required", verification: "pending", error: "正式發布總開關未啟用；已保留草稿與工作結果。" };
