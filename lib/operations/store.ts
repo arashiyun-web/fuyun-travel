@@ -20,6 +20,7 @@ import {
   defaultSubmission,
   dueStatusesFor,
   executeJob,
+  jobRunSucceeded,
   getImageContentType,
   jobApprovalHash,
   makePlatformCaptions,
@@ -400,6 +401,7 @@ async function fileRunJob(jobId: string, mode: RunMode, statuses: JobStatus[]) {
       }
     },
     approvedInstagramAccount: claimed.accounts.instagram,
+    postizContent: { contentId: claimed.content.id, approval: claimed.content.approval },
   });
   const plan = nextAttemptPlan(result, claimed.job.attempts);
   return serialize(async () => {
@@ -418,7 +420,7 @@ async function fileRunJob(jobId: string, mode: RunMode, statuses: JobStatus[]) {
     current.content.updatedAt = now();
     addEvent(state, { type: "job_result", contentId: current.content.id, jobId, platform: current.job.platform, detail: plan.error || plan.status });
     await writeState(state);
-    return { success: plan.status === "dry_run_verified" || plan.status === "published", status: plan.status, job: current.job, content: current.content };
+    return { success: jobRunSucceeded(plan.status), status: plan.status, job: current.job, content: current.content };
   });
 }
 
@@ -548,5 +550,5 @@ export async function readImage(contentId: string, fileName: string) {
 }
 
 export function isValidJobStatus(status: string): status is JobStatus {
-  return ["draft", "pending_approval", "approved", "queued", "scheduled", "processing", "submitted_pending_verification", "published", "awaiting_auth", "retryable_failed", "manual_required", "blocked_platform", "dry_run_verified"].includes(status as JobStatus);
+  return ["draft", "pending_approval", "approved", "queued", "scheduled", "processing", "submitted_pending_verification", "published", "awaiting_auth", "retryable_failed", "manual_required", "blocked_platform", "dry_run_verified", "postiz_draft"].includes(status as JobStatus);
 }

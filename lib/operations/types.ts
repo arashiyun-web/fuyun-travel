@@ -18,6 +18,8 @@ export const JOB_STATUSES = [
   "manual_required",
   "blocked_platform",
   "dry_run_verified",
+  /** Postiz draft exists. Not a public post, and the worker does not send it again. */
+  "postiz_draft",
   /** Published website article taken down by an admin; never picked up again. */
   "withdrawn",
 ] as const;

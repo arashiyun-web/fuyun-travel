@@ -25,6 +25,7 @@ type HealthFeature = {
   email?: boolean;
   livePublish?: boolean;
   selected?: string | null;
+  outlet?: string;
   missing?: string[];
   unselected?: boolean;
   functionalCheck?: string;
@@ -43,6 +44,7 @@ const featureLabels: Record<string, string> = {
   instagramLogin: "Instagram 登入",
   x: "X 發文",
   scheduler: "排程",
+  postiz: "發布出口",
   inquiryNotify: "詢價通知",
 };
 
@@ -275,7 +277,7 @@ function SettingsStatus({ health, error }: { health: Record<string, HealthFeatur
         const ready = Boolean(feature.ready);
         return (
           <div key={key} className="border border-slate-800 rounded-xl p-3">
-            <p className="text-sm text-slate-200">{featureLabels[key] || key}：{ready ? "名稱已填" : "名稱未完成"}{key === "scheduler" ? `；正式發布開關${feature.livePublish ? "已打開" : "未打開"}` : ""}{feature.selected ? `；使用 ${feature.selected}` : ""}</p>
+            <p className="text-sm text-slate-200">{featureLabels[key] || key}：{ready ? "名稱已填" : "名稱未完成"}{key === "scheduler" ? `；正式發布開關${feature.livePublish ? "已打開" : "未打開"}` : ""}{feature.selected ? `；使用 ${feature.selected}` : ""}{feature.outlet ? `；目前發布出口：${feature.outlet}` : ""}</p>
             <p className="text-xs text-slate-500 mt-1">功能實測：{feature.functionalCheck === "not_tested" ? "未實測" : feature.functionalCheck || "未實測"}。授權狀態：{feature.authorizationCheck === "not_tested" ? "未實測" : feature.authorizationCheck || "未實測"}。名稱有填不代表已經測過或已授權。</p>
             {feature.unselected ? <p className="text-xs text-amber-300 mt-1">尚未選擇文案供應商。填上一對即可，另外兩家未填不用列成缺項。</p> : null}
             {feature.missing?.length ? <p className="text-xs text-amber-300 mt-1">未填：{feature.missing.join("、")}</p> : null}

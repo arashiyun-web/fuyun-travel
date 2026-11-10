@@ -358,4 +358,20 @@ model LineWebhookEvent {
   @@map("line_webhook_events")
 }
 
+/// One Postiz draft attempt per approved operations content and social platform.
+model PostizHandoff {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique @map("idempotency_key")
+  contentId      String   @map("content_id")
+  platform       String
+  status         String
+  postizPostId   String?  @map("postiz_post_id")
+  lastError      String?  @map("last_error")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([contentId, platform])
+  @@map("postiz_handoffs")
+}
+
 /// LINE raw message events (full capture, deduped by messageId + contentHash).
