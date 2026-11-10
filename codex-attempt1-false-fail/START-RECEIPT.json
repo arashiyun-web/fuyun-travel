@@ -1,0 +1,27 @@
+{
+  "status": "FAIL",
+  "reason": "Actual runtime model and reasoning effort cannot be verified; implementation not started.",
+  "model": null,
+  "reasoning_effort": null,
+  "approval_policy": null,
+  "approvals_reviewer": "auto_review",
+  "sandbox_mode": "workspace-write",
+  "session_id": "01a1c78e-2447-73b2-9a8b-495ee9dcb1be",
+  "work_root": "/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920",
+  "starting_head": "f9806b6e03a8350e00b5dfa826a4c1aeb44a9c0c",
+  "recorded_at": "2026-11-10T22:24:00.206865+00:00",
+  "required_model": "gpt-6.1-sol",
+  "required_reasoning_effort": "high",
+  "verification": {
+    "session_id_source": "CODEX_SESSION_ID (matches CODEX_THREAD_ID)",
+    "model_source": null,
+    "reasoning_effort_source": null,
+    "approval_policy_source": null,
+    "checked": [
+      "Matching session rollout filename absent",
+      "Matching state_5.sqlite thread row absent",
+      "Runtime process has no allowlisted model/effort/approval flags"
+    ],
+    "note": "Other sessions and configured defaults are not evidence of this session runtime. No mismatch is asserted; required runtime identity remains unverified."
+  }
+}

@@ -1,0 +1,239 @@
+TAP version 13
+# Subtest: F2: negated hours and airport multi-stop text never authorize catalog fare
+not ok 1 - F2: negated hours and airport multi-stop text never authorize catalog fare
+  ---
+  duration_ms: 1.26706
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:33:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    7000 !== null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual: 7000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:39:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: F2: staff-selected single-route ten hours retains correct fare
+not ok 2 - F2: staff-selected single-route ten hours retains correct fare
+  ---
+  duration_ms: 0.326369
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:41:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    7000 !== null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual: 7000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:44:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+not ok 3 - F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+  ---
+  duration_ms: 2.237559
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:48:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'hours')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:54:43)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+not ok 4 - F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+  ---
+  duration_ms: 1.628389
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:69:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    200 !== 400
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 400
+  actual: 200
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-fare.test.cjs:76:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: F3: unauthorized staff draft never writes
+ok 5 - F3: unauthorized staff draft never writes
+  ---
+  duration_ms: 0.457313
+  type: 'test'
+  ...
+# Subtest: disabled exactTrue variants suppress all pre/post sends even with complete channels
+not ok 6 - disabled exactTrue variants suppress all pre/post sends even with complete channels
+  ---
+  duration_ms: 3.619691
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:53:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:56:30
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:55:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: enabled without channels persists successfully and logs only presence booleans
+not ok 7 - enabled without channels persists successfully and logs only presence booleans
+  ---
+  duration_ms: 0.760498
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:60:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'string'
+    - 'boolean'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'boolean'
+  actual: 'string'
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:63:92
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:61:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: enabled sends once to each email and each LINE recipient in each pre/post stage
+not ok 8 - enabled sends once to each email and each LINE recipient in each pre/post stage
+  ---
+  duration_ms: 1.191876
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:66:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   ' one@example.invalid, two@example.invalid,one@example.invalid, '
+    -   'one@example.invalid',
+    -   'two@example.invalid'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'one@example.invalid'
+    1: 'two@example.invalid'
+  actual:
+    0: ' one@example.invalid, two@example.invalid,one@example.invalid, '
+  operator: 'deepStrictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:69:12
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:67:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: legacy LINE recipient list works; missing channel token skips LINE
+not ok 9 - legacy LINE recipient list works; missing channel token skips LINE
+  ---
+  duration_ms: 0.587938
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:79:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 4
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 4
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:81:28
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:80:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: recipient failures do not block remaining recipients or inquiry success; error contents stay private
+not ok 10 - recipient failures do not block remaining recipients or inquiry success; error contents stay private
+  ---
+  duration_ms: 1.082435
+  type: 'test'
+  location: '/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:87:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:91:12
+    async scenario (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:45:9)
+    async TestContext.<anonymous> (/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/scripts/step2-inquiry.test.cjs:88:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+ok 11 - authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+  ---
+  duration_ms: 1.91607
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 2
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 265.916871

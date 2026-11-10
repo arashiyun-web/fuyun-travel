@@ -1,0 +1,883 @@
+Excluded integration/platform suites: {"admin-session-flow.test.mjs":"requires PostgreSQL, next start and destructive DB recreation","member-order-publish.test.mjs":"requires sudo/PostgreSQL and destructive DB recreation","line-group-relay.test.mjs":"requires isolated PostgreSQL","line-webhook-claim.test.mjs":"requires isolated PostgreSQL","line-webhook-offline.test.mjs":"requires isolated PostgreSQL","operations-intake-cleanup.test.mjs":"requires isolated PostgreSQL","tools/vercel-ascii.test.mjs":"requires Windows PowerShell"}
+TAP version 13
+# (node:17) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/adminAuth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rejects every login when admin settings are missing
+ok 1 - rejects every login when admin settings are missing
+  ---
+  duration_ms: 1.590869
+  type: 'test'
+  ...
+# Subtest: accepts only the configured username and hashed password
+ok 2 - accepts only the configured username and hashed password
+  ---
+  duration_ms: 101.732597
+  type: 'test'
+  ...
+# Subtest: username tolerates surrounding whitespace from mobile autofill, but not other changes; password is exact
+ok 3 - username tolerates surrounding whitespace from mobile autofill, but not other changes; password is exact
+  ---
+  duration_ms: 85.904756
+  type: 'test'
+  ...
+# Subtest: rejects a short signing secret instead of falling back
+ok 4 - rejects a short signing secret instead of falling back
+  ---
+  duration_ms: 21.873827
+  type: 'test'
+  ...
+# Subtest: issued token and session cookie both last 90 days
+ok 5 - issued token and session cookie both last 90 days
+  ---
+  duration_ms: 31.06075
+  type: 'test'
+  ...
+# Subtest: issued token verifies; tampered token does not
+ok 6 - issued token verifies; tampered token does not
+  ---
+  duration_ms: 22.080643
+  type: 'test'
+  ...
+# Subtest: rejects legacy tokens without the version claim even with the current key
+ok 7 - rejects legacy tokens without the version claim even with the current key
+  ---
+  duration_ms: 21.361009
+  type: 'test'
+  ...
+# Subtest: rejects tokens signed with any other key (e.g. the old exposed fallback)
+ok 8 - rejects tokens signed with any other key (e.g. the old exposed fallback)
+  ---
+  duration_ms: 21.185472
+  type: 'test'
+  ...
+# Subtest: tokens stop verifying after the signing secret is rotated
+ok 9 - tokens stop verifying after the signing secret is rotated
+  ---
+  duration_ms: 21.853107
+  type: 'test'
+  ...
+# Subtest: rejects expired tokens and tokens for a different username
+ok 10 - rejects expired tokens and tokens for a different username
+  ---
+  duration_ms: 21.401297
+  type: 'test'
+  ...
+# Subtest: cookie session: valid token accepted, old-key or legacy token rejected
+ok 11 - cookie session: valid token accepted, old-key or legacy token rejected
+  ---
+  duration_ms: 22.141555
+  type: 'test'
+  ...
+# Subtest: cookie session is rejected when admin settings are missing
+ok 12 - cookie session is rejected when admin settings are missing
+  ---
+  duration_ms: 21.176576
+  type: 'test'
+  ...
+# Subtest: cookie-authenticated mutation requires same origin; bearer does not
+ok 13 - cookie-authenticated mutation requires same origin; bearer does not
+  ---
+  duration_ms: 22.137492
+  type: 'test'
+  ...
+# Subtest: sessions are revoked when any admin setting is removed (fail closed)
+ok 14 - sessions are revoked when any admin setting is removed (fail closed)
+  ---
+  duration_ms: 42.218576
+  type: 'test'
+  ...
+# Subtest: same-origin check uses the addressed host (Host / x-forwarded-host), not an internal request.url host
+ok 15 - same-origin check uses the addressed host (Host / x-forwarded-host), not an internal request.url host
+  ---
+  duration_ms: 0.412641
+  type: 'test'
+  ...
+# Subtest: only the operations owner action counts as approval
+ok 16 - only the operations owner action counts as approval
+  ---
+  duration_ms: 0.388145
+  type: 'test'
+  ...
+# Subtest: editing copy after approval returns every unsent job to pending review
+ok 17 - editing copy after approval returns every unsent job to pending review
+  ---
+  duration_ms: 0.151104
+  type: 'test'
+  ...
+# Subtest: generate, distribute, content-sync, cron and the worker never approve or publish on their own
+ok 18 - generate, distribute, content-sync, cron and the worker never approve or publish on their own
+  ---
+  duration_ms: 10.544576
+  type: 'test'
+  ...
+# Subtest: regression: round-4 recruitment hallucination is blocked
+ok 19 - regression: round-4 recruitment hallucination is blocked
+  ---
+  duration_ms: 1.260883
+  type: 'test'
+  ...
+# Subtest: unknown price: any amount without approved facts is a violation
+ok 20 - unknown price: any amount without approved facts is a violation
+  ---
+  duration_ms: 0.381041
+  type: 'test'
+  ...
+# Subtest: request to guess a price is still blocked
+ok 21 - request to guess a price is still blocked
+  ---
+  duration_ms: 0.119456
+  type: 'test'
+  ...
+# Subtest: approved per-vehicle price passes; per-person wording fails
+ok 22 - approved per-vehicle price passes; per-person wording fails
+  ---
+  duration_ms: 0.165041
+  type: 'test'
+  ...
+# Subtest: claiming meals or lodging not in approved includes fails; negated mention passes
+ok 23 - claiming meals or lodging not in approved includes fails; negated mention passes
+  ---
+  duration_ms: 0.116576
+  type: 'test'
+  ...
+# Subtest: expired or unversioned facts block and force human review
+ok 24 - expired or unversioned facts block and force human review
+  ---
+  duration_ms: 0.324225
+  type: 'test'
+  ...
+# Subtest: dates and quota must come from approved facts
+ok 25 - dates and quota must come from approved facts
+  ---
+  duration_ms: 0.141056
+  type: 'test'
+  ...
+# Subtest: composeDraft falls back to template and never auto-approves
+ok 26 - composeDraft falls back to template and never auto-approves
+  ---
+  duration_ms: 8.846299
+  type: 'test'
+  ...
+# Subtest: facts block renders missing fields as 待確認
+ok 27 - facts block renders missing fields as 待確認
+  ---
+  duration_ms: 0.312897
+  type: 'test'
+  ...
+# Subtest: approval is bound to exact content; any change invalidates it
+ok 28 - approval is bound to exact content; any change invalidates it
+  ---
+  duration_ms: 0.589922
+  type: 'test'
+  ...
+# Subtest: regression (live 2026-09-27): refusal, invented stops and overlong text fall back to template
+ok 29 - regression (live 2026-09-27): refusal, invented stops and overlong text fall back to template
+  ---
+  duration_ms: 0.350321
+  type: 'test'
+  ...
+# Subtest: collects explicit images, full_picture and Facebook attachment/sub-attachment images, deduplicated in order
+ok 30 - collects explicit images, full_picture and Facebook attachment/sub-attachment images, deduplicated in order
+  ---
+  duration_ms: 0.701186
+  type: 'test'
+  ...
+# Subtest: a legacy single full_picture still works; empty or odd payloads give no photos
+ok 31 - a legacy single full_picture still works; empty or odd payloads give no photos
+  ---
+  duration_ms: 0.114816
+  type: 'test'
+  ...
+# Subtest: only https URLs or site image paths are kept, at most 10
+ok 32 - only https URLs or site image paths are kept, at most 10
+  ---
+  duration_ms: 0.121792
+  type: 'test'
+  ...
+# Subtest: merges an admin-chosen cover with the source post's other photos (cover first, no duplicates)
+ok 33 - merges an admin-chosen cover with the source post's other photos (cover first, no duplicates)
+  ---
+  duration_ms: 0.184497
+  type: 'test'
+  ...
+# Subtest: source URL must be https (Facebook or the site); anything else is dropped
+ok 34 - source URL must be https (Facebook or the site); anything else is dropped
+  ---
+  duration_ms: 0.065792
+  type: 'test'
+  ...
+# Subtest: only a draft with the exact approved title and body is published to highlights
+ok 35 - only a draft with the exact approved title and body is published to highlights
+  ---
+  duration_ms: 0.648242
+  type: 'test'
+  ...
+# Subtest: withdrawing approval unpublishes that exact card and nothing else
+ok 36 - withdrawing approval unpublishes that exact card and nothing else
+  ---
+  duration_ms: 0.08648
+  type: 'test'
+  ...
+# Subtest: highlights follow approval immediately; social and travel stay behind the live switch
+ok 37 - highlights follow approval immediately; social and travel stay behind the live switch
+  ---
+  duration_ms: 0.214961
+  type: 'test'
+  ...
+# (node:81) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/fleetCatalog.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: known rates are structured and unknown amounts are null, never zero
+ok 38 - known rates are structured and unknown amounts are null, never zero
+  ---
+  duration_ms: 0.875602
+  type: 'test'
+  ...
+# Subtest: public intros describe the ride and do not carry quote terms
+ok 39 - public intros describe the ride and do not carry quote terms
+  ---
+  duration_ms: 0.281377
+  type: 'test'
+  ...
+# Subtest: fleet pages read the catalog, and LINE quote code does not
+ok 40 - fleet pages read the catalog, and LINE quote code does not
+  ---
+  duration_ms: 0.354929
+  type: 'test'
+  ...
+# Subtest: a single checked trip can confirm the catalog fare and its own terms
+ok 41 - a single checked trip can confirm the catalog fare and its own terms
+  ---
+  duration_ms: 0.922563
+  type: 'test'
+  ...
+# Subtest: missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare
+ok 42 - missing hours, multi-stop, via-city, overload, and a 42-seat request do not confirm a fare
+  ---
+  duration_ms: 0.364833
+  type: 'test'
+  ...
+# Subtest: draft routes do not send LINE
+ok 43 - draft routes do not send LINE
+  ---
+  duration_ms: 0.166032
+  type: 'test'
+  ...
+# Subtest: Gemini returns text, rejects errors and empty bodies, and times out
+ok 44 - Gemini returns text, rejects errors and empty bodies, and times out
+  ---
+  duration_ms: 6.325331
+  type: 'test'
+  ...
+# Subtest: nine source links resolve to the committed webp sets, ignoring www, slash and query
+ok 45 - nine source links resolve to the committed webp sets, ignoring www, slash and query
+  ---
+  duration_ms: 0.700882
+  type: 'test'
+  ...
+# Subtest: every mapped file exists, is webp, and stays within 1600px
+ok 46 - every mapped file exists, is webp, and stays within 1600px
+  ---
+  duration_ms: 94.622079
+  type: 'test'
+  ...
+# Subtest: GET /api/inquiry checks admin auth before anything else
+ok 47 - GET /api/inquiry checks admin auth before anything else
+  ---
+  duration_ms: 0.38205
+  type: 'test'
+  ...
+# Subtest: PATCH /api/inquiry checks admin mutation auth (same-origin cookie or bearer) first
+ok 48 - PATCH /api/inquiry checks admin mutation auth (same-origin cookie or bearer) first
+  ---
+  duration_ms: 0.085248
+  type: 'test'
+  ...
+# Subtest: POST /api/inquiry stays public for the inquiry form
+ok 49 - POST /api/inquiry stays public for the inquiry form
+  ---
+  duration_ms: 0.205152
+  type: 'test'
+  ...
+# Subtest: guards come from the shared admin auth module
+ok 50 - guards come from the shared admin auth module
+  ---
+  duration_ms: 0.063072
+  type: 'test'
+  ...
+# (node:120) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-login-v2.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing Instagram credentials never fall back to Facebook; reports no secret values
+ok 51 - missing Instagram credentials never fall back to Facebook; reports no secret values
+  ---
+  duration_ms: 0.56373
+  type: 'test'
+  ...
+# Subtest: configuration present is not proof of OAuth, activation, or publishing
+ok 52 - configuration present is not proof of OAuth, activation, or publishing
+  ---
+  duration_ms: 0.181681
+  type: 'test'
+  ...
+# Subtest: only Instagram host is used; token stays in Authorization, not URL or body
+ok 53 - only Instagram host is used; token stays in Authorization, not URL or body
+  ---
+  duration_ms: 11.134561
+  type: 'test'
+  ...
+# Subtest: multi-image carousel uses JPEG child containers and a separate carousel container
+ok 54 - multi-image carousel uses JPEG child containers and a separate carousel container
+  ---
+  duration_ms: 0.610465
+  type: 'test'
+  ...
+# Subtest: non-public, unapproved-origin, non-JPEG and oversized content rejected before network
+ok 55 - non-public, unapproved-origin, non-JPEG and oversized content rejected before network
+  ---
+  duration_ms: 0.51885
+  type: 'test'
+  ...
+# Subtest: timeouts are ambiguous, sanitized, and never automatically retried
+ok 56 - timeouts are ambiguous, sanitized, and never automatically retried
+  ---
+  duration_ms: 0.118656
+  type: 'test'
+  ...
+# Subtest: HTTP 200 without valid ID, 5xx, 429 and malformed responses are not success
+ok 57 - HTTP 200 without valid ID, 5xx, 429 and malformed responses are not success
+  ---
+  duration_ms: 1.400533
+  type: 'test'
+  ...
+# Subtest: invalid/expired authorization never exposes the provider error text
+ok 58 - invalid/expired authorization never exposes the provider error text
+  ---
+  duration_ms: 0.267553
+  type: 'test'
+  ...
+# Subtest: container PUBLISHED does not itself verify a public post
+ok 59 - container PUBLISHED does not itself verify a public post
+  ---
+  duration_ms: 0.438353
+  type: 'test'
+  ...
+# Subtest: verification requires matching ID, exact approved caption, image, and Instagram permalink
+ok 60 - verification requires matching ID, exact approved caption, image, and Instagram permalink
+  ---
+  duration_ms: 0.850547
+  type: 'test'
+  ...
+# (node:128) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-oauth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: user_id larger than MAX_SAFE_INTEGER survives as the exact digit string
+ok 61 - user_id larger than MAX_SAFE_INTEGER survives as the exact digit string
+  ---
+  duration_ms: 10.078687
+  type: 'test'
+  ...
+# Subtest: malformed provider JSON is a provider error, not a crash
+ok 62 - malformed provider JSON is a provider error, not a crash
+  ---
+  duration_ms: 0.224641
+  type: 'test'
+  ...
+# Subtest: token store resolution: database by default, file only off Vercel, malformed values rejected
+ok 63 - token store resolution: database by default, file only off Vercel, malformed values rejected
+  ---
+  duration_ms: 0.371521
+  type: 'test'
+  ...
+# Subtest: file store: encrypted at rest, expiry reported, clear works
+ok 64 - file store: encrypted at rest, expiry reported, clear works
+  ---
+  duration_ms: 7.159862
+  type: 'test'
+  ...
+# Subtest: diagnostics: present-but-invalid token store is INVALID, not PASS
+ok 65 - diagnostics: present-but-invalid token store is INVALID, not PASS
+  ---
+  duration_ms: 0.597586
+  type: 'test'
+  ...
+# Subtest: authorization state: CONFIG_INCOMPLETE → NOT_AUTHORIZED → AUTHORIZED → EXPIRED → STORAGE_UNAVAILABLE
+ok 66 - authorization state: CONFIG_INCOMPLETE → NOT_AUTHORIZED → AUTHORIZED → EXPIRED → STORAGE_UNAVAILABLE
+  ---
+  duration_ms: 2.962185
+  type: 'test'
+  ...
+# Subtest: database store: shared durable token, encrypted column, clear
+ok 67 - database store: shared durable token, encrypted column, clear # SKIP
+  ---
+  duration_ms: 0.062336
+  type: 'test'
+  ...
+# (node:140) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/lib/social/instagram-oauth.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: OAuth state is bound to the HttpOnly cookie and rejects tampering
+ok 68 - OAuth state is bound to the HttpOnly cookie and rejects tampering
+  ---
+  duration_ms: 0.865219
+  type: 'test'
+  ...
+# Subtest: authorization URL contains only public OAuth parameters
+ok 69 - authorization URL contains only public OAuth parameters
+  ---
+  duration_ms: 0.295729
+  type: 'test'
+  ...
+# Subtest: official code exchange uses server-side secret and stores long-lived result shape
+ok 70 - official code exchange uses server-side secret and stores long-lived result shape
+  ---
+  duration_ms: 9.943727
+  type: 'test'
+  ...
+# Subtest: token store encrypts at rest and expired credentials are not returned
+ok 71 - token store encrypts at rest and expired credentials are not returned
+  ---
+  duration_ms: 6.378099
+  type: 'test'
+  ...
+# Subtest: parses the LINE ID from the site's configured URL forms
+ok 72 - parses the LINE ID from the site's configured URL forms
+  ---
+  duration_ms: 0.477825
+  type: 'test'
+  ...
+# Subtest: default account is the one the public site links to
+ok 73 - default account is the one the public site links to
+  ---
+  duration_ms: 0.108128
+  type: 'test'
+  ...
+# Subtest: oaMessage URL encodes the ID and the text exactly once
+ok 74 - oaMessage URL encodes the ID and the text exactly once
+  ---
+  duration_ms: 0.101409
+  type: 'test'
+  ...
+# Subtest: dry run is not terminal: claimable, due again for a live run, not due for another dry run
+ok 75 - dry run is not terminal: claimable, due again for a live run, not due for another dry run
+  ---
+  duration_ms: 0.41685
+  type: 'test'
+  ...
+# Subtest: awaiting_auth is parked (not auto-due); retryable_failed is due only after its backoff
+ok 76 - awaiting_auth is parked (not auto-due); retryable_failed is due only after its backoff
+  ---
+  duration_ms: 0.338513
+  type: 'test'
+  ...
+# Subtest: Instagram container still IN_PROGRESS after polling → retryable, container kept, nothing published
+ok 77 - Instagram container still IN_PROGRESS after polling → retryable, container kept, nothing published
+  ---
+  duration_ms: 0.437969
+  type: 'test'
+  ...
+# Subtest: resume: the next attempt reuses the created container and publishes once it is FINISHED
+ok 78 - resume: the next attempt reuses the created container and publishes once it is FINISHED
+  ---
+  duration_ms: 0.281489
+  type: 'test'
+  ...
+# Subtest: container ERROR stays a reconciliation case (never auto-resent)
+ok 79 - container ERROR stays a reconciliation case (never auto-resent)
+  ---
+  duration_ms: 0.108049
+  type: 'test'
+  ...
+# Subtest: publishing to an account other than the approved one is refused before any container is created
+ok 80 - publishing to an account other than the approved one is refused before any container is created
+  ---
+  duration_ms: 0.072592
+  type: 'test'
+  ...
+# Subtest: approval hash binds the Instagram account; another account yields another hash
+ok 81 - approval hash binds the Instagram account; another account yields another hash
+  ---
+  duration_ms: 0.138049
+  type: 'test'
+  ...
+# Subtest: resolveInstagramAccountId prefers the explicit env and otherwise uses the stored OAuth token account
+ok 82 - resolveInstagramAccountId prefers the explicit env and otherwise uses the stored OAuth token account
+  ---
+  duration_ms: 7.185301
+  type: 'test'
+  ...
+# Subtest: lockIsTakeable: live holder with an old creation time but fresh heartbeat is kept
+ok 83 - lockIsTakeable: live holder with an old creation time but fresh heartbeat is kept
+  ---
+  duration_ms: 3.085658
+  type: 'test'
+  ...
+# Subtest: acquireLock refuses a live worker's lock created 11 minutes ago (review scenario) and leaves it intact
+ok 84 - acquireLock refuses a live worker's lock created 11 minutes ago (review scenario) and leaves it intact
+  ---
+  duration_ms: 2.610488
+  type: 'test'
+  ...
+# Subtest: acquireLock takes over a dead holder's lock and a lock whose heartbeat stopped
+ok 85 - acquireLock takes over a dead holder's lock and a lock whose heartbeat stopped
+  ---
+  duration_ms: 2.742232
+  type: 'test'
+  ...
+# Subtest: refresh and release only touch a lock this process still owns
+ok 86 - refresh and release only touch a lock this process still owns
+  ---
+  duration_ms: 1.122548
+  type: 'test'
+  ...
+# Subtest: one-shot exit code: 0 on success, 1 on HTTP error or connection failure (review P2)
+ok 87 - one-shot exit code: 0 on success, 1 on HTTP error or connection failure (review P2)
+  ---
+  duration_ms: 171.262519
+  type: 'test'
+  ...
+# Subtest: a second worker exits 1 while a live worker holds the lock
+ok 88 - a second worker exits 1 while a live worker holds the lock
+  ---
+  duration_ms: 20.572575
+  type: 'test'
+  ...
+# Subtest: complete confirmation for GX10 and Hermes passes
+ok 89 - complete confirmation for GX10 and Hermes passes
+  ---
+  duration_ms: 0.359073
+  type: 'test'
+  ...
+# Subtest: missing record or a missing caller blocks
+ok 90 - missing record or a missing caller blocks
+  ---
+  duration_ms: 0.717538
+  type: 'test'
+  ...
+# Subtest: incomplete or unsafe entries block
+ok 91 - incomplete or unsafe entries block
+  ---
+  duration_ms: 0.106848
+  type: 'test'
+  ...
+# Subtest: readCallers: absent or malformed file blocks
+ok 92 - readCallers: absent or malformed file blocks
+  ---
+  duration_ms: 0.755843
+  type: 'test'
+  ...
+# Subtest: up to date → ok
+ok 93 - up to date → ok
+  ---
+  duration_ms: 0.903698
+  type: 'test'
+  ...
+# Subtest: exit 1 with exactly the expected pending migrations → ok
+ok 94 - exit 1 with exactly the expected pending migrations → ok
+  ---
+  duration_ms: 0.879474
+  type: 'test'
+  ...
+# Subtest: unreachable database, bad URL, missing prisma → not ok (review: status was never checked)
+ok 95 - unreachable database, bad URL, missing prisma → not ok (review: status was never checked)
+  ---
+  duration_ms: 0.246576
+  type: 'test'
+  ...
+# Subtest: failed migration, extra or missing pending migration → not ok
+ok 96 - failed migration, extra or missing pending migration → not ok
+  ---
+  duration_ms: 0.232529
+  type: 'test'
+  ...
+# Subtest: phase is required and must be pre-release or pre-deploy
+ok 97 - phase is required and must be pre-release or pre-deploy
+  ---
+  duration_ms: 0.556978
+  type: 'test'
+  ...
+# Subtest: pre-release: 10 baseline migrations and no new ones → PASS
+ok 98 - pre-release: 10 baseline migrations and no new ones → PASS
+  ---
+  duration_ms: 0.825538
+  type: 'test'
+  ...
+# Subtest: pre-release: new migrations already applied → FAIL
+ok 99 - pre-release: new migrations already applied → FAIL
+  ---
+  duration_ms: 0.153313
+  type: 'test'
+  ...
+# Subtest: pre-deploy: exactly 13 finished, the three new ones applied → PASS (review: old preflight failed here after step 4)
+ok 100 - pre-deploy: exactly 13 finished, the three new ones applied → PASS (review: old preflight failed here after step 4)
+  ---
+  duration_ms: 0.067072
+  type: 'test'
+  ...
+# Subtest: pre-deploy: not yet migrated, partial, unfinished or unexpected migration → FAIL
+ok 101 - pre-deploy: not yet migrated, partial, unfinished or unexpected migration → FAIL
+  ---
+  duration_ms: 0.078704
+  type: 'test'
+  ...
+# Subtest: backup: PENDING before the release window, real check before deploy
+ok 102 - backup: PENDING before the release window, real check before deploy
+  ---
+  duration_ms: 0.143905
+  type: 'test'
+  ...
+# Subtest: Production env names: missing is PENDING before step 5, FAIL before deploy
+ok 103 - Production env names: missing is PENDING before step 5, FAIL before deploy
+  ---
+  duration_ms: 0.08832
+  type: 'test'
+  ...
+# Subtest: exit code: PENDING allowed only in pre-release; FAIL/UNVERIFIED always block
+ok 104 - exit code: PENDING allowed only in pre-release; FAIL/UNVERIFIED always block
+  ---
+  duration_ms: 0.099648
+  type: 'test'
+  ...
+# Subtest: F2: negated hours and airport multi-stop text never authorize catalog fare
+ok 105 - F2: negated hours and airport multi-stop text never authorize catalog fare
+  ---
+  duration_ms: 0.752194
+  type: 'test'
+  ...
+# Subtest: F2: staff-selected single-route ten hours retains correct fare
+ok 106 - F2: staff-selected single-route ten hours retains correct fare
+  ---
+  duration_ms: 0.486881
+  type: 'test'
+  ...
+# Subtest: F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+ok 107 - F3: draft → API reread → convert uses persisted inputs and ignores edited prose
+  ---
+  duration_ms: 3.8823
+  type: 'test'
+  ...
+# Subtest: F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+ok 108 - F3: changed itinerary invalidates selection; malformed overrides cannot reuse it
+  ---
+  duration_ms: 2.088199
+  type: 'test'
+  ...
+# Subtest: F3: unauthorized staff draft never writes
+ok 109 - F3: unauthorized staff draft never writes
+  ---
+  duration_ms: 0.196944
+  type: 'test'
+  ...
+# Subtest: disabled exactTrue variants suppress all pre/post sends even with complete channels
+ok 110 - disabled exactTrue variants suppress all pre/post sends even with complete channels
+  ---
+  duration_ms: 6.002018
+  type: 'test'
+  ...
+# Subtest: enabled without channels persists successfully and logs only presence booleans
+ok 111 - enabled without channels persists successfully and logs only presence booleans
+  ---
+  duration_ms: 0.381233
+  type: 'test'
+  ...
+# Subtest: enabled sends once to each email and each LINE recipient in each pre/post stage
+ok 112 - enabled sends once to each email and each LINE recipient in each pre/post stage
+  ---
+  duration_ms: 1.145155
+  type: 'test'
+  ...
+# Subtest: legacy LINE recipient list works; missing channel token skips LINE
+ok 113 - legacy LINE recipient list works; missing channel token skips LINE
+  ---
+  duration_ms: 0.670178
+  type: 'test'
+  ...
+# Subtest: recipient failures do not block remaining recipients or inquiry success; error contents stay private
+ok 114 - recipient failures do not block remaining recipients or inquiry success; error contents stay private
+  ---
+  duration_ms: 0.389666
+  type: 'test'
+  ...
+# Subtest: authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+ok 115 - authenticated status persists New → Quoted → Confirmed and Cancelled; rejects anonymous/cross-origin
+  ---
+  duration_ms: 1.47474
+  type: 'test'
+  ...
+# Subtest: database failure logs do not expose raw exception contents
+ok 116 - database failure logs do not expose raw exception contents
+  ---
+  duration_ms: 0.455186
+  type: 'test'
+  ...
+# Subtest: charter migration is repeatable against empty and preexisting tables and preserves rows
+ok 117 - charter migration is repeatable against empty and preexisting tables and preserves rows
+  ---
+  duration_ms: 863.854667
+  type: 'test'
+  ...
+# Subtest: only 403 AccessDenied counts as a refusal
+ok 118 - only 403 AccessDenied counts as a refusal
+  ---
+  duration_ms: 0.64629
+  type: 'test'
+  ...
+# Subtest: NoSuchBucket is inconclusive, not a scope PASS
+ok 119 - NoSuchBucket is inconclusive, not a scope PASS
+  ---
+  duration_ms: 0.148849
+  type: 'test'
+  ...
+# Subtest: timeouts are inconclusive (SDK TimeoutError and a hung call)
+ok 120 - timeouts are inconclusive (SDK TimeoutError and a hung call)
+  ---
+  duration_ms: 19.621899
+  type: 'test'
+  ...
+# Subtest: connection errors are inconclusive
+ok 121 - connection errors are inconclusive
+  ---
+  duration_ms: 0.281088
+  type: 'test'
+  ...
+# Subtest: credential errors are inconclusive (a wrong key is not a scoped key)
+ok 122 - credential errors are inconclusive (a wrong key is not a scoped key)
+  ---
+  duration_ms: 0.125313
+  type: 'test'
+  ...
+# Subtest: AccessDenied without a 403 status is not trusted
+ok 123 - AccessDenied without a 403 status is not trusted
+  ---
+  duration_ms: 0.119376
+  type: 'test'
+  ...
+# Subtest: anonymous GET: exact R2 signature-required answer is refused; others are not
+ok 124 - anonymous GET: exact R2 signature-required answer is refused; others are not
+  ---
+  duration_ms: 0.184321
+  type: 'test'
+  ...
+# Subtest: public entry closed only when both management answers say so
+ok 125 - public entry closed only when both management answers say so
+  ---
+  duration_ms: 0.058032
+  type: 'test'
+  ...
+# Subtest: token policy: Object Read & Write on exactly this bucket is scoped
+ok 126 - token policy: Object Read & Write on exactly this bucket is scoped
+  ---
+  duration_ms: 0.578866
+  type: 'test'
+  ...
+# Subtest: token policy: all-buckets, account-wide, other bucket, extra permission, wrong id, inactive are not scoped
+ok 127 - token policy: all-buckets, account-wide, other bucket, extra permission, wrong id, inactive are not scoped
+  ---
+  duration_ms: 0.486978
+  type: 'test'
+  ...
+# PASS POST with TRAVEL_IMPORT_API_KEY unset → 503 — 503
+# PASS GET without admin login → 401 — 401
+# PASS GET response does not reveal whether the key is set
+# PASS POST with wrong x-api-key → 401 — 401
+# PASS POST without x-api-key → 401 — 401
+# PASS GET without admin login (key set) → 401 — 401
+# Subtest: scripts/travel-import-auth.test.mjs
+ok 24 - scripts/travel-import-auth.test.mjs
+  ---
+  duration_ms: 143.415106
+  type: 'test'
+  ...
+# Subtest: copy provider prefers Gemini, then Anthropic, then OpenAI, and refuses when none is complete
+ok 129 - copy provider prefers Gemini, then Anthropic, then OpenAI, and refuses when none is complete
+  ---
+  duration_ms: 18.987481
+  type: 'test'
+  ...
+# Subtest: X OAuth 1.0a header is signed with the user token and does not echo secrets in the clear
+ok 130 - X OAuth 1.0a header is signed with the user token and does not echo secrets in the clear
+  ---
+  duration_ms: 0.841955
+  type: 'test'
+  ...
+# Subtest: worker auth accepts CRON_SECRET and OPERATIONS_CRON_TOKEN, and rejects a wrong bearer
+ok 131 - worker auth accepts CRON_SECRET and OPERATIONS_CRON_TOKEN, and rejects a wrong bearer
+  ---
+  duration_ms: 9.168619
+  type: 'test'
+  ...
+# Subtest: health report is booleans and names only
+ok 132 - health report is booleans and names only
+  ---
+  duration_ms: 1.52506
+  type: 'test'
+  ...
+# Subtest: slug is deterministic per content and valid for /travel
+ok 133 - slug is deterministic per content and valid for /travel
+  ---
+  duration_ms: 0.55717
+  type: 'test'
+  ...
+# Subtest: article body is the approved caption, only the duplicated title heading removed
+ok 134 - article body is the approved caption, only the duplicated title heading removed
+  ---
+  duration_ms: 0.07496
+  type: 'test'
+  ...
+# Subtest: publish writes one article with the approved text and permanent image paths, then verifies the public page
+ok 135 - publish writes one article with the approved text and permanent image paths, then verifies the public page
+  ---
+  duration_ms: 0.587313
+  type: 'test'
+  ...
+# Subtest: retrying the same job reuses the same article (no duplicate)
+ok 136 - retrying the same job reuses the same article (no duplicate)
+  ---
+  duration_ms: 0.214929
+  type: 'test'
+  ...
+# Subtest: not published when the public page lacks the approved text
+ok 137 - not published when the public page lacks the approved text
+  ---
+  duration_ms: 0.099248
+  type: 'test'
+  ...
+# Subtest: not published when a public image does not match the approved bytes
+ok 138 - not published when a public image does not match the approved bytes
+  ---
+  duration_ms: 0.250497
+  type: 'test'
+  ...
+# Subtest: refuses a slug owned by other content
+ok 139 - refuses a slug owned by other content
+  ---
+  duration_ms: 0.237617
+  type: 'test'
+  ...
+# Subtest: public image lookup serves only listed images of published articles
+ok 140 - public image lookup serves only listed images of published articles
+  ---
+  duration_ms: 0.090416
+  type: 'test'
+  ...
+# Subtest: executeJob: website publishes through the publisher in live mode and reports URL + article id
+ok 141 - executeJob: website publishes through the publisher in live mode and reports URL + article id
+  ---
+  duration_ms: 0.452594
+  type: 'test'
+  ...
+1..141
+# tests 141
+# suites 0
+# pass 140
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 4062.973355

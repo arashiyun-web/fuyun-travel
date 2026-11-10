@@ -1,0 +1,6 @@
+
+/home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/app/admin/quotes/[id]/page.tsx
+  186:6  warning  React Hook useEffect has missing dependencies: 'loadOrder' and 'loadQuote'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+

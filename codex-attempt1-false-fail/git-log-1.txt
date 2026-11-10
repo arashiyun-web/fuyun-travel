@@ -1,0 +1,7 @@
+commit a1b9db590f3671a0f67afe1f788500107242c8f8
+Author:     Codex <codex@localhost>
+AuthorDate: Wed Nov 11 06:24:40 2026 +0800
+Commit:     Codex <codex@localhost>
+CommitDate: Wed Nov 11 06:24:40 2026 +0800
+
+    docs: record blocked step2 runtime identity preflight

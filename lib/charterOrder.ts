@@ -1,3 +1,4 @@
+import { savedFleetFare } from "@/lib/fleetFareInput";
 import { createHash } from "crypto";
 import { Prisma } from "@prisma/client";
 import { buildFleetQuoteDraft, reviewItems, vehicleFees, type FleetQuoteDraft, type ReviewItem } from "@/lib/fleetQuoteDraft";
@@ -5,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export class CharterOrderUnavailableError extends Error {
   constructor() {
-    super("訂單表尚未建立。正式遷移還在待審，這次沒有寫入。");
+    super("訂單表尚未建立。請由獲授權人員套用正式遷移，這次沒有寫入。");
     this.name = "CharterOrderUnavailableError";
   }
 }
@@ -25,6 +26,7 @@ type QuoteRow = {
   remark: string | null;
   recommendedVehicle: string | null;
   passengerCount: number | null;
+  quoteOptions?: unknown;
 };
 
 export type StaffDecision = {
@@ -43,13 +45,14 @@ type ConvertHooks = {
 const STAFF_PRICED = "staff_priced";
 const PENDING = "pending_confirmation";
 
-export function quoteFingerprint(quote: Pick<QuoteRow, "pickup" | "destination" | "remark" | "recommendedVehicle" | "passengerCount">) {
+export function quoteFingerprint(quote: Pick<QuoteRow, "pickup" | "destination" | "remark" | "recommendedVehicle" | "passengerCount" | "quoteOptions">) {
   return createHash("sha256").update(JSON.stringify({
     pickup: quote.pickup || "",
     destination: quote.destination || "",
     remark: quote.remark || "",
     recommendedVehicle: quote.recommendedVehicle || "",
     passengerCount: quote.passengerCount,
+    ...savedFleetFare(quote),
   })).digest("hex");
 }
 
@@ -60,6 +63,7 @@ function draftFor(quote: QuoteRow) {
     remark: quote.remark,
     vehicleHint: quote.recommendedVehicle,
     passengerCount: quote.passengerCount,
+    ...savedFleetFare(quote),
   });
 }
 

@@ -1,3 +1,4 @@
+import { exactTrue } from "@/lib/liveSwitch";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import nodemailer from "nodemailer";
@@ -194,20 +195,42 @@ function parseDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function recipients(value: string | undefined) {
+  return Array.from(new Set((value || "").split(",").map((item) => item.trim()).filter(Boolean)));
+}
+
+async function notifyInquiryLine(text: string) {
+  if (!exactTrue(process.env.INQUIRY_NOTIFY_ENABLED)) return;
+  const ids = recipients(process.env.LINE_ADMIN_USER_ID?.trim() || process.env.ADMIN_LINE_USER_ID);
+  const configured = { LINE_ADMIN_USER_ID: ids.length > 0, LINE_CHANNEL_ACCESS_TOKEN: Boolean(process.env.LINE_CHANNEL_ACCESS_TOKEN) };
+  if (!configured.LINE_ADMIN_USER_ID || !configured.LINE_CHANNEL_ACCESS_TOKEN) {
+    console.error("inquiry line notify skipped", configured);
+    return;
+  }
+  for (const id of ids) {
+    try {
+      await pushLineText(id, text);
+    } catch {
+      console.error("inquiry line notify failed", configured);
+    }
+  }
+}
+
 async function sendNotificationEmail(inquiry: InquiryRecord) {
+  if (!exactTrue(process.env.INQUIRY_NOTIFY_ENABLED)) return;
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const to = process.env.INQUIRY_TO_EMAIL || user;
+  const to = recipients(process.env.INQUIRY_TO_EMAIL || user);
   const from = process.env.INQUIRY_FROM_EMAIL || user;
 
-  if (!host || !user || !pass || !to || !from) {
+  if (!host || !user || !pass || !to.length || !from) {
     console.error("inquiry email notify skipped", {
       SMTP_HOST: Boolean(host),
       SMTP_USER: Boolean(user),
       SMTP_PASS: Boolean(pass),
-      INQUIRY_TO_EMAIL: Boolean(to),
+      INQUIRY_TO_EMAIL: to.length > 0,
       INQUIRY_FROM_EMAIL: Boolean(from),
     });
     return;
@@ -239,13 +262,19 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
     inquiry.special_requests || "未填",
   ].join("\n");
 
-  await transporter.sendMail({
-    from,
-    to,
-    subject: `${SITE.name} 新詢價：${inquiry.name}`,
-    text,
-    replyTo: from,
-  });
+  for (const recipient of to) {
+    try {
+      await transporter.sendMail({
+        from,
+        to: recipient,
+        subject: `${SITE.name} 新詢價：${inquiry.name}`,
+        text,
+        replyTo: from,
+      });
+    } catch {
+      console.error("inquiry email notify failed", { SMTP_HOST: Boolean(host), SMTP_USER: Boolean(user), SMTP_PASS: Boolean(pass), INQUIRY_TO_EMAIL: to.length > 0, INQUIRY_FROM_EMAIL: Boolean(from) });
+    }
+  }
 }
 
 // Fired independently of the database write (before prisma.inquiry.create), so a
@@ -253,8 +282,7 @@ async function sendNotificationEmail(inquiry: InquiryRecord) {
 // Must never throw into the caller — a notification failure must not fail the
 // customer's form submission.
 async function notifyInquiryFallback(inquiry: InquiryRecord) {
-  const adminUserId = process.env.LINE_ADMIN_USER_ID || process.env.ADMIN_LINE_USER_ID || "";
-  if (!adminUserId) return;
+  if (!exactTrue(process.env.INQUIRY_NOTIFY_ENABLED)) return;
 
   const text = [
     "【詢價表單通知（備援，不代表已存入系統）】",
@@ -271,11 +299,7 @@ async function notifyInquiryFallback(inquiry: InquiryRecord) {
     `收到時間：${inquiry.created_at}`,
   ].join("\n");
 
-  try {
-    await pushLineText(adminUserId, text);
-  } catch (err) {
-    console.error("inquiry fallback notify failed", { error: String(err) });
-  }
+  await notifyInquiryLine(text);
 }
 
 // Admin only: returns customer contact details (unmasked phone). Same auth as the quote admin API:
@@ -296,7 +320,7 @@ export async function GET(request: Request) {
     if (isDatabaseUnavailable(error)) {
       return NextResponse.json({ success: false, message: "資料庫暫時無法連線。" }, { status: 503 });
     }
-    console.error("inquiry read failed", error);
+    console.error("inquiry read failed");
     return NextResponse.json({ success: false, message: "讀取失敗。" }, { status: 500 });
   }
 }
@@ -410,28 +434,19 @@ export async function POST(request: Request) {
     addAudit(request, "CREATE_INQUIRY", created.id);
 
     const stored = toPublicRecord(created);
-    const adminUserId = process.env.LINE_ADMIN_USER_ID || process.env.ADMIN_LINE_USER_ID || "";
-    if (!adminUserId) {
-      console.error("inquiry line notify skipped", { reason: "LINE_ADMIN_USER_ID unset" });
-    } else {
-      try {
-        await pushLineText(adminUserId, [
-          "【詢價已存入系統】",
-          `姓名：${stored.name}`,
-          `電話：${stored.phone}`,
-          `日期：${stored.start_date}`,
-          `人數：${stored.passenger_count}`,
-          `路線：${stored.pickup_location} → ${stored.destination}`,
-        ].join("\n"));
-      } catch (error) {
-        console.error("inquiry line notify failed", { error: String(error) });
-      }
-    }
+    await notifyInquiryLine([
+      "【詢價已存入系統】",
+      `姓名：${stored.name}`,
+      `電話：${stored.phone}`,
+      `日期：${stored.start_date}`,
+      `人數：${stored.passenger_count}`,
+      `路線：${stored.pickup_location} → ${stored.destination}`,
+    ].join("\n"));
     try {
       await sendNotificationEmail(stored);
-    } catch (error) {
+    } catch {
       addAudit(request, "EMAIL_FAILED", created.id);
-      console.error("inquiry email notify failed", { error: String(error) });
+      console.error("inquiry email notify failed", { INQUIRY_NOTIFY_ENABLED: exactTrue(process.env.INQUIRY_NOTIFY_ENABLED) });
     }
 
     return NextResponse.json({
@@ -446,7 +461,7 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    console.error("inquiry create failed", error);
+    console.error("inquiry create failed");
     return NextResponse.json({ success: false, message: "詢價送出失敗，請稍後再試。" }, { status: 500 });
   }
 }
@@ -491,7 +506,7 @@ export async function PATCH(request: Request) {
     if (isDatabaseUnavailable(error)) {
       return NextResponse.json({ success: false, message: "資料庫暫時無法連線。" }, { status: 503 });
     }
-    console.error("inquiry update failed", error);
+    console.error("inquiry update failed");
     return NextResponse.json({ success: false, message: "更新失敗。" }, { status: 500 });
   }
 }

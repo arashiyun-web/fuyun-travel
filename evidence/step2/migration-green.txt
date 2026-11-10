@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: charter migration is repeatable against empty and preexisting tables and preserves rows
+ok 1 - charter migration is repeatable against empty and preexisting tables and preserves rows
+  ---
+  duration_ms: 891.922769
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 968.647834

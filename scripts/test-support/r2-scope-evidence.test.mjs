@@ -19,7 +19,12 @@ test("NoSuchBucket is inconclusive, not a scope PASS", async () => {
 
 test("timeouts are inconclusive (SDK TimeoutError and a hung call)", async () => {
   assert.equal((await expectRefused(() => Promise.reject(Object.assign(new Error("t"), { name: "TimeoutError" })))).kind, "timeout");
-  const hung = await expectRefused(() => new Promise(() => {}), { timeoutMs: 20 });
+  // The probe intentionally unrefs its deadline. Simulate an active caller so
+  // node:test does not exit before that deadline fires.
+  const caller = setTimeout(() => {}, 1000);
+  let hung;
+  try { hung = await expectRefused(() => new Promise(() => {}), { timeoutMs: 20 }); }
+  finally { clearTimeout(caller); }
   assert.equal(hung.outcome, "inconclusive");
   assert.equal(hung.kind, "timeout");
 });

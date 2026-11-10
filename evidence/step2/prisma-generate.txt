@@ -1,0 +1,4 @@
+Prisma schema loaded from schema.prisma
+
+✔ Generated Prisma Client (6.19.0) to ./../../home/arashiyun/codex-work/fuyun-step2-20261111-20261111-061920/node_modules/.prisma/client in 139ms
+

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
 
 type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; minAmountTwd?: number | null; maxAmountTwd?: number | null; source: string };
@@ -25,6 +26,7 @@ type Quote = {
   remark: string | null;
   recommendedVehicle: string | null;
   quoteDraftText: string | null;
+  quoteOptions?: unknown;
   quoteStatus: string;
   sentAt: string | null;
 };
@@ -32,6 +34,8 @@ type Quote = {
 export default function QuoteEditPage({ params }: { params: { id: string } }) {
   // Authenticated by the HttpOnly admin session cookie (same-origin fetch); no token in the URL.
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [rateId, setRateId] = useState("");
+  const [hours, setHours] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [orderBusy, setOrderBusy] = useState(false);
@@ -46,6 +50,9 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     if (response.status === 401) throw new Error("請先在 /admin 登入管理員");
     if (!response.ok || !data.success) throw new Error(data.error || "讀取失敗");
     setQuote(data.quote);
+    const fare = savedFleetFare(data.quote);
+    setRateId(fare.rateId || "");
+    setHours(fare.hours == null ? "" : String(fare.hours));
   }
 
   async function saveQuote() {
@@ -74,12 +81,13 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     const response = await fetch(`/api/admin/quotes/${params.id}/draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vehicleHint: quote.recommendedVehicle || "" }),
+      body: JSON.stringify({ vehicleHint: quote.recommendedVehicle || "", rateId: rateId || null, hours: hours === "" ? null : Number(hours) }),
     });
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.error || "草稿產生失敗");
     setQuote(data.quote);
     setMessage("已寫入後台草稿，尚未送給客人。待確認項目留在草稿裡，沒有猜成總價。");
+    await loadOrder();
   }
 
   async function loadOrder() {
@@ -206,6 +214,16 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
           <label className="block text-xs text-slate-400">建議車型</label>
           <input value={quote.recommendedVehicle || ""} onChange={(event) => setQuote({ ...quote, recommendedVehicle: event.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 focus:outline-none focus:border-amber-500" />
+
+          <p className="text-xs text-slate-400">請先核對整趟行程符合單點方案，再明選路線與時數。備註不會自動決定基本車資。</p>
+          <label className="block text-xs text-slate-400" htmlFor="checked-route">已核對路線</label>
+          <select id="checked-route" value={rateId} onChange={(event) => setRateId(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200">
+            <option value="">尚未核對</option>
+            <option value="taipei-day-10h">台北一日單點方案</option>
+            <option value="taipei-jiufen-10h">台北至九份單點方案</option>
+          </select>
+          <label className="block text-xs text-slate-400" htmlFor="checked-hours">用車時數</label>
+          <input id="checked-hours" type="number" min="1" step="1" value={hours} onChange={(event) => setHours(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200" />
 
           <label className="block text-xs text-slate-400">正式報價內容</label>
           <textarea value={quote.quoteDraftText || ""} onChange={(event) => setQuote({ ...quote, quoteDraftText: event.target.value })} rows={16} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 font-mono text-sm focus:outline-none focus:border-amber-500" />

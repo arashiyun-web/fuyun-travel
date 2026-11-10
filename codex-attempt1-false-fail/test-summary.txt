@@ -1,0 +1,8 @@
+FAIL — runtime identity preflight unverified
+Session: 01a1c78e-2447-73b2-9a8b-495ee9dcb1be
+Starting HEAD: f9806b6e03a8350e00b5dfa826a4c1aeb44a9c0c
+Application implementation: not started
+Application tests: NOT RUN
+SQL verification: NOT RUN
+Production DB / website / SMTP / LINE: not accessed
+No passing test count is claimed. The prior 41-test result was task background, not reverified here.
