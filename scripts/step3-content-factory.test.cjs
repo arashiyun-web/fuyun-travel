@@ -74,7 +74,10 @@ test('selected source generates and persists SQL draft; returned id reads back a
   assert.equal(row.output_json.facebook.body, '生成 FB 文案');
   assert.equal(row.output_json.instagram.caption, '生成 IG 文案');
   assert.equal(row.output_json.x.body, '生成 FB 文案');
-  assert.equal(row.output_json.seo_article.body_markdown, '生成網站文案');
+  assert.match(row.output_json.seo_article.body_markdown, /^生成網站文案/);
+  assert.match(row.output_json.seo_article.body_markdown, /!\[九份山城實拍\]\(https:\/\/images\.example\.invalid\/cover\.jpg\)/);
+  assert.match(row.output_json.seo_article.body_markdown, /!\[九份山城實拍2\]\(https:\/\/fuyuntravel\.com\/images\/fixture\.jpg\)/);
+  assert.doesNotMatch(row.output_json.seo_article.body_markdown, /\/fleet\//);
   assert.equal(JSON.parse(row.output_json.json_ld).offers, undefined);
   assert.match(llmCalls[0].user, /已公開且授權的散步素材/); assert.doesNotMatch(llmCalls[0].user, /forged/);
   const readback = await save.GET(new Request('http://localhost', { headers: { authorization: `Bearer ${token}` } }));
