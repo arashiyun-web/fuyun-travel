@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/site";
+import { ARCHIVED_STATUS } from "@/lib/content-sync/listManage";
 import type { ContentFactoryInput } from "@/lib/content-factory/types";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,10 @@ export async function POST(request: Request) {
     const item = await prisma.contentSyncItem.findUnique({ where: { id } });
     if (!item) {
       results.push({ id, success: false, error: "找不到這個項目" });
+      continue;
+    }
+    if (item.status === ARCHIVED_STATUS) {
+      results.push({ id, success: false, error: "這則已從清單移除，請先還原" });
       continue;
     }
 
