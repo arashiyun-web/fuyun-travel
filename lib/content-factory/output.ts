@@ -1,4 +1,5 @@
 import type { GeneratedContent } from "./types";
+import { rewriteGeneratedContent } from "./rewriteInternalLinks";
 
 type Obj = Record<string, unknown>;
 function object(value: unknown): Obj {
@@ -43,7 +44,7 @@ export function normalizeGeneratedContent(value: unknown): GeneratedContent {
   if (root.json_ld !== undefined) {
     jsonLd = typeof root.json_ld === "string" ? root.json_ld : JSON.stringify(object(root.json_ld));
   }
-  return {
+  return rewriteGeneratedContent({
     meta: { trip_title: text(meta.trip_title), generated_keywords: { primary: texts(keywords.primary), secondary: texts(keywords.secondary), long_tail: texts(keywords.long_tail) }, missing_fields: texts(meta.missing_fields), internal_links: internalLinks },
     geo_summary: text(root.geo_summary),
     seo_article: { h1: text(seo.h1), body_markdown: webBody, faq: questions(seo.faq) },
@@ -55,5 +56,5 @@ export function normalizeGeneratedContent(value: unknown): GeneratedContent {
     edm: { subject: text(edm.subject), body: text(edm.body) },
     extras: { gmb_short: text(extras.gmb_short), ai_qa_block: questions(extras.ai_qa_block), ab_test: { fb: texts(ab.fb), ig: texts(ab.ig) } },
     json_ld: jsonLd,
-  };
+  });
 }
