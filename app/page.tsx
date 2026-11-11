@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE, organizationJsonLd, websiteJsonLd } from "@/lib/site";
+import { SITE, languageAlternates, organizationJsonLd, websiteJsonLd } from "@/lib/site";
 import HomeHeroV2 from "@/components/HomeHero_v2";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { absolute: SITE.defaultTitle },
   description: SITE.defaultDescription,
-  alternates: { canonical: SITE.url },
+  alternates: {
+    canonical: SITE.url,
+    languages: languageAlternates("/"),
+  },
   openGraph: {
     title: SITE.defaultTitle,
     description: SITE.defaultDescription,
