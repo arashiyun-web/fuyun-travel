@@ -38,5 +38,5 @@ export async function POST(request: Request, { params }: { params: { id: string 
       recommendedVehicle: draft.vehicleLabel || quote.recommendedVehicle,
     },
   });
-  return NextResponse.json({ success: true, quote: updated, pending: draft.pending, amountTwd: draft.amountTwd, sendsToCustomer: false });
+  return NextResponse.json({ success: true, quote: updated, pending: draft.pending, amountTwd: draft.amountTwd, staffHints: draft.staffHints, sendsToCustomer: false });
 }

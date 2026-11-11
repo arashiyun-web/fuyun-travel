@@ -1,9 +1,11 @@
 import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { relayGroupEvents } from "@/lib/line/groupRelay";
 import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClaim, type Claim, type WebhookEventStore } from "@/lib/line/webhookEvents";
 import { lineMemberUid, rememberLineMember } from "@/lib/members/lineMember";
+import { buildQuotePrefill } from "@/lib/quotePrefill";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -412,6 +414,28 @@ async function notifyAdminQuote(quote: { id: string }, fields: QuoteFields, user
   console.info("line-webhook admin notify", { handlerVersion: HANDLER_VERSION, quoteId: quote.id, status: response.status, ok: response.ok });
 }
 
+/** Staff-only draft for the admin list. Stored on the row; never part of the reply or any push. */
+function staffQuotePrefill(fields: QuoteFields) {
+  try {
+    const prefill = buildQuotePrefill({
+      tripDate: fields.date,
+      passengerCount: fields.people || null,
+      pickup: fields.origin,
+      destination: fields.destination,
+      remark: fields.note,
+      quoteOptions: [],
+    }, "line-webhook");
+    return {
+      recommendedVehicle: prefill.recommendedVehicle,
+      quoteOptions: prefill.quoteOptions as Prisma.InputJsonObject,
+      quoteDraftText: prefill.quoteDraftText,
+    };
+  } catch (error) {
+    console.error("line-webhook quote prefill skipped", { handlerVersion: HANDLER_VERSION, error: String(error).slice(0, 120) });
+    return { recommendedVehicle: "", quoteOptions: [] as Prisma.InputJsonArray, quoteDraftText: "" };
+  }
+}
+
 async function createOfficialQuote(userId: string) {
   const session = await getSession(userId);
   const fields = mergeFields(session?.draft || {}, {});
@@ -427,9 +451,7 @@ async function createOfficialQuote(userId: string) {
       pickup: fields.origin,
       destination: fields.destination,
       remark: fields.note || "無",
-      recommendedVehicle: "",
-      quoteOptions: [],
-      quoteDraftText: "",
+      ...staffQuotePrefill(fields),
       quoteStatus: "new",
     },
   });

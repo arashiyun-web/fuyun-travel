@@ -82,6 +82,7 @@ export async function convertConfirmedQuote(quoteId: string, hooks?: ConvertHook
       if (hooks?.afterLock) await hooks.afterLock(tx);
       const quote = await tx.charterQuote.findUnique({ where: { id: quoteId } });
       if (!quote) return { missing: true as const };
+      if (quote.quoteStatus === "ARCHIVED") return { refused: "這筆詢價已移除，請先還原再建立訂單。" };
       const draft = draftFor(quote);
       if (draft.amountTwd == null || !draft.vehicleLabel) {
         return { refused: "這筆報價沒有可沿用的基本車資，不能建立訂單。" };
