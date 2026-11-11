@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
+import { autoDraftOf } from "@/lib/quoteSendGuard";
+import { QuoteArchiveButton } from "../QuoteActions";
 
 type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; minAmountTwd?: number | null; maxAmountTwd?: number | null; source: string };
 type Decision = { decision: "" | "amount" | "not_applicable"; amount: string; quantity: string; reason: string };
@@ -86,7 +88,8 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.error || "草稿產生失敗");
     setQuote(data.quote);
-    setMessage("已寫入後台草稿，尚未送給客人。待確認項目留在草稿裡，沒有猜成總價。");
+    const hints = Array.isArray(data.staffHints) ? data.staffHints.filter((item: unknown): item is string => typeof item === "string") : [];
+    setMessage(["已寫入後台草稿，尚未送給客人。待確認項目留在草稿裡，沒有猜成總價。", ...hints].join(" "));
     await loadOrder();
   }
 
@@ -192,7 +195,11 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-6">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-2">
         <Link href="/admin/quotes" className="text-xs text-amber-400">返回詢價清單</Link>
-        <h1 className="text-xl font-bold text-amber-400">編輯正式報價</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-amber-400">編輯正式報價</h1>
+          <QuoteArchiveButton id={quote.id} archived={quote.quoteStatus === "ARCHIVED"} locked={Boolean(orderView) || quote.quoteStatus === "ORDER_PENDING" || quote.quoteStatus === "STAFF_PRICED"} onDone={(status) => { setQuote({ ...quote, quoteStatus: status }); setMessage(status === "ARCHIVED" ? "已移除，可在清單的「已移除」分頁還原。" : "已還原。"); }} />
+        </div>
+        {quote.quoteStatus === "ARCHIVED" ? <p className="text-xs text-red-300">這筆詢價已移除，不能送出或建立訂單；按「還原」可放回清單。</p> : null}
         <p className="text-xs text-slate-500">{quote.pickup || "未填"} → {quote.destination || "未填"} / {quote.passengerCount || "-"} 人 / {quote.tripDate || "未填日期"}</p>
       </div>
 
@@ -225,14 +232,15 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
           <label className="block text-xs text-slate-400" htmlFor="checked-hours">用車時數</label>
           <input id="checked-hours" type="number" min="1" step="1" value={hours} onChange={(event) => setHours(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200" />
 
-          <label className="block text-xs text-slate-400">正式報價內容</label>
+          <AutoDraftPanel options={quote.quoteOptions} />
+          <label className="block text-xs text-slate-400">正式報價內容（會原樣送給客人）</label>
           <textarea value={quote.quoteDraftText || ""} onChange={(event) => setQuote({ ...quote, quoteDraftText: event.target.value })} rows={16} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 font-mono text-sm focus:outline-none focus:border-amber-500" />
 
           <div className="flex flex-wrap gap-3">
             <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>
             <button type="button" disabled={orderBusy} onClick={() => makeOrder().catch((err) => setError(err instanceof Error ? err.message : "轉成訂單失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">記下待確認訂單</button>
             <button onClick={() => saveQuote().catch((err) => setError(err instanceof Error ? err.message : "儲存失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">儲存正式報價</button>
-            <button onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500">送出給 LINE</button>
+            <button disabled={quote.quoteStatus === "ARCHIVED"} onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">送出給 LINE</button>
           </div>
         </div>
       </div>
@@ -271,4 +279,26 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
 
 function Info({ label, value }: { label: string; value: string | null }) {
   return <div><p className="text-xs text-slate-500">{label}</p><p className="text-sm text-slate-200 mt-1">{value || "未填"}</p></div>;
+}
+
+/** Every line in the staff box starts with 參考行情, so a pasted line is refused by the send guard. */
+function staffLine(line: string) {
+  return line.startsWith("參考行情") ? line : `參考行情｜${line}`;
+}
+
+/** Staff-only notes from the auto draft (reference range, 待補, internal note). Never sent to the customer. */
+function AutoDraftPanel({ options }: { options: unknown }) {
+  const meta = autoDraftOf(options);
+  if (!meta) return null;
+  const lines = Array.isArray(meta.staffLines) ? meta.staffLines.filter((line): line is string => typeof line === "string") : [];
+  const reviewed = meta.staffReviewed === true;
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-1 text-xs text-slate-300">
+      <p className="font-bold text-amber-300">{staffLine("內部參考（只在後台顯示，不會送給客人）")}</p>
+      {typeof meta.staffNote === "string" ? <p>{staffLine(meta.staffNote)}</p> : null}
+      {typeof meta.vehicleLabel === "string" && meta.vehicleByCount ? <p>{staffLine(`建議車型依人數推定：${meta.vehicleLabel}，請確認。`)}</p> : null}
+      {lines.map((line, index) => <p key={index}>{staffLine(line)}</p>)}
+      <p className={reviewed ? "text-emerald-300" : "text-red-300"}>{staffLine(reviewed ? "人員已改寫並儲存，可以送出。" : "尚未由人員改寫：請改寫下方正式報價內容並按「儲存正式報價」，之後才能送出給 LINE。")}</p>
+    </div>
+  );
 }

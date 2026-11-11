@@ -23,8 +23,16 @@ export type FleetQuoteDraft = {
   capacity: CapacityState;
   pending: string[];
   known: string[];
+  /** Staff-only hints shown in the admin UI. Never part of `text`, which is what 「送出給 LINE」 sends. */
+  staffHints: string[];
   sendsToCustomer: false;
 };
+
+/** Shown next to the editor after 「依已核對車資產生草稿」; kept out of the draft body. */
+export const FLEET_DRAFT_STAFF_HINTS = [
+  "後台報價草稿，尚未送給客人。",
+  "請人員核對後再決定是否送出。本按鈕不會自動傳送。",
+];
 
 /** Nine-seat vans do not have a confirmed passenger count, because the driver may occupy one seat. */
 export function capacityFor(slug: string, count: number | null): CapacityState {
@@ -190,8 +198,6 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
   const hoursNote = hours === null ? "時數：未填。只能把 10 小時方案當參考。" : hours === 10 ? "時數：10 小時。" : `時數：${hours} 小時。`;
   const conditionTitle = amount === null ? "參考或本趟適用的已知條件" : "已知條件";
   const text = [
-    "【後台報價草稿】尚未送給客人。",
-    "",
     `出發：${pickup || "未填"}`,
     `目的：${destination || "未填"}`,
     `人數：${input.passengerCount || "未填"}`,
@@ -207,8 +213,6 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
     "",
     "待確認",
     ...(pending.length ? pending.map((line) => `- ${line}`) : ["- 沒有要列入的待確認項目。"]),
-    "",
-    "請人員核對後再決定是否送出。本按鈕不會自動傳送。",
   ].join("\n");
 
   return {
@@ -220,6 +224,7 @@ export function buildFleetQuoteDraft(input: QuoteDraftInput): FleetQuoteDraft {
     capacity,
     pending,
     known,
+    staffHints: FLEET_DRAFT_STAFF_HINTS.slice(),
     sendsToCustomer: false,
   };
 }
