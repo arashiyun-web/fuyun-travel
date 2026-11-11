@@ -3,6 +3,7 @@ import { unauthorized, verifyAdminMutation } from "@/lib/adminQuoteAuth";
 import { pushLineText } from "@/lib/lineApi";
 import { prisma } from "@/lib/prisma";
 import { sendBlock } from "@/lib/quoteSendGuard";
+import { adminStaffStrings } from "@/lib/quoteStaffText";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (quote.quoteStatus === "ARCHIVED") return NextResponse.json({ success: false, error: "這筆詢價已移除，請先還原再送出。" }, { status: 409 });
   if (!quote.quoteDraftText) return NextResponse.json({ success: false, error: "正式報價內容不可為空" }, { status: 400 });
   // Unreviewed auto drafts and internal wording (參考行情／自動預生成) never reach the customer.
-  const blocked = sendBlock(quote);
+  // v7: also compared against everything the admin list and detail page show for this row.
+  const blocked = sendBlock(quote, adminStaffStrings(quote));
   if (blocked) return NextResponse.json({ success: false, code: blocked.code, error: blocked.error }, { status: blocked.status });
 
   await pushLineText(quote.lineUserId, quote.quoteDraftText);

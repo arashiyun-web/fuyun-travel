@@ -2,9 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { adminSessionTokenFromCookies } from "@/lib/adminSession";
 import { prisma } from "@/lib/prisma";
-import { QUOTE_PAGE_SIZE, QUOTE_TABS, quoteIdsWithOrders, quoteTab, tabWhere, type QuoteTab } from "@/lib/quoteArchive";
+import { HANDOFF, openWhere, QUOTE_PAGE_SIZE, QUOTE_TABS, quoteIdsWithOrders, quoteTab, tabWhere, type QuoteTab } from "@/lib/quoteArchive";
 import { quoteEstimate } from "@/lib/quotePrefill";
-import { autoDraftNeedsReview } from "@/lib/quoteSendGuard";
 import { QuoteArchiveButton, QuotePrefillButton } from "./QuoteActions";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +31,13 @@ const STATUS_LABELS: Record<string, string> = {
   ORDER_PENDING: "待確認訂單",
   STAFF_PRICED: "內部已核定",
   ARCHIVED: "已移除",
+  [HANDOFF]: "待真人客服",
 };
+
+function handoffOf(options: unknown) {
+  const value = options && typeof options === "object" && !Array.isArray(options) ? (options as Record<string, unknown>).handoff : null;
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
 
 function pageHref(tab: QuoteTab, page: number) {
   return `/admin/quotes?tab=${tab}${page > 1 ? `&page=${page}` : ""}`;
@@ -43,24 +48,20 @@ function EstimateCell({ quote }: { quote: Quote }) {
   return (
     <span className="block">
       <EstimateText quote={quote} />
-      {autoDraftNeedsReview(quote.quoteOptions) ? <span className="block text-[11px] text-red-300">自動草稿，人員改寫儲存後才能送出</span> : null}
+      {handoffOf(quote.quoteOptions)?.status === "pending_human" ? <span className="mt-1 inline-block rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300">待真人客服</span> : null}
     </span>
   );
 }
 
-/** Staff-only column. Reference ranges and 待補 come from quoteOptions/knowledge base, never from the customer text. */
+/** Staff-only column: the customer range (範圍報價) plus 待補; a staff-confirmed fleet fare shows as base fare. */
 function EstimateText({ quote }: { quote: Quote }) {
   const estimate = quoteEstimate(quote);
-  if (estimate.amountTwd != null) {
-    return <span className="font-mono text-amber-300">NT${estimate.amountTwd.toLocaleString("en-US")}<span className="block text-[11px] font-sans text-slate-500">基本車資，非總價</span></span>;
-  }
-  if (estimate.summary) {
-    return <span className="text-xs text-amber-300">{estimate.summary}<span className="block text-[11px] text-slate-500">知識庫參考行情，非確定金額</span></span>;
-  }
   return (
     <span className="text-xs">
-      <span className="text-amber-300">參考行情｜待補：{estimate.missing.join("、") || "人員核對"}</span>
-      {estimate.references.length ? <span className="block text-[11px] text-slate-500">參考行情 車隊表 {estimate.references[0]}</span> : null}
+      {estimate.amountTwd != null ? <span className="block font-mono text-amber-300">NT${estimate.amountTwd.toLocaleString("en-US")}<span className="block text-[11px] font-sans text-slate-500">人員核定基本車資（內部），非總價</span></span> : null}
+      {estimate.summary ? <span className="block text-amber-300">{estimate.summary}</span> : null}
+      <span className="block text-[11px] text-slate-500">客人看到的是範圍報價，不是確定金額</span>
+      {estimate.references.length ? <span className="block text-[11px] text-slate-500">參考行情 車隊表 {estimate.references[0]}（內部）</span> : null}
     </span>
   );
 }
@@ -68,11 +69,11 @@ function EstimateText({ quote }: { quote: Quote }) {
 export default async function QuotesPage({ searchParams }: { searchParams: SearchParams }) {
   if (searchParams.admin_token) redirect("/admin/quotes?legacy=1");
   const legacyLink = searchParams.legacy === "1";
-  const tab = quoteTab(searchParams.tab);
+  let tab = quoteTab(searchParams.tab);
   const requestedPage = Math.max(1, Math.floor(Number(searchParams.page) || 1));
   const sessionToken = adminSessionTokenFromCookies();
   let quotes: Quote[] | null = null;
-  let counts: Record<QuoteTab, number> = { pending: 0, sent: 0, archived: 0 };
+  let counts: Record<QuoteTab, number> = { handoff: 0, pending: 0, sent: 0, archived: 0 };
   let ungenerated = 0;
   let page = 1;
   let totalPages = 1;
@@ -80,13 +81,16 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   let loadError = "";
   if (sessionToken) {
     try {
-      const [pending, sent, archived, missingDrafts] = await Promise.all([
+      const [handoff, pending, sent, archived, missingDrafts] = await Promise.all([
+        prisma.charterQuote.count({ where: tabWhere("handoff") }),
         prisma.charterQuote.count({ where: tabWhere("pending") }),
         prisma.charterQuote.count({ where: tabWhere("sent") }),
         prisma.charterQuote.count({ where: tabWhere("archived") }),
-        prisma.charterQuote.count({ where: { AND: [tabWhere("pending"), { OR: [{ quoteDraftText: null }, { quoteDraftText: "" }] }] } }),
+        prisma.charterQuote.count({ where: { AND: [openWhere(), { OR: [{ quoteDraftText: null }, { quoteDraftText: "" }] }] } }),
       ]);
-      counts = { pending, sent, archived };
+      counts = { handoff, pending, sent, archived };
+      // 待真人客服 comes first: without an explicit tab, open it whenever it has rows.
+      if (!searchParams.tab && handoff > 0) tab = "handoff";
       ungenerated = missingDrafts;
       totalPages = Math.max(1, Math.ceil(counts[tab] / QUOTE_PAGE_SIZE));
       page = Math.min(requestedPage, totalPages);
@@ -120,7 +124,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
         <p className="text-xs text-slate-500 uppercase tracking-wider">official quote workflow</p>
         <h1 className="text-xl font-bold text-amber-400 mt-1">LINE 詢價清單</h1>
-        <p className="text-xs text-slate-500 mt-2">查看 LINE AI 客服收進來的包車詢價。新詢價進來時會依車隊費率表或知識庫行情自動產生報價草稿，草稿只存在這裡；參考行情只在後台顯示，自動草稿要人員改寫儲存後才能送出。</p>
+        <p className="text-xs text-slate-500 mt-2">查看 LINE AI 客服收進來的包車詢價。新詢價進來時會自動產生「範圍報價」草稿（不是確定金額），草稿只存在這裡；客人需求資料齊全時列入「待真人客服」，由專人確認後報價。後台參考（知識庫、車隊表單價、待補）只在後台顯示，不能送給客人。</p>
       </div>
 
       {!sessionToken ? (
@@ -140,7 +144,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
                 </Link>
               ))}
             </div>
-            {tab === "pending" ? <QuotePrefillButton pendingCount={ungenerated} /> : null}
+            {tab === "pending" || tab === "handoff" ? <QuotePrefillButton pendingCount={ungenerated} /> : null}
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

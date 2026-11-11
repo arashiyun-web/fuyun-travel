@@ -11,15 +11,11 @@ import { KNOWLEDGE_RANGES } from "@/lib/quoteKnowledge";
  * whitespace removal) is rejected.
  */
 export const CUSTOMER_FORBIDDEN_MARKERS = [
-  "參考行情", "自動預生成", "待補", "內部參考", "待人工", "行情表未涵蓋", "後台報價草稿",
+  "待補", "內部參考", "待人工", "行情表未涵蓋", "後台報價草稿", "自動預生成",
   "知識庫", "pricing_matrix", "quote_rules",
+  // v7: admin labels. Customer text always says 「初步行情」 and 「由專人報價」, never these.
+  "參考行情", "客人範圍", "待專人報價", "內部核定",
 ] as const;
-
-/**
- * 「參考」 at a line start (or after whitespace) or right after 「｜」, followed by a number, NT$ or a vehicle name: the
- * shape of an admin summary line. Mid-sentence 「建議參考九人座方案」 is not matched.
- */
-const SUMMARY_SHAPE = /(?:^|\n|\|)參考(?:行情)?\n?[:|]?\n?(?:nt\$|\$|\d|九人座|賓士|toyota|中巴|42人座|43座|44|大巴|車隊表)/;
 
 /** Lines shorter than this are not matched by containment (too generic); markers still apply. */
 const MIN_LINE_MATCH = 6;
@@ -53,22 +49,9 @@ export function compactForMatch(text: string | null | undefined) {
     .replace(/(\d)[,.](?=\d{3}(?!\d))/g, "$1");
 }
 
-/**
- * NFKC + lower case, every whitespace run turned into a line break. The PATCH save folds newlines
- * into spaces, so a space is treated as a line start for the summary-shape rule.
- */
-function linesForMatch(text: string | null | undefined) {
-  return (text || "")
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[\u200b-\u200d\u2060\ufeff]+/g, "")
-    .replace(/\s+/g, "\n");
-}
-
 export function forbiddenMarkersIn(text: string | null | undefined) {
   const value = compactForMatch(text);
   const found: string[] = CUSTOMER_FORBIDDEN_MARKERS.filter((marker) => value.includes(compactForMatch(marker)));
-  if (SUMMARY_SHAPE.test(linesForMatch(text))) found.push("參考摘要");
   return found;
 }
 
@@ -166,17 +149,31 @@ export function containsKnowledgeRange(text: string | null | undefined, rowRange
   return ranges.some((range) => amounts.has(range.low) && amounts.has(range.high));
 }
 
-/** Staff-only strings stored with the row (summary, detail lines, note), each with and without the 參考行情 prefix. */
-function staffStrings(meta: Record<string, unknown> | null) {
-  if (!meta) return [];
-  const raw = [meta.reference, meta.staffNote, ...(Array.isArray(meta.staffLines) ? meta.staffLines : [])]
-    .filter((item): item is string => typeof item === "string");
+/**
+ * True when a (compacted) string is only amounts: digits, NT$／元／萬／k, range separators and
+ * punctuation. Such a fragment carries no staff wording.
+ */
+export function isAmountOnly(compact: string) {
+  return compact.replace(/nt\$|ntd|nt|\$|元|萬|万|千|k|起|約|[\d.,，．、~～〜\-–—至到/／+＋()（）:：｜|]/g, "") === "";
+}
+
+/**
+ * Staff-only strings of this row, each with and without the 參考行情 prefix, normalized: the stored
+ * auto-draft strings (reference, staffNote, staffLines) plus `extra` — what the admin pages show for the
+ * row (list summary, fleet references, detail staff box, fleet-draft hints; lib/quoteStaffText.ts).
+ */
+function staffStrings(meta: Record<string, unknown> | null, extra: readonly string[] = []) {
+  const stored = meta ? [meta.reference, meta.staffNote, ...(Array.isArray(meta.staffLines) ? meta.staffLines : [])] : [];
+  const raw = [...stored, ...extra].filter((item): item is string => typeof item === "string");
   const out = new Set<string>();
   for (const item of raw) {
-    for (const variant of [item, item.replace(/^參考行情[｜|:：\s]*/, "")]) {
-      const compact = compactForMatch(variant);
-      if (compact.length >= MIN_LINE_MATCH) out.add(compact);
-    }
+    const full = compactForMatch(item);
+    if (full.length >= MIN_LINE_MATCH) out.add(full);
+    // v8: the prefix-stripped form is compared only when something besides a price is left. A bare
+    // range/amount (「16,000～22,000」, 「NT$7,000」) is customer-safe and is part of the customer draft;
+    // such entries are matched only as the full labelled line (and 參考行情 is a marker anyway).
+    const stripped = compactForMatch(item.replace(/^參考行情[｜|:：\s]*/, ""));
+    if (stripped !== full && stripped.length >= MIN_LINE_MATCH && !isAmountOnly(stripped)) out.add(stripped);
   }
   return Array.from(out);
 }
@@ -193,30 +190,24 @@ export function autoDraftNeedsReview(options: unknown) {
 
 export type SendBlock = {
   status: 409;
-  code: "AUTO_DRAFT_UNREVIEWED" | "FORBIDDEN_MARKER" | "KNOWLEDGE_RANGE" | "STAFF_LINE";
+  code: "FORBIDDEN_MARKER" | "STAFF_LINE";
   error: string;
   markers?: string[];
 };
 
 /**
- * Server-side check before 「送出給 LINE」. Refuses: an unreviewed auto draft; internal markers;
- * any knowledge-base range (row or table, any format); any staff-only line of this row.
- * A single staff-chosen amount (e.g. NT$18,000) or a fleet-table price written by staff passes.
+ * Server-side check before 「送出給 LINE」 (v6). Range quotes are customer-safe and are allowed; an
+ * auto draft no longer has to be edited first. Still refused: internal staff markers and any
+ * staff-only line of this row (knowledge-base source lines, fleet-table single prices, 待補, notes).
  */
-export function sendBlock(quote: { quoteDraftText?: string | null; quoteOptions?: unknown }): SendBlock | null {
+export function sendBlock(quote: { quoteDraftText?: string | null; quoteOptions?: unknown }, adminStrings: readonly string[] = []): SendBlock | null {
   const meta = autoDraftOf(quote.quoteOptions);
-  if (meta && meta.staffReviewed !== true) {
-    return { status: 409, code: "AUTO_DRAFT_UNREVIEWED", error: "這是系統自動產生的草稿，請先改寫成正式報價並按「儲存」，才能送出給客人。" };
-  }
   const markers = forbiddenMarkersIn(quote.quoteDraftText);
   if (markers.length) {
     return { status: 409, code: "FORBIDDEN_MARKER", error: `報價內容含有內部用字（${markers.join("、")}），請刪除後再送出。`, markers };
   }
-  if (containsKnowledgeRange(quote.quoteDraftText, meta?.range)) {
-    return { status: 409, code: "KNOWLEDGE_RANGE", error: "報價內容含有知識庫參考行情區間，請改成人員確認的金額後再送出。" };
-  }
   const text = compactForMatch(quote.quoteDraftText);
-  if (staffStrings(meta).some((line) => text.includes(line))) {
+  if (staffStrings(meta, adminStrings).some((line) => text.includes(line))) {
     return { status: 409, code: "STAFF_LINE", error: "報價內容含有後台內部參考的文字，請刪除後再送出。" };
   }
   return null;
