@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
-import { panelLines } from "@/lib/quotePanelText";
+import { draftReplaceBlock } from "@/lib/quoteDraftGuard";
+import { legacyDraftView, panelLines } from "@/lib/quotePanelText";
 import { QuoteArchiveButton } from "../QuoteActions";
 
 type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; minAmountTwd?: number | null; maxAmountTwd?: number | null; source: string };
@@ -43,6 +44,8 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   const [orderBusy, setOrderBusy] = useState(false);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [orderView, setOrderView] = useState<OrderView | null>(null);
+  // v11: restore stays hidden until the order lookup finished and found no order.
+  const [orderChecked, setOrderChecked] = useState(false);
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [totalInput, setTotalInput] = useState("");
 
@@ -98,6 +101,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     const data = await response.json();
     if (response.status === 404) {
       setOrderView(null);
+      setOrderChecked(true);
       return;
     }
     if (!response.ok || !data.success) throw new Error(data.error || "訂單讀取失敗");
@@ -110,6 +114,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
       included: data.included || [],
       terms: data.terms || [],
     });
+    setOrderChecked(true);
     setDecisions((current) => {
       const next = { ...current };
       for (const item of data.items || []) {
@@ -173,6 +178,18 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
     }
   }
 
+  async function restoreLegacy() {
+    if (!quote) return;
+    if (!window.confirm("把正式報價內容換回重新產生前的舊草稿？已儲存的內容會先另存在還原紀錄；編輯框裡尚未儲存的修改不會保留，請先按儲存。")) return;
+    setMessage("");
+    setError("");
+    const response = await fetch(`/api/admin/quotes/${params.id}/legacy-restore`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || "還原失敗");
+    if (data.quote) setQuote(data.quote);
+    setMessage(data.changed ? "已還原成舊草稿，尚未送給客人。" : "已經是舊草稿，沒有變更。");
+  }
+
   async function sendQuote() {
     setMessage("");
     setError("");
@@ -233,6 +250,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
           <input id="checked-hours" type="number" min="1" step="1" value={hours} onChange={(event) => setHours(event.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200" />
 
           <AutoDraftPanel options={quote.quoteOptions} />
+          <LegacyDraftPanel options={quote.quoteOptions} restoreBlock={draftReplaceBlock(quote, !orderChecked || Boolean(orderView))} onRestore={() => restoreLegacy().catch((err) => setError(err instanceof Error ? err.message : "還原失敗"))} />
           <label className="block text-xs text-slate-400">正式報價內容（會原樣送給客人）</label>
           <textarea value={quote.quoteDraftText || ""} onChange={(event) => setQuote({ ...quote, quoteDraftText: event.target.value })} rows={16} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 font-mono text-sm focus:outline-none focus:border-amber-500" />
 
@@ -292,6 +310,24 @@ function AutoDraftPanel({ options }: { options: unknown }) {
       <p className="font-bold text-amber-300">{title}</p>
       {rest.map((line, index) => <p key={index}>{line}</p>)}
       <p className="text-emerald-300">{last}</p>
+    </div>
+  );
+}
+
+/** v10: read-only copy of the draft that regenerateLegacy replaced, with a one-click restore. Admin only. */
+function LegacyDraftPanel({ options, restoreBlock, onRestore }: { options: unknown; restoreBlock: string | null; onRestore: () => void }) {
+  const view = legacyDraftView(options);
+  if (!view) return null;
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4 space-y-2 text-xs text-slate-300">
+      <p className="font-bold text-slate-200">重新產生前的舊草稿（唯讀{view.replacedAt ? `，${new Date(view.replacedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })} 被取代` : ""}）</p>
+      <pre className="whitespace-pre-wrap font-mono text-slate-400 max-h-64 overflow-auto">{view.text}</pre>
+      {view.historyCount ? <p className="text-slate-500">還原前的版本已保存 {view.historyCount} 份（quoteOptions.restoreHistory）。</p> : null}
+      {view.regenerated && restoreBlock ? <p className="text-slate-500">{restoreBlock}</p> : null}
+      {view.regenerated && !restoreBlock ? (
+        <button type="button" onClick={onRestore} className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-slate-300 hover:bg-slate-200">還原成舊草稿</button>
+      ) : null}
+      {!view.regenerated ? <p className="text-slate-500">目前沒有重新產生的草稿可還原。</p> : null}
     </div>
   );
 }

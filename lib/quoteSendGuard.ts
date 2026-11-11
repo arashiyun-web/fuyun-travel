@@ -4,6 +4,7 @@
  * reference wording or the internal auto-draft note. Pure; no network, env or DB access.
  */
 
+import { FLEET_DRAFT_STAFF_HINTS } from "@/lib/fleetQuoteDraft";
 import { KNOWLEDGE_RANGES } from "@/lib/quoteKnowledge";
 
 /**
@@ -40,13 +41,48 @@ export function draftFingerprint(text: string) {
   return hash.toString(16).padStart(8, "0");
 }
 
-/** NFKC (full→half width), lower case, no whitespace or zero-width chars, no thousands commas. */
+/**
+ * v9: characters a reader cannot see. Removed before any comparison, so interleaving them in staff
+ * wording (soft hyphen, LRM/RLM, bidi embeddings and isolates, word joiner, BOM, variation selectors,
+ * tag characters …) changes nothing. Every format character (\p{Cf}) and every non-spacing or
+ * enclosing mark (\p{Mn}/\p{Me}, which covers U+FE00–FE0F, U+E0100–E01EF and U+034F) is included,
+ * plus the blank fillers that are letters or symbols (Hangul fillers, Khmer inherent vowels,
+ * Mongolian free variation selectors and vowel separator, braille blank). Only used for matching.
+ */
+// Built with new RegExp: the tsconfig target (es5) does not accept a /u regex literal.
+const INVISIBLE = new RegExp(String.raw`[\p{Cf}\p{Mn}\p{Me}\u00ad\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\u2800\u3164\ufe00-\ufe0f\ufeff\uffa0\u{e0000}-\u{e007f}\u{e0100}-\u{e01ef}]`, "gu");
+const PUNCTUATION = new RegExp(String.raw`[\p{P}\p{S}]`, "gu");
+
+/** NFKC with invisible characters removed before and after (NFKC can expose or recompose some). */
+export function foldForMatch(text: string | null | undefined) {
+  return (text || "").replace(INVISIBLE, "").normalize("NFKC").replace(INVISIBLE, "");
+}
+
+/** NFKC (full→half width), lower case, no whitespace or invisible chars, no thousands commas. */
 export function compactForMatch(text: string | null | undefined) {
-  return (text || "")
-    .normalize("NFKC")
+  return foldForMatch(text)
     .toLowerCase()
-    .replace(/[\s\u200b-\u200d\u2060\ufeff]+/g, "")
+    .replace(/\s+/g, "")
     .replace(/(\d)[,.](?=\d{3}(?!\d))/g, "$1");
+}
+
+/**
+ * v9: fixed staff-only lines, compared on every row whatever quoteOptions holds (old rows have no
+ * quoteOptions.fleetFare.staffHints). They are matched without punctuation or symbols too, so
+ * 「需要訂金，金額與取消規則未定」 or the line with its full stops removed is still refused.
+ */
+export const FIXED_STAFF_LINES = [
+  "需要訂金。金額與取消規則未定。",
+  ...FLEET_DRAFT_STAFF_HINTS,
+] as const;
+
+function withoutPunctuation(compact: string) {
+  return compact.replace(PUNCTUATION, "");
+}
+
+export function fixedStaffLineIn(text: string | null | undefined) {
+  const bare = withoutPunctuation(compactForMatch(text));
+  return FIXED_STAFF_LINES.some((line) => bare.includes(withoutPunctuation(compactForMatch(line))));
 }
 
 export function forbiddenMarkersIn(text: string | null | undefined) {
@@ -125,10 +161,10 @@ function amountsOf(prepared: string) {
  * whitespace as a separator (catches 「16000 22000」) — and the union is returned.
  */
 export function amountsIn(text: string | null | undefined) {
-  const folded = (text || "").normalize("NFKC").toLowerCase();
+  const folded = foldForMatch(text).toLowerCase();
   const dropCommas = (value: string) => value.replace(/(\d),(?=\d{3}(?!\d))/g, "$1");
-  const joined = dropCommas(folded.replace(/[\s\u200b-\u200d\u2060\ufeff]+/g, ""));
-  const spaced = dropCommas(folded.replace(/(\d)[^\S\n]+,|,[^\S\n]+(?=\d)/g, "$1,").replace(/[\u200b-\u200d\u2060\ufeff]+/g, ""));
+  const joined = dropCommas(folded.replace(/\s+/g, ""));
+  const spaced = dropCommas(folded.replace(/(\d)[^\S\n]+,|,[^\S\n]+(?=\d)/g, "$1,"));
   return new Set([...Array.from(amountsOf(joined)), ...Array.from(amountsOf(spaced))]);
 }
 
@@ -207,7 +243,7 @@ export function sendBlock(quote: { quoteDraftText?: string | null; quoteOptions?
     return { status: 409, code: "FORBIDDEN_MARKER", error: `報價內容含有內部用字（${markers.join("、")}），請刪除後再送出。`, markers };
   }
   const text = compactForMatch(quote.quoteDraftText);
-  if (staffStrings(meta, adminStrings).some((line) => text.includes(line))) {
+  if (staffStrings(meta, adminStrings).some((line) => text.includes(line)) || fixedStaffLineIn(quote.quoteDraftText)) {
     return { status: 409, code: "STAFF_LINE", error: "報價內容含有後台內部參考的文字，請刪除後再送出。" };
   }
   return null;
