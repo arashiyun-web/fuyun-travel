@@ -29,6 +29,12 @@ export type PublicFleetProfile = {
   keywords: string[];
   /** Only this vehicle's own files. Empty means the photo area is not ready. */
   photos: string[];
+  /** Optional Traditional Chinese alt text per photo path. Missing paths use the page default. */
+  photoAlts?: Record<string, string>;
+  /** Optional /fleet card main photo. Defaults to photos[0]. */
+  cardPhoto?: string;
+  /** Optional /fleet card thumbnails. Defaults to photos.slice(1, 3). */
+  cardThumbs?: string[];
   photosReady: boolean;
   /** False while this vehicle's own photos are missing. */
   readyForLaunch: boolean;
@@ -146,10 +152,23 @@ const toyota: PublicFleetProfile = {
   detail: "中巴給已經坐不進一台小車、又還不需要 42 人座大巴的團體。含司機 21 座，最多 20 位乘客。建議保留座位，讓同行旅客坐得更舒適；行李依人數與尺寸事先確認。適合親友同行、公司小型團體與團體出遊。",
   keywords: ["TOYOTA 中巴", "中巴包車", "台北九份中巴"],
   photos: [
+    "/fleet/toyota-midibus-exterior-front.webp",
+    "/fleet/toyota-midibus-exterior-side-door.webp",
+    "/fleet/toyota-midibus-exterior-side-left.webp",
     "/fleet/toyota-midibus-side.webp",
     "/fleet/toyota-midibus-interior-front.webp",
     "/fleet/toyota-midibus-interior-rear.webp",
     "/fleet/toyota-midibus-front.webp",
+  ],
+  photoAlts: {
+    "/fleet/toyota-midibus-exterior-front.webp": "TOYOTA 中巴正面外觀，白色車身與大片前擋風玻璃",
+    "/fleet/toyota-midibus-exterior-side-door.webp": "TOYOTA 中巴右側外觀，白色車身與中段乘客車門",
+    "/fleet/toyota-midibus-exterior-side-left.webp": "TOYOTA 中巴左側外觀，白色車身與整排側窗",
+  },
+  cardPhoto: "/fleet/toyota-midibus-exterior-side-door.webp",
+  cardThumbs: [
+    "/fleet/toyota-midibus-interior-front.webp",
+    "/fleet/toyota-midibus-interior-rear.webp",
   ],
   photosReady: true,
   readyForLaunch: true,
@@ -254,6 +273,8 @@ export function publicFleetProfiles(): PublicFleetProfile[] {
   return profiles.map((profile) => ({
     ...profile,
     photos: [...profile.photos],
+    ...(profile.photoAlts ? { photoAlts: { ...profile.photoAlts } } : {}),
+    ...(profile.cardThumbs ? { cardThumbs: [...profile.cardThumbs] } : {}),
     sections: profile.sections.map((section) => ({ ...section, lines: [...section.lines] })),
     faqs: profile.faqs.map((item) => ({ ...item })),
   }));

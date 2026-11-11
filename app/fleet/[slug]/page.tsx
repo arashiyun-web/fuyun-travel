@@ -66,7 +66,7 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
                 <img
                   key={src}
                   src={src}
-                  alt={`${SITE.name} ${vehicle.title}`}
+                  alt={vehicle.photoAlts?.[src] ?? `${SITE.name} ${vehicle.title}`}
                   className="h-72 w-full object-cover"
                 />
               ))}
