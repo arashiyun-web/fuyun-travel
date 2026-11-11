@@ -3,6 +3,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { cleanSourceUrl, mergePhotoUrls } from "@/lib/content-sync/photos";
 import { ownerHasApprovedCopy } from "@/lib/operations/store";
+import { ARCHIVED_STATUS } from "@/lib/content-sync/listManage";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
   // photos, so a single-photo form never drops the others. The source link falls back to the post URL.
   const sourceItemId = body.sourceItemId?.trim() || null;
   const sourceItem = sourceItemId ? await prisma.contentSyncItem.findUnique({ where: { id: sourceItemId } }) : null;
+  if (sourceItem?.status === ARCHIVED_STATUS) {
+    return NextResponse.json({ error: "這則已從清單移除，請先還原再上首頁。" }, { status: 409 });
+  }
   const photoUrls = mergePhotoUrls(body.photoUrl, Array.isArray(body.photoUrls) ? body.photoUrls : [], sourceItem?.rawPayload ?? null);
 
   const spot = await prisma.featuredSpot.create({

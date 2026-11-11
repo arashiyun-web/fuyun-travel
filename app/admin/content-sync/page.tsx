@@ -27,6 +27,30 @@ type AuthorizedMember = {
   note: string | null;
 };
 
+type ListTab = "pending" | "featured" | "archived";
+type TabCounts = Record<ListTab, number>;
+
+const LIST_TABS: Array<{ key: ListTab; label: string }> = [
+  { key: "pending", label: "待處理" },
+  { key: "featured", label: "已上首頁" },
+  { key: "archived", label: "已移除" },
+];
+
+const PAGE_SIZE = 10;
+
+const ARCHIVE_CONFIRM_TEXT =
+  "確定要把這則從清單移除嗎？\n\n" +
+  "・只會從這份清單移除，資料不會刪掉，之後可以在「已移除」分頁還原。\n" +
+  "・已經上首頁的卡片會照舊留在首頁，不受影響。";
+
+function pageNumbers(current: number, total: number) {
+  const pages: number[] = [];
+  const start = Math.max(1, Math.min(current - 2, total - 4));
+  const end = Math.min(total, start + 4);
+  for (let p = start; p <= end; p += 1) pages.push(p);
+  return pages;
+}
+
 const SOURCE_LABELS: Record<string, { label: string; badge: string }> = {
   page_official: { label: "粉專官方", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
   group_official: { label: "社團官方帳號", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
@@ -60,19 +84,69 @@ export default function ContentSyncPage() {
   const [featuredItemIds, setFeaturedItemIds] = useState<Set<string>>(new Set());
   const [featureAllSubmitting, setFeatureAllSubmitting] = useState(false);
   const [featureAllMsg, setFeatureAllMsg] = useState("");
+  const [listTab, setListTab] = useState<ListTab>("pending");
+  const [listPage, setListPage] = useState(1);
+  const [listTotalPages, setListTotalPages] = useState(1);
+  const [listCounts, setListCounts] = useState<TabCounts>({ pending: 0, featured: 0, archived: 0 });
+  const [listMsg, setListMsg] = useState("");
+  const [archivingId, setArchivingId] = useState<string | null>(null);
 
   useEffect(() => {
     setToken(localStorage.getItem("admin_token") || "");
   }, []);
 
-  async function loadItems(t = token) {
+  async function loadItems(t = token, tab = listTab, page = listPage) {
     if (!t) return;
-    const res = await fetch("/api/content-sync/items?status=pending", {
+    const res = await fetch(`/api/content-sync/items?tab=${tab}&page=${page}&pageSize=${PAGE_SIZE}`, {
       headers: { Authorization: `Bearer ${t}` },
       cache: "no-store",
     });
     const data = await res.json();
-    if (data.success) setItems(data.items);
+    if (data.success) {
+      setItems(data.items);
+      if (data.counts) setListCounts(data.counts);
+      if (typeof data.totalPages === "number") setListTotalPages(data.totalPages);
+      if (typeof data.page === "number" && data.page !== page) setListPage(data.page);
+    }
+  }
+
+  function switchTab(tab: ListTab) {
+    setListTab(tab);
+    setListPage(1);
+    setListMsg("");
+  }
+
+  function goToPage(page: number) {
+    setListPage(Math.min(Math.max(1, page), listTotalPages));
+  }
+
+  async function archiveItem(item: SyncItem, restore = false) {
+    if (!restore && !window.confirm(ARCHIVE_CONFIRM_TEXT)) return;
+    setArchivingId(item.id);
+    setListMsg("");
+    try {
+      const res = await fetch("/api/content-sync/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(restore ? { id: item.id, restore: true } : { id: item.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setListMsg(data.error || (restore ? "還原失敗" : "移除失敗"));
+      } else {
+        setListMsg(restore ? "已還原到「待處理」" : "已移除，可在「已移除」分頁還原");
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+        loadItems();
+      }
+    } catch (error) {
+      setListMsg(String(error));
+    } finally {
+      setArchivingId(null);
+    }
   }
 
   async function loadMembers(t = token) {
@@ -105,12 +179,16 @@ export default function ContentSyncPage() {
 
   useEffect(() => {
     if (token) {
-      loadItems(token);
       loadMembers(token);
       loadFeaturedStatus(token);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (token) loadItems(token, listTab, listPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, listTab, listPage]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -257,6 +335,7 @@ export default function ContentSyncPage() {
         setFeatureMsg((prev) => ({ ...prev, [item.id]: "已上首頁「這裡真好玩」區塊" }));
         setFeatureFormId(null);
         setFeaturedItemIds((prev) => new Set(prev).add(item.id));
+        loadItems();
       }
     } catch (error) {
       setFeatureMsg((prev) => ({ ...prev, [item.id]: String(error) }));
@@ -279,6 +358,7 @@ export default function ContentSyncPage() {
       } else {
         setFeatureAllMsg(data.needsApproval ? `已發布 ${data.created} 則。另有 ${data.needsApproval} 則尚未在營運後台核准，沒有上首頁。` : `已發布 ${data.created} 則到首頁，略過 ${data.skipped} 則（無照片或已處理過）`);
         loadFeaturedStatus();
+        loadItems();
       }
     } catch (error) {
       setFeatureAllMsg(String(error));
@@ -298,7 +378,21 @@ export default function ContentSyncPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-8 max-w-5xl mx-auto">
+    <div id="content-sync-top" className="min-h-[calc(100vh-160px)] text-slate-100 space-y-8 max-w-5xl mx-auto">
+      <div className="flex items-center gap-2 flex-wrap">
+        <a
+          href="/admin"
+          className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all"
+        >
+          ← 回後台首頁
+        </a>
+        <a
+          href="/"
+          className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all"
+        >
+          回官網首頁
+        </a>
+      </div>
       <div>
         <p className="text-xs text-slate-500 uppercase tracking-wider">weekly content sync</p>
         <h1 className="text-xl font-bold text-amber-400 mt-1">社群內容同步清單</h1>
@@ -434,8 +528,33 @@ export default function ContentSyncPage() {
         {featureAllMsg ? <p className="text-xs text-slate-400 mb-4">{featureAllMsg}</p> : null}
         {pullMsg ? <p className="text-xs text-slate-400 mb-4">{pullMsg}</p> : null}
 
+        <div className="flex gap-2 mb-4 flex-wrap" role="tablist" aria-label="清單分類">
+          {LIST_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={listTab === t.key}
+              onClick={() => switchTab(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs border transition-all ${
+                listTab === t.key
+                  ? "border-amber-500/60 text-amber-300 bg-amber-500/10"
+                  : "border-slate-700 text-slate-400 hover:border-amber-500/60 hover:text-amber-300"
+              }`}
+            >
+              {t.label}（{listCounts[t.key]}）
+            </button>
+          ))}
+        </div>
+        {listTab === "archived" ? (
+          <p className="text-xs text-slate-500 mb-4">已移除的項目資料都還在，按「還原」會回到「待處理」。每週拉取不會把已移除的貼文重新加回來。</p>
+        ) : null}
+        {listMsg ? <p className="text-xs text-slate-400 mb-4">{listMsg}</p> : null}
+
         {items.length === 0 ? (
-          <p className="text-xs text-slate-600 py-8 text-center">目前沒有待選項目</p>
+          <p className="text-xs text-slate-600 py-8 text-center">
+            {listTab === "archived" ? "目前沒有已移除的項目" : listTab === "featured" ? "目前沒有已上首頁的項目" : "目前沒有待選項目"}
+          </p>
         ) : (
           <div className="space-y-2 mb-4">
             {items.map((item) => {
@@ -445,13 +564,15 @@ export default function ContentSyncPage() {
                   key={item.id}
                   className="flex items-start gap-3 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 hover:border-slate-700"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(item.id)}
-                    onChange={() => toggleSelect(item.id)}
-                    className="mt-1"
-                    aria-label="選取送出產生草稿"
-                  />
+                  {listTab !== "archived" ? (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                      className="mt-1"
+                      aria-label="選取送出產生草稿"
+                    />
+                  ) : null}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className={`text-[10px] px-2 py-0.5 rounded border ${src.badge}`}>{src.label}</span>
@@ -466,7 +587,23 @@ export default function ContentSyncPage() {
                     ) : null}
 
                     <div className="mt-2">
-                      {featuredItemIds.has(item.id) ? (
+                      {listTab === "archived" ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {featuredItemIds.has(item.id) ? (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] border border-emerald-500/40 text-emerald-300">
+                              ✓ 首頁卡片照舊保留
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => archiveItem(item, true)}
+                            disabled={archivingId === item.id}
+                            className="px-3 py-1 rounded-lg text-[11px] border border-amber-500/40 text-amber-300 hover:border-amber-400 hover:text-amber-200 transition-all disabled:opacity-50"
+                          >
+                            {archivingId === item.id ? "還原中…" : "還原"}
+                          </button>
+                        </div>
+                      ) : featuredItemIds.has(item.id) ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] border border-emerald-500/40 text-emerald-300">
                           ✓ 已上首頁
                         </span>
@@ -529,6 +666,16 @@ export default function ContentSyncPage() {
                           確認上首頁
                         </button>
                       )}
+                      {listTab !== "archived" && featureFormId !== item.id ? (
+                        <button
+                          type="button"
+                          onClick={() => archiveItem(item)}
+                          disabled={archivingId === item.id}
+                          className="ml-2 px-3 py-1 rounded-lg text-[11px] border border-red-500/40 text-red-400 hover:border-red-400 hover:text-red-300 transition-all disabled:opacity-50"
+                        >
+                          {archivingId === item.id ? "移除中…" : "移除"}
+                        </button>
+                      ) : null}
                       {featureMsg[item.id] ? (
                         <p className="text-[11px] text-slate-400 mt-1">{featureMsg[item.id]}</p>
                       ) : null}
@@ -540,15 +687,65 @@ export default function ContentSyncPage() {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={submitSelected}
-          disabled={submitting || selectedIds.size === 0}
-          className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all disabled:opacity-50"
-        >
-          {submitting ? "送出中…" : `送出勾選項目產生草稿（${selectedIds.size}）`}
-        </button>
+        {listTotalPages > 1 ? (
+          <div className="flex items-center justify-center gap-1 mb-4 flex-wrap" aria-label="分頁">
+            <button
+              type="button"
+              onClick={() => goToPage(listPage - 1)}
+              disabled={listPage <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all disabled:opacity-40"
+            >
+              上一頁
+            </button>
+            {pageNumbers(listPage, listTotalPages).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => goToPage(p)}
+                aria-current={p === listPage ? "page" : undefined}
+                className={`min-w-[2rem] px-2 py-1.5 rounded-lg text-xs border transition-all ${
+                  p === listPage
+                    ? "border-amber-500/60 text-amber-300 bg-amber-500/10"
+                    : "border-slate-700 text-slate-400 hover:border-amber-500/60 hover:text-amber-300"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => goToPage(listPage + 1)}
+              disabled={listPage >= listTotalPages}
+              className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all disabled:opacity-40"
+            >
+              下一頁
+            </button>
+            <span className="text-[11px] text-slate-500 ml-2">
+              第 {listPage} / {listTotalPages} 頁
+            </span>
+          </div>
+        ) : null}
+
+        {listTab !== "archived" ? (
+          <button
+            type="button"
+            onClick={submitSelected}
+            disabled={submitting || selectedIds.size === 0}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all disabled:opacity-50"
+          >
+            {submitting ? "送出中…" : `送出勾選項目產生草稿（${selectedIds.size}）`}
+          </button>
+        ) : null}
         {submitMsg ? <p className="text-xs text-slate-400 mt-3">{submitMsg}</p> : null}
+        <div className="mt-6 text-right">
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-all"
+          >
+            ↑ 回頂端
+          </button>
+        </div>
       </div>
     </div>
   );
