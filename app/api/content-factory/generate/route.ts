@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { CopywriterUnavailableError, generateCopy } from "@/lib/ai/copywriter";
+import { sanitizeProviderError } from "@/lib/ai/providerError";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { normalizeGeneratedContent } from "@/lib/content-factory/output";
@@ -95,8 +96,18 @@ export async function POST(request: Request) {
     if (err instanceof CopywriterUnavailableError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
+    const sanitized = sanitizeProviderError(err);
+    console.error("content-factory/generate provider error", {
+      provider_status: sanitized.provider_status,
+      provider_error_type: sanitized.provider_error_type,
+      message: sanitized.message,
+    });
     return NextResponse.json(
-      { error: "無法連線到文案供應商，未建立草稿。" },
+      {
+        error: "無法連線到文案供應商，未建立草稿。",
+        provider_status: sanitized.provider_status,
+        provider_error_type: sanitized.provider_error_type,
+      },
       { status: 502 },
     );
   }
