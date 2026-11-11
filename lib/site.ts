@@ -67,21 +67,24 @@ function normalizePath(path: string) {
   return withSlash.replace(/\/+$/, "") || "/";
 }
 
-// 首頁與語言入口頁共用同一組 alternates（互相列出）；
-// 其餘中文頁沒有翻譯版，只宣告自己。
+// 首頁與語言入口頁共用同一組 alternates（8 個語言入口 + x-default 指向 /）。
+// 只有中文、沒有翻譯版的頁面：不輸出 x-default，也不輸出只指向自己的 hreflang。
 type LanguageAlternates = NonNullable<NonNullable<Metadata["alternates"]>["languages"]>;
 
-function languageAlternates(path: string): LanguageAlternates {
+export function isMultilingualEntry(path: string) {
   const normalized = normalizePath(path);
-  if (normalized === "/" || LOCALE_ENTRY_PATHS.includes(normalized)) {
-    const languages: LanguageAlternates = {};
-    for (const entry of LOCALE_ENTRIES) languages[entry.hreflang] = absoluteUrl(entry.path);
-    languages["x-default"] = absoluteUrl("/");
-    return languages;
-  }
-  const self = absoluteUrl(path);
-  return { "zh-Hant": self, "x-default": self };
+  return normalized === "/" || LOCALE_ENTRY_PATHS.includes(normalized);
 }
+
+export function languageAlternates(path: string): LanguageAlternates | undefined {
+  if (!isMultilingualEntry(path)) return undefined;
+  const languages: LanguageAlternates = {};
+  for (const entry of LOCALE_ENTRIES) languages[entry.hreflang] = absoluteUrl(entry.path);
+  languages["x-default"] = absoluteUrl("/");
+  return languages;
+}
+
+export const LOCALE_ENTRY_LANGUAGES = languageAlternates("/")!;
 
 export function pageMeta(args: {
   title: string;
@@ -95,14 +98,12 @@ export function pageMeta(args: {
   const url = absoluteUrl(path);
   const image = args.image ?? SITE.ogImage;
   const fullTitle = `${args.title}｜${SITE.name}`;
+  const languages = languageAlternates(path);
 
   return {
     title: args.title,
     description,
-    alternates: {
-      canonical: url,
-      languages: languageAlternates(path),
-    },
+    alternates: languages ? { canonical: url, languages } : { canonical: url },
     openGraph: {
       title: fullTitle,
       description,

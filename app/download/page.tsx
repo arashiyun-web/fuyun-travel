@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LINE_URL } from "@/lib/site";
+import { LINE_URL, absoluteUrl } from "@/lib/site";
 import { lineProfileUrl } from "@/lib/config/line";
 
 export const metadata: Metadata = {
   title: "下載 App｜浮雲輕鬆遊",
   description: "將浮雲輕鬆遊安裝到 Android、iPhone 或 iPad 主畫面，台灣包車詢價一鍵搞定。",
   robots: { index: true, follow: true },
+  alternates: { canonical: absoluteUrl("/download") },
 };
 
 export default function DownloadPage() {
