@@ -1,3 +1,5 @@
+import { BUS_DRIVER_FEE, busRangeRow } from "@/lib/busRangeTable";
+
 /**
  * LINE 客服知識庫的大巴行情（報價機器人），移植自 backend/knowledge_base 與 backend/app/pricing_rules.py。
  * 只給「參考行情」，永遠不是確定金額，不寫進 CharterOrder，也不送給客人。
@@ -14,16 +16,19 @@ export type KnowledgeRouteClass =
 
 export type KnowledgeRange = { low: number; high: number; label: string; source: string };
 
-/** 來源：backend/knowledge_base/pricing_matrix.yaml → pricing_matrix.bus_44_45 */
+/** 大巴範圍來自單一資料表 lib/busRangeTable.ts（台北市區短程改用老闆 15:05 參考表的 43 座平日一日範圍）。 */
+function tableRange(route: Parameters<typeof busRangeRow>[0]): KnowledgeRange {
+  const row = busRangeRow(route);
+  if (!row) throw new Error(`bus range table has no row for ${route}`);
+  const seat = row.seatLabel ? ` ${row.seatLabel}` : "";
+  const holiday = row.holiday ? `平日；假日 ${row.holiday.low.toLocaleString("en-US")}～${row.holiday.high.toLocaleString("en-US")}` : "";
+  return { low: row.weekday.low, high: row.weekday.high, label: `${row.label}${seat}${holiday ? ` ${holiday}` : ""}`, source: row.source };
+}
 const RANGES: Record<Exclude<KnowledgeRouteClass, "mountain" | "uncovered">, KnowledgeRange> = {
-  // pricing_matrix.yaml taipei_city_short: "11000~12500元"
-  taipei_city_short: { low: 11000, high: 12500, label: "台北市區短程", source: "pricing_matrix.yaml taipei_city_short" },
-  // pricing_matrix.yaml taipei_to_taoyuan_hsinchu: "12500~15000元"
-  taipei_to_taoyuan_hsinchu: { low: 12500, high: 15000, label: "台北到桃園、新竹", source: "pricing_matrix.yaml taipei_to_taoyuan_hsinchu" },
-  // pricing_matrix.yaml taipei_to_taichung_changhua_lukang_round_trip: "16000~22000元"
-  taipei_to_taichung_changhua_lukang_round_trip: { low: 16000, high: 22000, label: "台北到台中、彰化、鹿港來回", source: "pricing_matrix.yaml taipei_to_taichung_changhua_lukang_round_trip" },
-  // pricing_matrix.yaml taipei_to_south_long: "24000~35000元"
-  taipei_to_south_long: { low: 24000, high: 35000, label: "台北到南部長程", source: "pricing_matrix.yaml taipei_to_south_long" },
+  taipei_city_short: tableRange("taipei_city_day"),
+  taipei_to_taoyuan_hsinchu: tableRange("taipei_to_taoyuan_hsinchu"),
+  taipei_to_taichung_changhua_lukang_round_trip: tableRange("taipei_to_taichung_changhua_lukang_round_trip"),
+  taipei_to_south_long: tableRange("taipei_to_south_long"),
 };
 
 /** Every knowledge-base bus range; the send guard refuses any of these low/high pairs in outgoing text. */
@@ -47,9 +52,9 @@ const MOUNTAIN = ["日月潭", "清境", "合歡山", "阿里山", "山區"];
 /** 來源：backend/knowledge_base/pricing_matrix.yaml mountain_addon "日月潭、清境、山區另加價" */
 const MOUNTAIN_ADDON = "日月潭、清境、山區另加價";
 
-/** 加註項目。來源：pricing_matrix.yaml driver_tip / driver_meal / work_hours，quote_rules.yaml price_components */
+/** 加註項目。來源：老闆 15:04 司機服務費（取代 driver_tip）/ pricing_matrix.yaml driver_meal / work_hours，quote_rules.yaml price_components */
 export const KNOWLEDGE_NOTES = [
-  "司機小費 NT$1,000～2,000／天", // pricing_matrix.yaml driver_tip
+  `司機服務費另計：平日 NT$${BUS_DRIVER_FEE.weekday.toLocaleString("en-US")}、假日 NT$${BUS_DRIVER_FEE.holiday.toLocaleString("en-US")}`, // 老闆 2026-11-11 15:04（取代 pricing_matrix.yaml driver_tip 舊的司機小費）
   "司機誤餐費 NT$250／餐", // pricing_matrix.yaml driver_meal
   "工時計算不含空車回送", // pricing_matrix.yaml work_hours
   "發票 5%", // quote_rules.yaml price_components
@@ -155,7 +160,7 @@ export function knowledgeQuote(input: KnowledgeInput): KnowledgeQuote {
   const routeClass = classifyKnowledgeRoute(pickup, destination);
   // 山區：pricing_rules.py quote_range 的 mountain 分支回 "NT$16,000~22,000 起，山區另加價"（數字同 pricing_matrix.yaml 中部來回）
   const range = routeClass === "uncovered" ? null
-    : routeClass === "mountain" ? { ...RANGES.taipei_to_taichung_changhua_lukang_round_trip, label: "台北到山區，基準依 pricing_rules.py 山區分支，數字同中部來回，另加價", source: "pricing_rules.py quote_range mountain + pricing_matrix.yaml" }
+    : routeClass === "mountain" ? { ...tableRange("mountain"), label: "台北到山區，基準依 pricing_rules.py 山區分支，另加價" }
     : RANGES[routeClass];
   return {
     routeClass,
@@ -189,7 +194,7 @@ export function knowledgeDraftLines(quote: KnowledgeQuote) {
   if (quote.blocked) {
     lines.push(quote.blocked, `建議改為：${quote.alternatives.join("、")}（round_taiwan_rules.yaml）`);
   } else if (quote.range) {
-    lines.push(`參考行情 NT$${formatRange(quote.range)}（知識庫 pricing_matrix：${quote.range.label}）。這不是確定金額。`);
+    lines.push(`參考行情 NT$${formatRange(quote.range)}（大巴範圍表：${quote.range.label}；來源 ${quote.range.source}）。這不是確定金額。`);
     if (quote.mountainAddon) lines.push(`山區：${quote.mountainAddon}（pricing_matrix.yaml mountain_addon）`);
   } else {
     lines.push("行情表未涵蓋，待人工（知識庫 pricing_matrix 沒有這條路線，不套用其他路線行情）。");

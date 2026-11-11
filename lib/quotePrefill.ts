@@ -1,7 +1,9 @@
 import { confirmedVehicleRate, fleetQuoteRecord, type FleetRateId } from "@/lib/fleetCatalog";
 import { savedFleetFare } from "@/lib/fleetFareInput";
-import { buildFleetQuoteDraft, type FleetQuoteDraft } from "@/lib/fleetQuoteDraft";
+import { buildFleetQuoteDraft } from "@/lib/fleetQuoteDraft";
 import { draftFingerprint } from "@/lib/quoteSendGuard";
+import { missingFields, parseLuggage, parseTripType, rangeDraftText } from "@/lib/quoteConversation";
+import { customerRange } from "@/lib/quoteRange";
 import { knowledgeDraftLines, knowledgeQuote, knowledgeSummary, LARGE_GROUP_MIN, LARGE_GROUP_VEHICLE, STAFF_PREFIX } from "@/lib/quoteKnowledge";
 
 /**
@@ -14,7 +16,7 @@ import { knowledgeDraftLines, knowledgeQuote, knowledgeSummary, LARGE_GROUP_MIN,
  * authorizes a fare; it lists what staff still has to fill in.
  */
 
-export const AUTO_DRAFT_VERSION = 1 as const;
+export const AUTO_DRAFT_VERSION = 2 as const;
 
 export type PrefillSource = {
   tripDate?: string | null;
@@ -24,11 +26,18 @@ export type PrefillSource = {
   remark?: string | null;
   recommendedVehicle?: string | null;
   quoteOptions?: unknown;
+  /** Collected by the LINE conversation; otherwise read from the remark. */
+  luggage?: string | null;
+  tripType?: string | null;
 };
 
 export type AutoDraftMeta = {
   version: typeof AUTO_DRAFT_VERSION;
-  engine: "fleetQuoteDraft" | "knowledgeBase";
+  engine: "rangeQuote";
+  /** Staff reference source behind the staff lines: fleet table or knowledge base. */
+  staffSource: "fleetQuoteDraft" | "knowledgeBase";
+  /** The customer-facing range written into quoteDraftText (null = 專人報價, no number). */
+  customerRange: { vehicle: string | null; low: number | null; high: number | null; routeLabel: string | null; source: string | null };
   trigger: "line-webhook" | "backfill";
   generatedAt: string;
   vehicleLabel: string | null;
@@ -136,18 +145,6 @@ function referenceLines(label: string | null) {
   }).filter((line): line is string => Boolean(line));
 }
 
-function missingFor(source: PrefillSource, draft: FleetQuoteDraft, label: string | null, fare: { rateId: FleetRateId | null; hours: number | null }) {
-  const missing: string[] = [];
-  if (!text(source.tripDate)) missing.push("日期");
-  if (count(source.passengerCount) == null) missing.push("人數");
-  if (!text(source.pickup)) missing.push("出發地");
-  if (!text(source.destination)) missing.push("目的地");
-  if (!label) missing.push("車型");
-  if (!fare.rateId) missing.push("路線方案");
-  if (fare.hours == null) missing.push("時數");
-  if (missing.length === 0 && draft.amountTwd == null) missing.push(label === COACH_LABEL ? "大巴車資" : "人數與車型核對");
-  return missing;
-}
 
 /** Small vehicles with fleet rates use the fleet table; buses and unknown vehicles use the knowledge base. */
 function usesKnowledge(label: string | null) {
@@ -164,68 +161,72 @@ function knowledgeFor(source: PrefillSource) {
   });
 }
 
-/** Read-only estimate for the list column. Uses the saved staff fare when there is one. */
-export function quoteEstimate(source: PrefillSource): QuoteEstimate {
-  const fare = savedFleetFare(source);
-  const { draft, label } = resolveVehicle(source, fare);
-  if (draft.amountTwd == null && usesKnowledge(label)) {
-    const knowledge = knowledgeFor(source);
-    return { amountTwd: null, missing: knowledge.missing, references: [], summary: knowledgeSummary(knowledge) };
-  }
+function conversationFields(source: PrefillSource) {
+  const remark = text(source.remark);
   return {
-    amountTwd: draft.amountTwd,
-    missing: draft.amountTwd == null ? missingFor(source, draft, label, fare) : [],
-    references: draft.amountTwd == null ? referenceLines(label) : [],
-    summary: null,
+    date: text(source.tripDate),
+    people: count(source.passengerCount),
+    origin: text(source.pickup),
+    destination: text(source.destination),
+    note: remark,
+    luggage: text(source.luggage) || parseLuggage(remark),
+    tripType: text(source.tripType) || parseTripType(remark),
+    vehicle: text(source.recommendedVehicle),
   };
 }
 
-/** Internal note shown to staff only (admin list/detail). Never part of quoteDraftText. */
-export const AUTO_DRAFT_STAFF_NOTE = "參考行情｜【自動預生成草稿】LINE 詢價進來時由系統產生，尚未送給客人。請改寫成正式報價並儲存後才能送出。";
-
-/** Drops the fleet draft's own staff-only first and last lines so the body is customer text only. */
-function customerFleetText(text: string) {
-  const lines = text.split("\n");
-  while (lines.length && (/^【後台報價草稿】/.test(lines[0]) || lines[0].trim() === "")) lines.shift();
-  while (lines.length && (/^請人員核對後再決定是否送出/.test(lines[lines.length - 1]) || lines[lines.length - 1].trim() === "")) lines.pop();
-  return lines.join("\n");
+function rangeSummary(source: PrefillSource) {
+  const fields = conversationFields(source);
+  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date });
+  const missing = missingFields(fields);
+  const tail = missing.length ? `｜待補：${missing.join("、")}` : "";
+  if (range.blocked) return { missing, summary: `${STAFF_PREFIX}：一日環島不受理，建議二～四日${tail}` };
+  if (range.low == null || range.high == null) return { missing, summary: `${STAFF_PREFIX}：客人範圍待專人報價${tail}` };
+  return { missing, summary: `${STAFF_PREFIX} 客人範圍 ${range.low.toLocaleString("en-US")}～${range.high.toLocaleString("en-US")}${range.mountainAddon ? "＋山區加價" : ""}${tail}` };
 }
 
+/** Read-only estimate for the list column (staff only). A staff-confirmed fleet fare shows as the base fare. */
+export function quoteEstimate(source: PrefillSource): QuoteEstimate {
+  const fare = savedFleetFare(source);
+  const { draft, label } = resolveVehicle(source, fare);
+  const { missing, summary } = rangeSummary(source);
+  if (draft.amountTwd != null) return { amountTwd: draft.amountTwd, missing: [], references: [], summary };
+  return { amountTwd: null, missing, references: usesKnowledge(label) ? [] : referenceLines(label), summary };
+}
+
+/** Internal note shown to staff only (admin list/detail). Never part of quoteDraftText. */
+export const AUTO_DRAFT_STAFF_NOTE = "參考行情｜【自動預生成草稿】LINE 詢價進來時由系統產生的範圍報價草稿，尚未送給客人；送出前請專人確認行程。";
+
 /**
- * Builds the staff-only draft for a new or never-generated inquiry. Pure; writes nothing.
- * quoteDraftText holds customer-facing wording only: no knowledge-base range, no 待補 list and no
- * internal note. Those live in quoteOptions.autoDraft for the admin screens. The draft is marked
- * staffReviewed:false so 「送出給 LINE」 refuses it until staff edit and save it.
+ * Builds the draft for a new or never-generated inquiry. Pure; writes nothing.
+ * quoteDraftText is the customer-safe RANGE quote (lib/quoteConversation.ts rangeDraftText): a
+ * low～high range per vehicle type, the surcharge note and the questions still open — never a single
+ * fixed price and never staff wording. Staff references (knowledge-base lines, fleet-table prices,
+ * 待補) live only in quoteOptions.autoDraft.
  */
 export function buildQuotePrefill(source: PrefillSource, trigger: AutoDraftMeta["trigger"], now = new Date()): QuotePrefill {
   const fare = { rateId: null, hours: null };
-  const { draft, label } = resolveVehicle(source, fare);
+  const { label } = resolveVehicle(source, fare);
   const knowledge = usesKnowledge(label) ? knowledgeFor(source) : null;
-  const missing = knowledge ? knowledge.missing : missingFor(source, draft, label, fare);
+  const fields = conversationFields(source);
+  const missing = missingFields(fields);
   const references = referenceLines(label);
-  const quoteDraftText = (knowledge ? [
-    "您好，感謝您的包車詢價。以下是目前收到的行程資料：",
-    "",
-    `出發：${text(source.pickup) || "未填"}`,
-    `目的：${text(source.destination) || "未填"}`,
-    `人數：${count(source.passengerCount) || "未填"}`,
-    `日期：${text(source.tripDate) || "未填"}`,
-    `建議車型：${label || "待確認"}`,
-    `備註：${text(source.remark) || "無"}`,
-    "",
-    "正式報價會由專人確認行程細節後提供。",
-  ].join("\n") : customerFleetText(draft.text)).slice(0, 4500);
+  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date }, now);
+  const quoteDraftText = rangeDraftText(fields, now);
   const staffLines = knowledge ? knowledgeDraftLines(knowledge) : [
     `${STAFF_PREFIX}｜待補：${missing.length ? missing.join("、") : "無"}`,
     references.length ? `${STAFF_PREFIX}｜車隊表參考（人員選定路線與時數後才成立）：${references.join("；")}` : `${STAFF_PREFIX}｜車隊表參考：沒有已核對的車資可參考。`,
   ];
+  staffLines.push(`${STAFF_PREFIX}｜客人範圍來源：${range.source || "資料不足，未給數字"}`);
   const existing = source.quoteOptions;
   const options: Record<string, unknown> = Array.isArray(existing)
     ? existing.length ? { legacyOptions: existing } : {}
     : { ...object(existing) };
   const meta: AutoDraftMeta = {
     version: AUTO_DRAFT_VERSION,
-    engine: knowledge ? "knowledgeBase" : "fleetQuoteDraft",
+    engine: "rangeQuote",
+    staffSource: knowledge ? "knowledgeBase" : "fleetQuoteDraft",
+    customerRange: { vehicle: range.vehicle, low: range.low, high: range.high, routeLabel: range.routeLabel, source: range.source },
     trigger,
     generatedAt: now.toISOString(),
     vehicleLabel: label,

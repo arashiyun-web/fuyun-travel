@@ -7,6 +7,18 @@ import { reviewOnSave } from "@/lib/quoteSendGuard";
 
 export const dynamic = "force-dynamic";
 
+/** Like cleanText, but keeps line breaks so a saved multi-line range quote reaches LINE as written. */
+function cleanDraftText(value: unknown, limit: number) {
+  return String(value || "")
+    .replace(/[<>]/g, "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, limit);
+}
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   if (!verifyAdminRequest(request)) return unauthorized();
   const quote = await prisma.charterQuote.findUnique({ where: { id: params.id } });
@@ -24,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if ((requested === "ARCHIVED") !== (current.quoteStatus === "ARCHIVED")) {
     return NextResponse.json({ success: false, error: "移除或還原請用清單上的按鈕。" }, { status: 409 });
   }
-  const quoteDraftText = cleanText(body.quoteDraftText, 4500);
+  const quoteDraftText = cleanDraftText(body.quoteDraftText, 4500);
   // Saving an edited auto draft marks it staff-reviewed so it can be sent; unchanged text stays blocked.
   const reviewed = reviewOnSave(current.quoteOptions, quoteDraftText);
   const quote = await prisma.charterQuote.update({

@@ -4,10 +4,16 @@ import { unauthorized, verifyAdminMutation } from "@/lib/adminQuoteAuth";
 import { savedFleetFare, withFleetFare } from "@/lib/fleetFareInput";
 import { buildFleetQuoteDraft, isFareHours, isFleetRateId } from "@/lib/fleetQuoteDraft";
 import { prisma } from "@/lib/prisma";
+import { parseLuggage, parseTripType, rangeDraftText } from "@/lib/quoteConversation";
+import { fleetDraftHints, withStoredHints } from "@/lib/quoteStaffText";
 
 export const dynamic = "force-dynamic";
 
-/** Writes a staff draft only. Does not call LINE or email. */
+/**
+ * Writes a staff draft only. Does not call LINE or email. v6: the draft body is the customer RANGE
+ * quote; the fleet-table base fare (a single fixed price) stays staff-side in fleetFare and the
+ * response (amountTwd, staffHints), never in quoteDraftText.
+ */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   if (!verifyAdminMutation(request)) return unauthorized();
   const quote = await prisma.charterQuote.findUnique({ where: { id: params.id } });
@@ -30,13 +36,27 @@ export async function POST(request: Request, { params }: { params: { id: string 
     hours,
     rateId,
   });
+  const vehicle = draft.vehicleLabel || (typeof body.vehicleHint === "string" ? body.vehicleHint : "") || quote.recommendedVehicle;
+  const remark = quote.remark && quote.remark !== "無" ? quote.remark : "";
+  const customerText = rangeDraftText({
+    date: quote.tripDate,
+    people: quote.passengerCount,
+    origin: quote.pickup,
+    destination: quote.destination,
+    note: remark,
+    luggage: parseLuggage(remark),
+    tripType: parseTripType(remark),
+    vehicle,
+  });
+  const staffHints = fleetDraftHints(draft);
   const updated = await prisma.charterQuote.update({
     where: { id: params.id },
     data: {
-      quoteDraftText: draft.text,
-      quoteOptions: withFleetFare(quote, { rateId, hours }) as Prisma.InputJsonObject,
+      quoteDraftText: customerText,
+      // v8: the hints shown to staff are stored, so the send guard compares exactly what staff saw.
+      quoteOptions: withStoredHints(withFleetFare(quote, { rateId, hours }), staffHints) as Prisma.InputJsonObject,
       recommendedVehicle: draft.vehicleLabel || quote.recommendedVehicle,
     },
   });
-  return NextResponse.json({ success: true, quote: updated, pending: draft.pending, amountTwd: draft.amountTwd, staffHints: draft.staffHints, sendsToCustomer: false });
+  return NextResponse.json({ success: true, quote: updated, pending: draft.pending, amountTwd: draft.amountTwd, staffHints, sendsToCustomer: false });
 }

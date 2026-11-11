@@ -12,20 +12,30 @@ export const ARCHIVED = "ARCHIVED";
 const ORDER_STATUSES = ["ORDER_PENDING", "STAFF_PRICED"];
 export const QUOTE_PAGE_SIZE = 20;
 
-export type QuoteTab = "pending" | "sent" | "archived";
+/** Customer requirements complete; waiting for a human (v6 range-quote handoff). Listed first. */
+export const HANDOFF = "HANDOFF";
+
+export type QuoteTab = "handoff" | "pending" | "sent" | "archived";
 export const QUOTE_TABS: Array<{ key: QuoteTab; label: string }> = [
+  { key: "handoff", label: "待真人客服" },
   { key: "pending", label: "待處理" },
   { key: "sent", label: "已報價（送出）" },
   { key: "archived", label: "已移除" },
 ];
 
 export function quoteTab(value: unknown): QuoteTab {
-  return value === "sent" || value === "archived" ? value : "pending";
+  return value === "sent" || value === "archived" || value === "handoff" ? value : "pending";
 }
 
 export function tabWhere(tab: QuoteTab): Prisma.CharterQuoteWhereInput {
   if (tab === "archived") return { quoteStatus: ARCHIVED };
   if (tab === "sent") return { quoteStatus: { in: ["SENT", "CONFIRMED"] } };
+  if (tab === "handoff") return { quoteStatus: HANDOFF };
+  return { quoteStatus: { notIn: [ARCHIVED, "SENT", "CONFIRMED", HANDOFF] } };
+}
+
+/** Rows staff still work on (待真人客服 + 待處理). Used by the batch prefill. */
+export function openWhere(): Prisma.CharterQuoteWhereInput {
   return { quoteStatus: { notIn: [ARCHIVED, "SENT", "CONFIRMED"] } };
 }
 
@@ -115,7 +125,7 @@ export async function restoreQuote(quoteId: string): Promise<ArchiveResult> {
 export async function backfillQuoteDrafts(options: { dryRun?: boolean; limit?: number } = {}) {
   const limit = Math.min(Math.max(Math.floor(options.limit || 100), 1), 200);
   const rows = await prisma.charterQuote.findMany({
-    where: { AND: [tabWhere("pending"), { OR: [{ quoteDraftText: null }, { quoteDraftText: "" }] }] },
+    where: { AND: [openWhere(), { OR: [{ quoteDraftText: null }, { quoteDraftText: "" }] }] },
     orderBy: { createdAt: "asc" },
     take: limit,
   });

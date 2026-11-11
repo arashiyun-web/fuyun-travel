@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
-import { autoDraftOf } from "@/lib/quoteSendGuard";
+import { panelLines } from "@/lib/quotePanelText";
 import { QuoteArchiveButton } from "../QuoteActions";
 
 type ReviewItem = { key: string; label: string; role: string; unitAmountTwd: number | null; quantityLabel: string | null; minAmountTwd?: number | null; maxAmountTwd?: number | null; source: string };
@@ -281,24 +281,17 @@ function Info({ label, value }: { label: string; value: string | null }) {
   return <div><p className="text-xs text-slate-500">{label}</p><p className="text-sm text-slate-200 mt-1">{value || "未填"}</p></div>;
 }
 
-/** Every line in the staff box starts with 參考行情, so a pasted line is refused by the send guard. */
-function staffLine(line: string) {
-  return line.startsWith("參考行情") ? line : `參考行情｜${line}`;
-}
-
 /** Staff-only notes from the auto draft (reference range, 待補, internal note). Never sent to the customer. */
 function AutoDraftPanel({ options }: { options: unknown }) {
-  const meta = autoDraftOf(options);
-  if (!meta) return null;
-  const lines = Array.isArray(meta.staffLines) ? meta.staffLines.filter((line): line is string => typeof line === "string") : [];
-  const reviewed = meta.staffReviewed === true;
+  const lines = panelLines(options);
+  if (!lines) return null;
+  const [title, ...rest] = lines;
+  const last = rest.pop();
   return (
     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-1 text-xs text-slate-300">
-      <p className="font-bold text-amber-300">{staffLine("內部參考（只在後台顯示，不會送給客人）")}</p>
-      {typeof meta.staffNote === "string" ? <p>{staffLine(meta.staffNote)}</p> : null}
-      {typeof meta.vehicleLabel === "string" && meta.vehicleByCount ? <p>{staffLine(`建議車型依人數推定：${meta.vehicleLabel}，請確認。`)}</p> : null}
-      {lines.map((line, index) => <p key={index}>{staffLine(line)}</p>)}
-      <p className={reviewed ? "text-emerald-300" : "text-red-300"}>{staffLine(reviewed ? "人員已改寫並儲存，可以送出。" : "尚未由人員改寫：請改寫下方正式報價內容並按「儲存正式報價」，之後才能送出給 LINE。")}</p>
+      <p className="font-bold text-amber-300">{title}</p>
+      {rest.map((line, index) => <p key={index}>{line}</p>)}
+      <p className="text-emerald-300">{last}</p>
     </div>
   );
 }

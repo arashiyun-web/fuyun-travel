@@ -6,6 +6,8 @@ import { relayGroupEvents } from "@/lib/line/groupRelay";
 import { claimEvent, markDelivered, markDeliveryFailed, recordBuilt, releaseClaim, type Claim, type WebhookEventStore } from "@/lib/line/webhookEvents";
 import { lineMemberUid, rememberLineMember } from "@/lib/members/lineMember";
 import { buildQuotePrefill } from "@/lib/quotePrefill";
+import { HANDOFF } from "@/lib/quoteArchive";
+import { HANDOFF_REPEAT_REPLY, HANDOFF_REPLY, missingFields, parseLuggage, parseTripType, rangeReply, type ConversationFields } from "@/lib/quoteConversation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -48,7 +50,19 @@ type QuoteFields = {
   origin?: string;
   destination?: string;
   note?: string;
+  /** v6 range-quote conversation only (quote_rules.yaml 行李件數、單程或來回). */
+  luggage?: string;
+  tripType?: string;
 };
+
+/**
+ * v6 automatic range-quote replies (老闆 2026-11-11 14:56). OFF unless LINE_AUTO_RANGE_REPLY is
+ * "1"/"true"/"on". Enabling it is a boss-approval red line; it is not set anywhere in the repo.
+ * OFF = the existing replies, byte for byte; only the saved staff draft is the new range text.
+ */
+function autoRangeReplyEnabled() {
+  return ["1", "true", "on"].includes((process.env.LINE_AUTO_RANGE_REPLY || "").trim().toLowerCase());
+}
 
 type QuoteSession = QuoteFields & {
   state: "COLLECTING" | "QUOTED" | "OFFICIAL_QUOTE_FLOW";
@@ -298,6 +312,8 @@ function draftFromJson(value: unknown): QuoteFields {
     origin: typeof draft.origin === "string" ? draft.origin : undefined,
     destination: typeof draft.destination === "string" ? draft.destination : undefined,
     note: typeof draft.note === "string" ? draft.note : undefined,
+    ...(typeof draft.luggage === "string" && draft.luggage ? { luggage: draft.luggage } : {}),
+    ...(typeof draft.tripType === "string" && draft.tripType ? { tripType: draft.tripType } : {}),
   };
 }
 
@@ -308,6 +324,8 @@ function mergeFields(current: QuoteFields, parsed: QuoteFields): QuoteFields {
   if (parsed.origin) merged.origin = parsed.origin;
   if (parsed.destination) merged.destination = parsed.destination;
   if (parsed.note) merged.note = parsed.note;
+  if (parsed.luggage) merged.luggage = parsed.luggage;
+  if (parsed.tripType) merged.tripType = parsed.tripType;
   merged.note ||= "無";
   return merged;
 }
@@ -423,6 +441,8 @@ function staffQuotePrefill(fields: QuoteFields) {
       pickup: fields.origin,
       destination: fields.destination,
       remark: fields.note,
+      luggage: fields.luggage,
+      tripType: fields.tripType,
       quoteOptions: [],
     }, "line-webhook");
     return {
@@ -436,13 +456,29 @@ function staffQuotePrefill(fields: QuoteFields) {
   }
 }
 
-async function createOfficialQuote(userId: string) {
-  const session = await getSession(userId);
-  const fields = mergeFields(session?.draft || {}, {});
-  const missing = missingReply(fields);
-  if (!userId || missing) return null;
+function conversationFields(fields: QuoteFields): ConversationFields {
+  const note = fields.note && fields.note !== "無" ? fields.note : "";
+  return {
+    date: fields.date,
+    people: fields.people || null,
+    origin: fields.origin,
+    destination: fields.destination,
+    note,
+    luggage: fields.luggage || parseLuggage(note),
+    tripType: fields.tripType || parseTripType(note),
+  };
+}
 
-  const quote = await prisma.charterQuote.create({
+/**
+ * Creates the CharterQuote row. When every quote_rules field is known the row goes straight to
+ * 待真人客服 (quoteStatus HANDOFF + quoteOptions.handoff); a human gives the formal price.
+ */
+async function createQuoteRow(userId: string, fields: QuoteFields, trigger: "official-request" | "range-conversation") {
+  const prefill = staffQuotePrefill(fields);
+  const complete = missingFields(conversationFields(fields)).length === 0;
+  const options = Array.isArray(prefill.quoteOptions) ? {} : { ...(prefill.quoteOptions as Record<string, unknown>) };
+  if (complete) options.handoff = { status: "pending_human", trigger, at: new Date().toISOString(), sendsToCustomer: false };
+  return prisma.charterQuote.create({
     data: {
       lineUserId: userId,
       lineName: null,
@@ -451,10 +487,30 @@ async function createOfficialQuote(userId: string) {
       pickup: fields.origin,
       destination: fields.destination,
       remark: fields.note || "無",
-      ...staffQuotePrefill(fields),
-      quoteStatus: "new",
+      recommendedVehicle: prefill.recommendedVehicle,
+      quoteDraftText: prefill.quoteDraftText,
+      quoteOptions: (complete || !Array.isArray(prefill.quoteOptions) ? options : prefill.quoteOptions) as Prisma.InputJsonValue,
+      quoteStatus: complete ? HANDOFF : "new",
     },
   });
+}
+
+async function markHandedOff(userId: string, fields: QuoteFields, quoteId: string) {
+  await prisma.lineSession.upsert({
+    where: { userId },
+    update: { state: "OFFICIAL_QUOTE_FLOW", draftJson: { ...fields, officialQuoteId: quoteId } },
+    create: { userId, state: "OFFICIAL_QUOTE_FLOW", draftJson: { ...fields, officialQuoteId: quoteId } },
+  });
+  sessions.set(userId, { ...fields, state: "OFFICIAL_QUOTE_FLOW", updatedAt: Date.now() });
+}
+
+async function createOfficialQuote(userId: string) {
+  const session = await getSession(userId);
+  const fields = mergeFields(session?.draft || {}, {});
+  const missing = missingReply(fields);
+  if (!userId || missing) return null;
+
+  const quote = await createQuoteRow(userId, fields, "official-request");
 
   await prisma.lineSession.upsert({
     where: { userId },
@@ -507,6 +563,43 @@ async function buildReply(text: string, userId: string) {
 
   if (userId) await completeSession(userId, merged);
   return quoteReply(merged);
+}
+
+/** LINE_AUTO_RANGE_REPLY on: range quote + questions until complete, then 待真人客服 and one handoff line. */
+async function buildRangeReply(text: string, userId: string) {
+  const message = clean(text);
+  const session = await getSession(userId);
+  const sessionState = session?.state || "";
+  const intent = classifyIntent(message);
+  const official = isOfficialQuoteRequest(message);
+
+  // Already with a human: anything about the trip (or small talk) gets the one-line handoff reminder.
+  if (sessionState === "OFFICIAL_QUOTE_FLOW" && (official || intent === "charter" || intent === "general" || ENTRY_KEYWORDS.has(message))) {
+    return HANDOFF_REPEAT_REPLY;
+  }
+  if (!official && ENTRY_KEYWORDS.has(message)) {
+    await startCharterSession(userId);
+    return helperReply();
+  }
+  const collecting = sessionState === "COLLECTING" || sessionState === "QUOTED";
+  if (!official && intent !== "charter" && !collecting) {
+    const nonCharterReply = intentReply(intent);
+    if (nonCharterReply) {
+      await clearSession(userId);
+      return nonCharterReply;
+    }
+    return "您好，請問需要包車、機場接送、國旅、校外教學，或真人客服協助？";
+  }
+
+  const parsed: QuoteFields = official ? {} : { ...parseQuote(message), luggage: parseLuggage(message), tripType: parseTripType(message) };
+  const merged = userId ? await mergeSession(userId, parsed) : { ...parsed, note: parsed.note || "無" };
+  const fields = conversationFields(merged);
+  if (!userId || missingFields(fields).length) return rangeReply(fields);
+
+  const quote = await createQuoteRow(userId, merged, "range-conversation");
+  await markHandedOff(userId, merged, quote.id);
+  await notifyAdminQuote({ id: quote.id }, merged, userId);
+  return HANDOFF_REPLY;
 }
 
 async function replyToLine(replyToken: string, replyText: string, accessToken: string) {
@@ -601,7 +694,7 @@ export async function POST(request: Request) {
     } else {
       const userId = clean((event.source as { userId?: string } | undefined)?.userId, 160);
       try {
-        replyText = await buildReply(message.text, userId);
+        replyText = autoRangeReplyEnabled() ? await buildRangeReply(message.text, userId) : await buildReply(message.text, userId);
       } catch (error) {
         console.error("line-webhook reply build failed", { handlerVersion: HANDLER_VERSION, webhookEventId, error: String(error).slice(0, 200) });
         if (tracked) await track("release", webhookEventId, (store) => releaseClaim(store, webhookEventId));
