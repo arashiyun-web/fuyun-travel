@@ -5,6 +5,7 @@ import { sanitizeProviderError } from "@/lib/ai/providerError";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { normalizeGeneratedContent } from "@/lib/content-factory/output";
+import { applyDraftImagesToContent, planDraftImages } from "@/lib/content-factory/draftImages";
 import { featuredSpotSource, isPublicDraftImage } from "@/lib/content-factory/sources";
 import { parseInput } from "@/lib/content-factory/parser";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/content-factory/systemPrompt";
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "請提供行程描述或已發布素材。" }, { status: 400 });
   }
   if ((body.image_urls !== undefined && (!Array.isArray(body.image_urls) || body.image_urls.some((url) => !isPublicDraftImage(url)))) || (body.cover_image_url && !isPublicDraftImage(body.cover_image_url))) {
-    return NextResponse.json({ error: "圖片須為既有 HTTPS 公開網址或 /images/ 站內素材。新圖片公開空間尚待核准。" }, { status: 400 });
+    return NextResponse.json({ error: "圖片須為既有 HTTPS 公開網址或 /images/、/fleet/ 站內素材。新圖片公開空間尚待核准。" }, { status: 400 });
   }
 
   const parsed = parseInput(body.user_notes || "", {
@@ -78,10 +79,17 @@ export async function POST(request: Request) {
     additional_info: body.additional_info,
   });
 
+  const imagePlan = planDraftImages({
+    input: parsed,
+    sourceImages: Array.isArray(body.image_urls) ? body.image_urls : [],
+    coverImageUrl: body.cover_image_url,
+    spotTitle: body.featured_spot_id ? parsed.trip_title : "",
+  });
+
   const fullInput: ContentFactoryInput = {
     ...parsed,
-    image_urls: Array.isArray(body.image_urls) ? body.image_urls : [],
-    cover_image_url: body.cover_image_url ?? body.image_urls?.[0] ?? "",
+    image_urls: imagePlan.image_urls,
+    cover_image_url: imagePlan.cover_image_url,
     ...(body.featured_spot_id ? { featured_spot_id: body.featured_spot_id } : {}),
   };
 
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
   const cleaned = stripFences(rawText);
   let generated: GeneratedContent;
   try {
-    generated = normalizeGeneratedContent(JSON.parse(cleaned));
+    generated = applyDraftImagesToContent(normalizeGeneratedContent(JSON.parse(cleaned)), imagePlan);
   } catch {
     return NextResponse.json(
       { error: "文案供應商回傳格式錯誤，未建立草稿。" },

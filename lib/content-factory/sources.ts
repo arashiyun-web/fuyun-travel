@@ -3,7 +3,10 @@ import type { FeaturedSpot } from "@prisma/client";
 /** Preserve existing public assets without downloading or rehosting them. */
 export function isPublicDraftImage(value: unknown): value is string {
   if (typeof value !== "string" || value !== value.trim() || /[\\\s\u0000-\u001f]/.test(value)) return false;
-  if (value.startsWith("/images/")) {
+  // Fleet photos are first-party static assets, same as /images/.
+  // Allowing /fleet/ keeps drafts consistent with existing site-path rules;
+  // article markdown still uses https://fuyuntravel.com absolute URLs.
+  if (value.startsWith("/images/") || value.startsWith("/fleet/")) {
     try {
       const decoded = decodeURIComponent(value);
       return !decoded.includes("..") && !/[\\?#\u0000-\u001f]/.test(decoded);
