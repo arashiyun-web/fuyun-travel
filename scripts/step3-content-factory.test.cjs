@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { PGlite } = require('@electric-sql/pglite');
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
 const db = new PGlite();
-let failRead = false, failWrite = false, llmCalls = [], responseText, providerMissing, externalCalls = 0;
+let failRead = false, failWrite = false, llmCalls = [], responseText, providerMissing, providerError, externalCalls = 0;
 const published = { id: 'published-spot', title: '九份山城', description: '已公開且授權的散步素材', photoUrl: 'https://images.example.invalid/cover.jpg', photoUrls: ['/images/fixture.jpg', 'http://unsafe.invalid/a.jpg', 'data:image/png;base64,AA==', '//unsafe.invalid/a.jpg'], status: 'published' };
 const hidden = { ...published, id: 'hidden-spot', status: 'draft' };
 let spots;
@@ -16,6 +16,7 @@ const token = createAdminToken();
 const copy = load('lib/ai/copywriter.ts');
 mock('@/lib/ai/copywriter', { ...copy, generateCopy: async (input) => {
   llmCalls.push(input);
+  if (providerError) throw providerError;
   if (providerMissing) return copy.generateCopy(input); // real provider selection, with no configured pairs
   return responseText;
 } });
@@ -47,7 +48,7 @@ before(async () => {
 });
 after(async () => db.close());
 beforeEach(() => {
-  spots = [structuredClone(published), structuredClone(hidden)]; failRead = failWrite = providerMissing = false; externalCalls = 0; llmCalls = []; responseText = JSON.stringify(validOutput);
+  spots = [structuredClone(published), structuredClone(hidden)]; failRead = failWrite = providerMissing = false; providerError = null; externalCalls = 0; llmCalls = []; responseText = JSON.stringify(validOutput);
   for (const key of ['GEMINI_API_KEY','GEMINI_MODEL','ANTHROPIC_API_KEY','AI_MODEL_NAME','OPENAI_API_KEY','OPENAI_MODEL']) delete process.env[key];
 });
 async function count() { return (await db.query('SELECT count(*)::int AS n FROM content_drafts')).rows[0].n; }
@@ -190,4 +191,42 @@ test('new-image upload stays fail-closed without an authorized public storage UR
   const r = await upload.POST(new Request('http://localhost/api/content-factory/upload', { method:'POST', headers: {authorization:`Bearer ${token}`} }));
   assert.equal(r.status, 503); const data = await r.json();
   assert.match(data.error, /待核/); assert.equal(data.url, undefined); assert.equal(uploads, 0);
+});
+
+test('provider throw returns 502 with status fields, logs a redacted message, and never echoes secrets or prompts', async () => {
+  const n = await count();
+  const logs = [];
+  const original = console.error;
+  console.error = (...args) => { logs.push(args); };
+  const secret = 'sk-ant-api03-THISISNOTAREALKEY-ABCDEFGHIJKLMNOP';
+  const err = new Error(`invalid x-api-key ${secret}`);
+  err.status = 401;
+  err.error = { type: 'error', error: { type: 'authentication_error', message: `invalid x-api-key ${secret}` } };
+  err.prompt = 'secret-prompt-must-not-appear';
+  err.system = 'system-prompt-must-not-appear';
+  err.user = 'user-prompt-must-not-appear';
+  providerError = err;
+  try {
+    const r = await generate.POST(request({ featured_spot_id: 'published-spot' }));
+    assert.equal(r.status, 502);
+    const body = await r.json();
+    assert.equal(body.error, '無法連線到文案供應商，未建立草稿。');
+    assert.equal(body.provider_status, 401);
+    assert.equal(body.provider_error_type, 'authentication_error');
+    const encoded = JSON.stringify(body);
+    assert.equal(encoded.includes(secret), false);
+    assert.equal(encoded.includes('secret-prompt-must-not-appear'), false);
+    assert.equal(logs.length, 1);
+    const logged = JSON.stringify(logs[0]);
+    assert.equal(logged.includes(secret), false);
+    assert.match(logged, /authentication_error/);
+    assert.match(logged, /"provider_status":401/);
+    assert.match(logged, /\[REDACTED\]/);
+    assert.equal(logged.includes('secret-prompt-must-not-appear'), false);
+    assert.equal(logged.includes('system-prompt-must-not-appear'), false);
+    assert.equal(logged.includes('user-prompt-must-not-appear'), false);
+  } finally {
+    console.error = original;
+  }
+  assert.equal(await count(), n);
 });
