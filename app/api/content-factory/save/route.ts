@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       inputJson: body.input as unknown as Prisma.InputJsonValue,
       outputJson: body.output as unknown as Prisma.InputJsonValue,
       imageUrls: Array.isArray(body.input.image_urls) ? body.input.image_urls : [],
-      coverImageUrl: body.input.cover_image_url || null,
+      coverImageUrl: body.input.cover_image_url ?? null,
       status: "draft",
     },
   });

@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// One claim per Taipei calendar date; failed deliveries release their claim for retry.
+model FridayReminderSend {
+  reminderDate String   @id @map("reminder_date")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("friday_reminder_sends")
+}
+
 model CharterQuote {
   id                 String    @id @default(cuid())
   lineUserId         String    @map("line_user_id")

@@ -30,7 +30,7 @@ mock('@/lib/prisma', { prisma: {
       if (failWrite) throw new Error('private-db-error');
       const id = 'draft-' + require('node:crypto').randomUUID();
       await db.query('INSERT INTO content_drafts (id, trip_title, input_json, output_json, image_urls, cover_image_url, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now())', [id,data.tripTitle,JSON.stringify(data.inputJson),JSON.stringify(data.outputJson),data.imageUrls,data.coverImageUrl,data.status]);
-      return { id, ...data };
+      return { id, ...data, createdAt: new Date() };
     },
     findMany: async () => (await db.query('SELECT id, input_json AS "inputJson", output_json AS "outputJson", status, created_at AS "createdAt" FROM content_drafts ORDER BY created_at DESC')).rows,
   },
@@ -230,3 +230,25 @@ test('provider throw returns 502 with status fields, logs a redacted message, an
   }
   assert.equal(await count(), n);
 });
+for (const { name, input, expectedCover } of [
+  { name: 'explicit empty cover survives even with a first gallery image', input: { cover_image_url: '' }, expectedCover: '' },
+  { name: 'omitted cover stays null without gallery fallback', input: {}, expectedCover: null },
+  { name: 'null cover stays null without gallery fallback', input: { cover_image_url: null }, expectedCover: null },
+  { name: 'nonempty cover stays unchanged', input: { cover_image_url: 'https://images.example.invalid/explicit.jpg' }, expectedCover: 'https://images.example.invalid/explicit.jpg' },
+]) {
+  test(`save persistence: ${name}`, async () => {
+    const originalInput = { trip_title: '儲存封面語意', image_urls: ['https://images.example.invalid/gallery.jpg'], ...input };
+    const r = await save.POST(new Request('http://localhost/api/content-factory/save', {
+      method: 'POST', headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify({ input: originalInput, output: validOutput }),
+    }));
+    assert.equal(r.status, 200);
+    const data = await r.json(); assert.equal(data.success, true);
+    const row = (await db.query('SELECT * FROM content_drafts WHERE id=$1', [data.draft.id])).rows[0];
+    assert.equal(row.cover_image_url, expectedCover);
+    assert.deepEqual(row.image_urls, originalInput.image_urls);
+    assert.deepEqual(row.input_json, originalInput);
+    assert.deepEqual(data.draft.input, originalInput);
+    assert.equal(row.status, 'draft'); assert.equal(externalCalls, 0);
+  });
+}
