@@ -24,6 +24,10 @@ export type ContentItem = {
   icon: LucideIcon;
   keywords?: string[];
   photos?: string[];
+  galleryPhotos?: string[];
+  photoAlts?: Record<string, string>;
+  cardPhoto?: string;
+  cardThumbs?: string[];
 };
 
 export const serviceItems: ContentItem[] = [
@@ -161,6 +165,10 @@ export const fleetItems: ContentItem[] = [
     icon: vehicle.slug === "mercedes-van" ? Car : BusFront,
     keywords: vehicle.keywords,
     photos: vehicle.photos,
+    galleryPhotos: vehicle.galleryPhotos,
+    photoAlts: vehicle.photoAlts,
+    cardPhoto: vehicle.cardPhoto,
+    cardThumbs: vehicle.cardThumbs,
   })),
 ];
 

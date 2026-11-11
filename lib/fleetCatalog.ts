@@ -29,6 +29,14 @@ export type PublicFleetProfile = {
   keywords: string[];
   /** Only this vehicle's own files. Empty means the photo area is not ready. */
   photos: string[];
+  /** Optional detail-page gallery order. Defaults to photos. Draft images and other readers keep using photos. */
+  galleryPhotos?: string[];
+  /** Optional Traditional Chinese alt text per photo path. Missing paths use the page default. */
+  photoAlts?: Record<string, string>;
+  /** Optional /fleet card main photo. Defaults to photos[0]. */
+  cardPhoto?: string;
+  /** Optional /fleet card thumbnails. Defaults to photos.slice(1, 3). */
+  cardThumbs?: string[];
   photosReady: boolean;
   /** False while this vehicle's own photos are missing. */
   readyForLaunch: boolean;
@@ -151,6 +159,25 @@ const toyota: PublicFleetProfile = {
     "/fleet/toyota-midibus-interior-rear.webp",
     "/fleet/toyota-midibus-front.webp",
   ],
+  galleryPhotos: [
+    "/fleet/toyota-midibus-exterior-front.webp",
+    "/fleet/toyota-midibus-exterior-side-door.webp",
+    "/fleet/toyota-midibus-exterior-side-left.webp",
+    "/fleet/toyota-midibus-side.webp",
+    "/fleet/toyota-midibus-interior-front.webp",
+    "/fleet/toyota-midibus-interior-rear.webp",
+    "/fleet/toyota-midibus-front.webp",
+  ],
+  photoAlts: {
+    "/fleet/toyota-midibus-exterior-front.webp": "TOYOTA 中巴正面外觀，白色車身與大片前擋風玻璃",
+    "/fleet/toyota-midibus-exterior-side-door.webp": "TOYOTA 中巴右側外觀，白色車身與中段乘客車門",
+    "/fleet/toyota-midibus-exterior-side-left.webp": "TOYOTA 中巴左側外觀，白色車身與整排側窗",
+  },
+  cardPhoto: "/fleet/toyota-midibus-exterior-side-door.webp",
+  cardThumbs: [
+    "/fleet/toyota-midibus-interior-front.webp",
+    "/fleet/toyota-midibus-interior-rear.webp",
+  ],
   photosReady: true,
   readyForLaunch: true,
   lineAutoQuote: false,
@@ -254,6 +281,9 @@ export function publicFleetProfiles(): PublicFleetProfile[] {
   return profiles.map((profile) => ({
     ...profile,
     photos: [...profile.photos],
+    ...(profile.galleryPhotos ? { galleryPhotos: [...profile.galleryPhotos] } : {}),
+    ...(profile.photoAlts ? { photoAlts: { ...profile.photoAlts } } : {}),
+    ...(profile.cardThumbs ? { cardThumbs: [...profile.cardThumbs] } : {}),
     sections: profile.sections.map((section) => ({ ...section, lines: [...section.lines] })),
     faqs: profile.faqs.map((item) => ({ ...item })),
   }));

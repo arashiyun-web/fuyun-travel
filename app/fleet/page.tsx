@@ -61,7 +61,7 @@ export default function FleetPage() {
           <div className={styles.featureMedia}>
             <img
               className={styles.featurePhoto}
-              src={midibus.photos[0]}
+              src={midibus.cardPhoto ?? midibus.photos[0]}
               alt="TOYOTA 中巴實車側面"
             />
             <span className={styles.photoTag}><Images size={15} aria-hidden="true" /> 實車照片</span>
@@ -71,7 +71,7 @@ export default function FleetPage() {
             <h2 id="fleet-midibus-title">{midibus.title}</h2>
             <p>{midibus.summary}</p>
             <div className={styles.interiorPhotos}>
-              {midibus.photos.slice(1, 3).map((photo, index) => (
+              {(midibus.cardThumbs ?? midibus.photos.slice(1, 3)).map((photo, index) => (
                 <img
                   key={photo}
                   src={photo}

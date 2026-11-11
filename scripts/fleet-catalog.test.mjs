@@ -44,6 +44,20 @@ test("known rates are structured and unknown amounts are null, never zero", () =
     assert.equal(van.photos.includes(photo), false);
   }
   assert.equal(JSON.stringify(van).includes("toyota-midibus"), false);
+  assert.equal(midibus.cardPhoto, "/fleet/toyota-midibus-exterior-side-door.webp");
+  assert.deepEqual(midibus.cardThumbs, [
+    "/fleet/toyota-midibus-interior-front.webp",
+    "/fleet/toyota-midibus-interior-rear.webp",
+  ]);
+  assert.deepEqual(midibus.galleryPhotos, [
+    "/fleet/toyota-midibus-exterior-front.webp",
+    "/fleet/toyota-midibus-exterior-side-door.webp",
+    "/fleet/toyota-midibus-exterior-side-left.webp",
+    ...midibus.photos,
+  ]);
+  for (const photo of midibus.galleryPhotos) assert.equal(existsSync(path.join(root, "public", photo)), true, photo);
+  for (const photo of midibus.galleryPhotos.slice(0, 3)) assert.match(midibus.photoAlts[photo], /^TOYOTA 中巴.+外觀/);
+  for (const photo of [midibus.cardPhoto, ...midibus.cardThumbs]) assert.equal(midibus.galleryPhotos.includes(photo), true, photo);
 });
 
 test("public intros describe the ride and do not carry quote terms", () => {

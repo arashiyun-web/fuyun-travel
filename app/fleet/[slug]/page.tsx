@@ -36,6 +36,7 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
   }
 
   const Icon = vehicle.icon;
+  const gallery = vehicle.galleryPhotos ?? vehicle.photos ?? [];
   const faq = catalog?.faqs ?? generateFaq(vehicle.title, "車隊介紹");
   const jsonLd = [
     vehicleSchema({
@@ -60,13 +61,13 @@ export default function FleetDetailPage({ params }: FleetDetailPageProps) {
           返回車隊介紹
         </Link>
         <article className="mt-6 overflow-hidden rounded-md border border-[#d8ccb2] bg-white shadow-[0_18px_45px_rgba(48,39,24,0.12)]">
-          {(vehicle.photos?.length ?? 0) > 0 ? (
+          {gallery.length > 0 ? (
             <div className="grid gap-2 p-2">
-              {vehicle.photos!.map((src) => (
+              {gallery.map((src) => (
                 <img
                   key={src}
                   src={src}
-                  alt={`${SITE.name} ${vehicle.title}`}
+                  alt={vehicle.photoAlts?.[src] ?? `${SITE.name} ${vehicle.title}`}
                   className="h-72 w-full object-cover"
                 />
               ))}
