@@ -50,9 +50,21 @@ const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
 /**
  * Day type from the customer's date text (2026-12-20, 2026/12/20, 12/20, 12月20日). Without a year
- * the next such date on or after `now` (Asia/Taipei) is used. Saturday/Sunday = 假日. National
+ * the next such date on or after `now` (Asia/Taipei) is used; callers that have the row pass its
+ * created_at as `now` (yearBaseOf). Saturday/Sunday = 假日. National
  * holidays are not known here, so a weekday answer says staff confirm holidays.
  */
+/**
+ * v9: base date for reading a trip date without a year: the inquiry's created_at, so an 8/7 asked on
+ * 2026-06-25 stays 2026-08-07 when the draft is (re)generated later. Missing or invalid created_at
+ * keeps the previous behaviour (`fallback`, normally now).
+ */
+export function yearBaseOf(createdAt: Date | string | null | undefined, fallback: Date = new Date()) {
+  if (createdAt == null || createdAt === "") return fallback;
+  const at = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  return Number.isFinite(at.getTime()) ? at : fallback;
+}
+
 export function dayTypeOf(date: string | null | undefined, now = new Date()): { dayType: DayType; label: string } | null {
   const value = (date || "").normalize("NFKC");
   const full = value.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);

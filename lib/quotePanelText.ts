@@ -31,3 +31,20 @@ export function panelLines(options: unknown): string[] | null {
   lines.push(isHandoff(options) ? PANEL_HANDOFF : PANEL_RANGE_INFO);
   return lines.map(staffLine);
 }
+
+/**
+ * v10: the draft text regenerateLegacy replaced (quoteOptions.legacyDraft), for the read-only box on the
+ * detail page. `regenerated` is true while the current draft is the regenerated one (restore possible).
+ */
+export function legacyDraftView(options: unknown): { text: string; replacedAt: string | null; regenerated: boolean; historyCount: number } | null {
+  const root = object(options);
+  const legacy = object(root?.legacyDraft);
+  if (!legacy || typeof legacy.text !== "string") return null;
+  const history = root?.restoreHistory;
+  return {
+    text: legacy.text,
+    replacedAt: typeof legacy.replacedAt === "string" ? legacy.replacedAt : null,
+    regenerated: root?.regenerated !== undefined,
+    historyCount: Array.isArray(history) ? history.length : 0,
+  };
+}

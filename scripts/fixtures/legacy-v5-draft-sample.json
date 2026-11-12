@@ -1,0 +1,27 @@
+{
+  "_note": "Fictional sample (not from any database). quoteDraftText is the output of the original v5 generator (e42ac37 lib/fleetQuoteDraft.ts buildFleetQuoteDraft(...).text) for these fields: no route, no hours, empty recommended vehicle.",
+  "id": "fixture-legacy-v5-sample",
+  "quoteStatus": "new",
+  "sentAt": null,
+  "createdAt": "2026-08-20T03:15:00.000Z",
+  "tripDate": "10/18",
+  "passengerCount": 35,
+  "pickup": "板橋",
+  "destination": "宜蘭",
+  "remark": "無",
+  "recommendedVehicle": "",
+  "quoteOptions": {
+    "fleetFare": {
+      "hours": null,
+      "rateId": null,
+      "source": {
+        "pickup": "板橋",
+        "remark": "無",
+        "destination": "宜蘭"
+      },
+      "version": 1
+    },
+    "legacyOptions": []
+  },
+  "quoteDraftText": "【後台報價草稿】尚未送給客人。\n\n出發：板橋\n目的：宜蘭\n人數：35\n車型：未指定\n時數：未填。只能把 10 小時方案當參考。\n\n車資\n尚未由人員明選已核對的單點路線（台北一日，或台北至九份）。自由文本、多點或跨區行程不自動套用車資。\n目前沒有可確認的基本車資，也沒有總價。\n\n參考或本趟適用的已知條件\n- 沒有要列入的已知條件。\n\n待確認\n- 沒有要列入的待確認項目。\n\n請人員核對後再決定是否送出。本按鈕不會自動傳送。"
+}

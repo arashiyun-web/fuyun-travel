@@ -3,7 +3,7 @@ import { savedFleetFare } from "@/lib/fleetFareInput";
 import { buildFleetQuoteDraft } from "@/lib/fleetQuoteDraft";
 import { draftFingerprint } from "@/lib/quoteSendGuard";
 import { missingFields, parseLuggage, parseTripType, rangeDraftText } from "@/lib/quoteConversation";
-import { customerRange } from "@/lib/quoteRange";
+import { customerRange, yearBaseOf } from "@/lib/quoteRange";
 import { knowledgeDraftLines, knowledgeQuote, knowledgeSummary, LARGE_GROUP_MIN, LARGE_GROUP_VEHICLE, STAFF_PREFIX } from "@/lib/quoteKnowledge";
 
 /**
@@ -29,6 +29,8 @@ export type PrefillSource = {
   /** Collected by the LINE conversation; otherwise read from the remark. */
   luggage?: string | null;
   tripType?: string | null;
+  /** The row's created_at. A trip date without a year is read relative to it (v9); missing = now. */
+  createdAt?: Date | string | null;
 };
 
 export type AutoDraftMeta = {
@@ -177,7 +179,7 @@ function conversationFields(source: PrefillSource) {
 
 function rangeSummary(source: PrefillSource) {
   const fields = conversationFields(source);
-  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date });
+  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date }, yearBaseOf(source.createdAt));
   const missing = missingFields(fields);
   const tail = missing.length ? `｜待補：${missing.join("、")}` : "";
   if (range.blocked) return { missing, summary: `${STAFF_PREFIX}：一日環島不受理，建議二～四日${tail}` };
@@ -211,8 +213,10 @@ export function buildQuotePrefill(source: PrefillSource, trigger: AutoDraftMeta[
   const fields = conversationFields(source);
   const missing = missingFields(fields);
   const references = referenceLines(label);
-  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date }, now);
-  const quoteDraftText = rangeDraftText(fields, now);
+  // v9: a date without a year is read from the row's created_at (backfill/regenerate); the webhook has no row yet, so now.
+  const dateBase = yearBaseOf(source.createdAt, now);
+  const range = customerRange({ passengerCount: fields.people, pickup: fields.origin, destination: fields.destination, remark: [fields.note, fields.tripType].join(" "), recommendedVehicle: fields.vehicle, date: fields.date }, dateBase);
+  const quoteDraftText = rangeDraftText(fields, dateBase);
   const staffLines = knowledge ? knowledgeDraftLines(knowledge) : [
     `${STAFF_PREFIX}｜待補：${missing.length ? missing.join("、") : "無"}`,
     references.length ? `${STAFF_PREFIX}｜車隊表參考（人員選定路線與時數後才成立）：${references.join("；")}` : `${STAFF_PREFIX}｜車隊表參考：沒有已核對的車資可參考。`,

@@ -5,6 +5,7 @@ import { savedFleetFare, withFleetFare } from "@/lib/fleetFareInput";
 import { buildFleetQuoteDraft, isFareHours, isFleetRateId } from "@/lib/fleetQuoteDraft";
 import { prisma } from "@/lib/prisma";
 import { parseLuggage, parseTripType, rangeDraftText } from "@/lib/quoteConversation";
+import { yearBaseOf } from "@/lib/quoteRange";
 import { fleetDraftHints, withStoredHints } from "@/lib/quoteStaffText";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     luggage: parseLuggage(remark),
     tripType: parseTripType(remark),
     vehicle,
-  });
+  }, yearBaseOf(quote.createdAt));
   const staffHints = fleetDraftHints(draft);
   const updated = await prisma.charterQuote.update({
     where: { id: params.id },
