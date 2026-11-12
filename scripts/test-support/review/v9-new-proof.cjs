@@ -3,10 +3,10 @@
 const path = require('path'); const root = process.argv[2]; process.chdir(root);
 const { mock, load } = require(path.join(root, 'scripts/test-support/step2-load-ts.cjs'));
 const rows = []; const clone = (v) => (v == null ? v : structuredClone(v));
-mock('@/lib/prisma', { prisma: { charterQuote: {
+mock('@/lib/prisma', { prisma: require(path.join(root, 'scripts/test-support/route-prisma.cjs')).routeTx({ charterQuote: {
   findUnique: async ({ where }) => clone(rows.find((r) => r.id === where.id) || null),
   update: async ({ where, data }) => clone(Object.assign(rows.find((r) => r.id === where.id), clone(data))),
-} } });
+} }) });
 mock('@/lib/adminQuoteAuth', { verifyAdminMutation: () => true, verifyAdminRequest: () => true, unauthorized: () => Response.json({}, { status: 401 }) });
 const pushed = []; mock('@/lib/lineApi', { pushLineText: async (to, t) => { pushed.push(t); } });
 const { buildQuotePrefill, quoteEstimate } = load('lib/quotePrefill.ts');

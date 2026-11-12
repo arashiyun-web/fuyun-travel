@@ -1,4 +1,4 @@
-// v10–v11 route proof on a THROWAWAY local PostgreSQL (DATABASE_URL must point at 127.0.0.1/localhost; refuses
+// v10–v12 route proof on a THROWAWAY local PostgreSQL (DATABASE_URL must point at 127.0.0.1/localhost; refuses
 // anything else). Real PrismaClient, real POST /api/admin/quotes/prefill and /api/admin/quotes/[id]/legacy-restore,
 // real lib/quoteArchive and the frozen v5 generator. Real adminQuoteAuth for the 401 checks (run with no admin
 // env), a switch for authorized runs. LINE and fetch are spies. Prints JSON; exit 1 on any failed check.
@@ -132,7 +132,10 @@ const v5 = (id, edit = (t) => t) => { const r = { id, lineUserId: 'U-test', quot
   await makeOrder('O_new_with_order');
   const back = await row('O_new_with_order');
   const pb = await patch('O_new_with_order', { quoteStatus: 'new', quoteDraftText: back.quoteDraftText, recommendedVehicle: back.recommendedVehicle });
-  check('有訂單但人員用 PATCH 把狀態改回 new', pb.status === 200 && (await row('O_new_with_order')).quoteStatus === 'new');
+  // v12: PATCH refuses to move an order row out of the order flow; the status is put back directly (old data).
+  check('v12：有訂單時 PATCH 把狀態改回 new → 409，狀態不變', pb.status === 409 && (await row('O_new_with_order')).quoteStatus === 'ORDER_PENDING', pb.body);
+  await db.charterQuote.update({ where: { id: 'O_new_with_order' }, data: { quoteStatus: 'new' } });
+  check('有訂單但狀態被改回 new（舊資料，直接寫 DB）', (await row('O_new_with_order')).quoteStatus === 'new');
   fp.O_new_with_order = (await db.charterOrder.findUnique({ where: { quoteId: 'O_new_with_order' } })).quoteFingerprint;
   await db.charterQuote.update({ where: { id: 'O_sent' }, data: { quoteStatus: 'SENT', sentAt: new Date() } });
   await db.charterQuote.update({ where: { id: 'O_confirmed' }, data: { quoteStatus: 'CONFIRMED', sentAt: new Date() } });

@@ -63,7 +63,8 @@ test('legacy-restore: ORDER_PENDING, STAFF_PRICED, order with status put back to
   const cases = {
     ORDER_PENDING: async (id) => { await makeOrder(id); },
     STAFF_PRICED: async (id) => { await makeOrder(id); await staffPrice(id); },
-    'order + status edited back to new': async (id) => { await makeOrder(id); assert.equal(await save(id, { quoteStatus: 'new', quoteDraftText: get(id).quoteDraftText, recommendedVehicle: get(id).recommendedVehicle }), 200); assert.equal(get(id).quoteStatus, 'new'); },
+    // v12: PATCH no longer moves an order row out of the order flow (409); the status is put back directly (old data).
+    'order + status edited back to new': async (id) => { await makeOrder(id); assert.equal(await save(id, { quoteStatus: 'new', quoteDraftText: get(id).quoteDraftText, recommendedVehicle: get(id).recommendedVehicle }), 409); assert.equal(get(id).quoteStatus, 'ORDER_PENDING'); get(id).quoteStatus = 'new'; },
     'order + DRAFT': async (id) => { await makeOrder(id); get(id).quoteStatus = 'DRAFT'; },
     'order + HANDOFF': async (id) => { await makeOrder(id); get(id).quoteStatus = 'HANDOFF'; },
     SENT: async (id) => { Object.assign(get(id), { quoteStatus: 'SENT', sentAt: new Date('2026-11-01T00:00:00Z') }); },

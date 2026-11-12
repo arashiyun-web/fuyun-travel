@@ -1,7 +1,7 @@
 // In-memory stand-in for the Prisma calls used by lib/quoteArchive.ts regenerate / legacy-restore (v11).
-// $executeRaw interprets the one conditional UPDATE in guardedDraftWrite by its SQL text and parameters,
-// with the same semantics as PostgreSQL (the real statement is exercised in quotes-v10-db-proof.cjs).
-const { isDeepStrictEqual } = require('node:util');
+// $executeRaw interprets the conditional UPDATEs (guardedDraftWrite, v12 send) by their SQL text and
+// parameters, with the same semantics as PostgreSQL (the real statements run in quotes-legacy-db-proof.cjs).
+const { applyGuardedUpdate } = require('./route-prisma.cjs');
 
 const clone = (v) => (v == null ? v : structuredClone(v));
 
@@ -38,11 +38,6 @@ function createQuoteDb() {
     },
     updateMany: async ({ where, data }) => { needTable(); const hit = db.orders.filter((o) => matches(o, where)); for (const o of hit) Object.assign(o, clone(data)); return { count: hit.length }; },
   };
-  const UPDATE_SHAPE = [
-    'UPDATE charter_quotes AS q', 'SET quote_draft_text = ', 'recommended_vehicle = ', 'quote_options = CAST(',
-    'WHERE q.id = ', 'AND q.quote_status = ', 'AND q.quote_status NOT IN (', 'AND q.sent_at IS NULL',
-    'AND q.quote_draft_text IS NOT DISTINCT FROM ', 'AND q.recommended_vehicle IS NOT DISTINCT FROM ', 'AND q.quote_options IS NOT DISTINCT FROM CAST(',
-  ];
   const tx = {
     charterQuote, charterOrder,
     $queryRaw: async (strings, ...values) => {
@@ -51,29 +46,15 @@ function createQuoteDb() {
       if (/FOR UPDATE/.test(text)) return get(values[0]) ? [{ id: values[0] }] : [];
       throw new Error(`unexpected $queryRaw: ${text}`);
     },
+    // v12: one interpreter for every guarded UPDATE (route-prisma.cjs): each WHERE clause the code sends is
+    // evaluated with PostgreSQL semantics, so dropping a clause from the code changes the outcome here.
     $executeRaw: async (query) => {
-      const text = query.sql;
-      db.sql.push(text);
-      let at = 0;
-      for (const part of UPDATE_SHAPE) { const i = text.indexOf(part, at); if (i < 0) throw new Error(`guarded UPDATE lost "${part}"`); at = i + part.length; }
-      const v = query.values;
-      const [newText, newVehicle, newOptions, id, status] = v;
-      const lockedCount = v.length - 8;
-      const locked = v.slice(5, 5 + lockedCount);
-      if (JSON.stringify(locked) !== JSON.stringify(['SENT', 'CONFIRMED', 'ARCHIVED', 'ORDER_PENDING', 'STAFF_PRICED'])) throw new Error(`guarded UPDATE locked statuses changed: ${JSON.stringify(locked)}`);
-      const [expText, expVehicle, expOptions] = v.slice(5 + lockedCount);
-      const noOrderClause = /NOT EXISTS \(SELECT 1 FROM charter_orders o WHERE o\.quote_id = q\.id\)/.test(text);
-      const row = get(id);
-      if (!row) return 0;
-      const options = row.quoteOptions === undefined ? null : row.quoteOptions;
-      const ok = row.quoteStatus === status && !locked.includes(row.quoteStatus) && row.sentAt == null &&
-        (row.quoteDraftText ?? null) === expText && (row.recommendedVehicle ?? null) === expVehicle &&
-        isDeepStrictEqual(options, expOptions == null ? null : JSON.parse(expOptions)) &&
-        (!noOrderClause || !db.orders.some((o) => o.quoteId === id));
-      if (!ok) return 0;
-      db.writes.push(id);
-      Object.assign(row, { quoteDraftText: newText, recommendedVehicle: newVehicle, quoteOptions: JSON.parse(newOptions) });
-      return 1;
+      db.sql.push(query.sql);
+      return applyGuardedUpdate(query, {
+        get: async (id) => get(id) || null,
+        write: async (id, data) => { db.writes.push(id); Object.assign(get(id), clone(data)); },
+        orderFor: (id) => db.orders.some((o) => o.quoteId === id),
+      });
     },
   };
   const prisma = { ...tx, $transaction: async (fn) => fn(tx) };
