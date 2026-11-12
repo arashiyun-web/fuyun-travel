@@ -62,6 +62,9 @@ mock('@/lib/line/webhookEvents', {
 mock('@/lib/members/lineMember', { lineMemberUid: () => null, rememberLineMember: async () => {} });
 const pushed = [];
 mock('@/lib/lineApi', { pushLineText: async (...args) => { pushed.push(args); } });
+// v13: the send route adds { retryKey, timeoutMs } (X-Line-Retry-Key = UUIDv5(quote id, LINE user, text)).
+const { quoteSendRetryKey } = load('lib/lineRetryKey.ts');
+const sentWith = (id, to, text) => [to, text, { retryKey: quoteSendRetryKey(id, to, text), timeoutMs: 8000 }];
 
 const archiveRoute = load('app/api/admin/quotes/[id]/archive/route.ts');
 const restoreRoute = load('app/api/admin/quotes/[id]/restore/route.ts');
@@ -404,7 +407,7 @@ test('guard v6: 40 人 台北→台中 untouched auto range draft sends 200 with
   rows.push({ ...base, id: 'q-kb', pickup: '台北', destination: '台中', passengerCount: 40, quoteStatus: 'new', ...prefill });
   const response = await sendQuote('q-kb');
   assert.equal(response.status, 200);
-  assert.deepEqual(pushed, [['U-mock', prefill.quoteDraftText]]);
+  assert.deepEqual(pushed, [sentWith('q-kb', 'U-mock', prefill.quoteDraftText)]);
   assert.equal(row('q-kb').quoteStatus, 'SENT');
   sendEvidence.untouched = { status: response.status, pushedCount: pushed.length, customerBody: prefill.quoteDraftText, staffLines: prefill.quoteOptions.autoDraft.staffLines };
 });
@@ -421,7 +424,7 @@ test('guard v6: after staff edit and save, the draft sends OK with exactly the e
   assert.equal(meta.engine, 'rangeQuote', 'other metadata is kept');
   const response = await sendQuote('q-kb');
   assert.equal(response.status, 200);
-  assert.deepEqual(pushed, [['U-mock', edited]]);
+  assert.deepEqual(pushed, [sentWith('q-kb', 'U-mock', edited)]);
   sendEvidence.edited = { status: response.status, pushed: clone(pushed) };
 });
 
@@ -445,7 +448,7 @@ test('guard v6: internal markers are rejected on every row; legacy clean drafts 
   assert.equal((await response.json()).code, 'FORBIDDEN_MARKER');
   assert.equal(pushed.length, 0);
   assert.equal((await sendQuote('q-draft')).status, 200);
-  assert.deepEqual(pushed, [['U-mock', 'old draft']]);
+  assert.deepEqual(pushed, [sentWith('q-draft', 'U-mock', 'old draft')]);
   assert.equal(sendBlock({ quoteDraftText: 'ok', quoteOptions: { autoDraft: { staffReviewed: false } } }), null, 'unreviewed is no longer a block');
   assert.equal(reviewOnSave({}, 'x'), null, 'rows without autoDraft are untouched');
   sendEvidence.markers = { legacyRef: 409, legacyNote: 409, editedWithMarker: 409, cleanLegacy: 200 };
