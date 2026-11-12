@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
-import { draftReplaceBlock, orderActionBlock } from "@/lib/quoteDraftGuard";
+import { SEND_UNCERTAIN_HINT, draftReplaceBlock, orderActionBlock, orderLocked } from "@/lib/quoteDraftGuard";
 import { legacyDraftView, panelLines } from "@/lib/quotePanelText";
 import { QuoteArchiveButton } from "../QuoteActions";
 
@@ -43,6 +43,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState("");
   const [orderBusy, setOrderBusy] = useState(false);
   const [pricingBusy, setPricingBusy] = useState(false);
+  const [sendBusy, setSendBusy] = useState(false);
   const [orderView, setOrderView] = useState<OrderView | null>(null);
   // v11: restore stays hidden until the order lookup finished and found no order.
   const [orderChecked, setOrderChecked] = useState(false);
@@ -193,14 +194,33 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   }
 
   async function sendQuote() {
+    if (sendBusy) return;
+    setSendBusy(true);
     setMessage("");
     setError("");
-    const response = await fetch(`/api/admin/quotes/${params.id}/send`, { method: "POST" });
-    const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.error || "送出失敗");
-    setQuote(data.quote);
-    trackEvent("quote_sent", { quote_id: params.id });
-    setMessage("已送出正式報價給 LINE 使用者。");
+    try {
+      // v13: once the request has left the browser, a missing or unreadable answer means LINE may already have
+      // delivered it; the server answers LINE_UNCERTAIN in the same case. A retry of the same content within
+      // 24 h is not delivered twice (X-Line-Retry-Key), but staff should look at LINE first.
+      let response: Response;
+      let data: { success?: boolean; error?: string; code?: string; quote?: Quote; alreadyDelivered?: boolean };
+      try {
+        response = await fetch(`/api/admin/quotes/${params.id}/send`, { method: "POST" });
+        data = await response.json();
+      } catch {
+        throw new Error(SEND_UNCERTAIN_HINT);
+      }
+      if (!response.ok || !data.success) {
+        if (data.code === "LINE_UNCERTAIN") throw new Error(data.error || SEND_UNCERTAIN_HINT);
+        if (response.status >= 500 && !data.code) throw new Error(SEND_UNCERTAIN_HINT);
+        throw new Error(data.error || "送出失敗");
+      }
+      if (data.quote) setQuote(data.quote);
+      trackEvent("quote_sent", { quote_id: params.id });
+      setMessage(data.alreadyDelivered ? "LINE 回覆這份內容先前已送達（24 小時內同內容不重複送出），這次沒有再送，已記為已送出。" : "已送出正式報價給 LINE 使用者。");
+    } finally {
+      setSendBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -213,6 +233,8 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   // for ORDER_PENDING / STAFF_PRICED or an order, and until the order lookup has answered.
   const orderUnknownOrPresent = !orderChecked || Boolean(orderView);
   const draftBlock = orderActionBlock(quote, orderUnknownOrPresent, "draft");
+  // v13: the server refuses a different recommended vehicle on these rows (409); read-only here as well.
+  const vehicleLocked = orderLocked(quote.quoteStatus, orderUnknownOrPresent);
   const sendBlocked = orderActionBlock(quote, orderUnknownOrPresent, "send");
 
   return (
@@ -244,7 +266,8 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
 
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
           <label className="block text-xs text-slate-400">建議車型</label>
-          <input value={quote.recommendedVehicle || ""} onChange={(event) => setQuote({ ...quote, recommendedVehicle: event.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 focus:outline-none focus:border-amber-500" />
+          <input value={quote.recommendedVehicle || ""} readOnly={vehicleLocked} onChange={(event) => setQuote({ ...quote, recommendedVehicle: event.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 focus:outline-none focus:border-amber-500" />
+          {orderChecked && vehicleLocked ? <p className="text-xs text-slate-500">已建立訂單，建議車型不能修改。</p> : null}
 
           <p className="text-xs text-slate-400">請先核對整趟行程符合單點方案，再明選路線與時數。備註不會自動決定基本車資。</p>
           <label className="block text-xs text-slate-400" htmlFor="checked-route">已核對路線</label>
@@ -265,7 +288,7 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
             {draftBlock ? null : <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>}
             <button type="button" disabled={orderBusy} onClick={() => makeOrder().catch((err) => setError(err instanceof Error ? err.message : "轉成訂單失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">記下待確認訂單</button>
             <button onClick={() => saveQuote().catch((err) => setError(err instanceof Error ? err.message : "儲存失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">儲存正式報價</button>
-            {sendBlocked ? null : <button disabled={quote.quoteStatus === "ARCHIVED"} onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">送出給 LINE</button>}
+            {sendBlocked ? null : <button type="button" disabled={quote.quoteStatus === "ARCHIVED" || sendBusy} onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">{sendBusy ? "送出中…" : "送出給 LINE"}</button>}
           </div>
           {orderChecked && sendBlocked ? <p className="text-xs text-slate-500">{sendBlocked}「依已核對車資產生草稿」也已停用。</p> : null}
         </div>

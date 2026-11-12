@@ -185,7 +185,7 @@ test('send and fleet draft without an order: as before (200, SENT + sent_at, one
   const r = await send('n1');
   assert.equal(r.status, 200); assert.equal(r.pushed, 1); assert.equal(pushed.at(-1).text, text); assert.equal(pushed.at(-1).to, 'U-mock');
   assert.equal(get('n1').quoteStatus, 'SENT'); assert.ok(get('n1').sentAt instanceof Date);
-  assert.deepEqual(Object.keys(r.body), ['success', 'quote']); assert.equal(r.body.quote.quoteStatus, 'SENT');
+  assert.deepEqual(Object.keys(r.body), ['success', 'quote', 'alreadyDelivered']); assert.equal(r.body.alreadyDelivered, false); assert.equal(r.body.quote.quoteStatus, 'SENT');
   assert.equal((await button('n1', { rateId: 'taipei-jiufen-10h', hours: 10 })).status, 200, 'SENT row: fleet draft still allowed (unchanged)');
   assert.equal((await send('n1')).status, 200, 'SENT row: re-send still allowed (unchanged)');
   // Unchanged refusals.
@@ -194,10 +194,12 @@ test('send and fleet draft without an order: as before (200, SENT + sent_at, one
   assert.equal((await send('e1')).status, 400);
   assert.equal((await send('missing')).status, 404); assert.equal((await button('missing')).status, 404);
   assert.equal((await button('a1', { hours: 0 })).status, 400);
-  // A failing LINE push propagates (route 500 as before); in PostgreSQL the transaction rolls the status back
-  // (proved in the local Postgres route test).
+  // A failing LINE push: v13 answers 500 LINE_UNCERTAIN (the push started, the customer may have it) instead of
+  // throwing; in PostgreSQL the transaction rolls the status back (proved in the local Postgres route test).
   reset([vanRow('f1')]); pushFails = true;
-  await assert.rejects(() => sendRoute.POST(new Request('http://x/s', { method: 'POST' }), { params: { id: 'f1' } }), /LINE Push API failed/);
+  const failed = await sendRoute.POST(new Request('http://x/s', { method: 'POST' }), { params: { id: 'f1' } });
+  assert.equal(failed.status, 500);
+  assert.deepEqual(await failed.json(), { success: false, code: 'LINE_UNCERTAIN', error: guard.SEND_UNCERTAIN_HINT });
   pushFails = false;
 });
 
@@ -278,9 +280,9 @@ test('detail page: send and fleet-draft buttons hidden for order states and unti
   assert.ok(page.includes('const draftBlock = orderActionBlock(quote, orderUnknownOrPresent, "draft");'));
   assert.ok(page.includes('const sendBlocked = orderActionBlock(quote, orderUnknownOrPresent, "send");'));
   assert.ok(page.includes('{draftBlock ? null : <button onClick={() => fillCheckedFare()'));
-  assert.ok(page.includes('{sendBlocked ? null : <button disabled={quote.quoteStatus === "ARCHIVED"} onClick={() => sendQuote()'));
+  assert.ok(page.includes('{sendBlocked ? null : <button type="button" disabled={quote.quoteStatus === "ARCHIVED" || sendBusy} onClick={() => sendQuote()'));
   assert.equal((page.match(/依已核對車資產生草稿<\/button>/g) || []).length, 1);
-  assert.equal((page.match(/送出給 LINE<\/button>/g) || []).length, 1);
+  assert.equal((page.match(/\{sendBusy \? "送出中…" : "送出給 LINE"\}<\/button>/g) || []).length, 1);
   // The page rule equals the API rule for every status × order presence.
   for (const status of ['new', 'DRAFT', 'HANDOFF', 'SENT', 'CONFIRMED', 'ARCHIVED', 'ORDER_PENDING', 'STAFF_PRICED']) {
     for (const hasOrder of [false, true]) {

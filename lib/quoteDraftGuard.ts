@@ -67,3 +67,22 @@ export function statusChangeBlock(current: unknown, requested: string, hasOrder:
   if (STAFF_SETTABLE_STATUSES.indexOf(requested) < 0) return STATUS_NOT_ALLOWED_ERROR;
   return null;
 }
+
+export const ORDER_VEHICLE_ERROR = "這筆詢價已經建立訂單，不能修改建議車型（訂單依目前車型核對）。";
+
+/** v13: the recommended vehicle as PATCH stores it (cleanText(…, 120)); null and "" are the same. */
+export function normalizeVehicle(value: unknown) {
+  return String(value || "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+/**
+ * v13: PATCH on a row in the order flow or with an order may not change recommended_vehicle (part of the
+ * order's quoteFingerprint, lib/charterOrder.ts). Pass the order lookup made under the row lock.
+ */
+export function vehicleChangeBlock(current: { quoteStatus?: unknown; recommendedVehicle?: unknown }, requestedVehicle: string, hasOrder: boolean): string | null {
+  if (!orderLocked(current.quoteStatus, hasOrder)) return null;
+  return normalizeVehicle(current.recommendedVehicle) === normalizeVehicle(requestedVehicle) ? null : ORDER_VEHICLE_ERROR;
+}
+
+/** v13: shown whenever a LINE send may have been delivered but was not confirmed (server and admin page). */
+export const SEND_UNCERTAIN_HINT = "LINE 沒有確認結果，可能已送達，請先確認 LINE 再重送。（同內容 24 小時內重送不會重複送達）";

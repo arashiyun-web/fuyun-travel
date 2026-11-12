@@ -35,11 +35,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // v12: under the row lock (options are read after a restore/regenerate in progress, not before) and with the
   // status allowlist: removal and restore go through /archive and /restore so the previous status is kept;
   // order-flow rows keep their status; otherwise only new, DRAFT or HANDOFF (lib/quoteDraftGuard.ts).
-  const result = await patchQuoteGuarded(params.id, requested, (current) => {
+  // v13: a row with an order keeps its recommended vehicle (409 if a different one is sent) and its options.
+  const recommendedVehicle = cleanText(body.recommendedVehicle, 120);
+  const result = await patchQuoteGuarded(params.id, requested, recommendedVehicle, (current, ordered) => {
     // Saving an edited auto draft marks it staff-reviewed so it can be sent; unchanged text stays blocked.
-    const reviewed = reviewOnSave(current.quoteOptions, quoteDraftText);
+    const reviewed = ordered ? null : reviewOnSave(current.quoteOptions, quoteDraftText);
     return {
-      recommendedVehicle: cleanText(body.recommendedVehicle, 120),
+      recommendedVehicle,
       quoteDraftText,
       quoteStatus: requested,
       ...(reviewed ? { quoteOptions: reviewed as Prisma.InputJsonObject } : {}),
