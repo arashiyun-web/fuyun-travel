@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
+const { routeTx } = require('./test-support/route-prisma.cjs');
 
 const root = path.resolve(__dirname, '..');
 let rows = [];
@@ -26,15 +27,18 @@ const matches = (row, where = {}) => {
   return true;
 };
 const writes = [];
-mock('@/lib/prisma', { prisma: {
+mock('@/lib/prisma', { prisma: routeTx({ // v12: send / draft / PATCH run in a transaction (route-prisma.cjs)
   charterQuote: {
     findUnique: async ({ where }) => clone(rows.find((r) => r.id === where.id) || null),
     findMany: async ({ where, take } = {}) => clone(rows.filter((r) => matches(r, where)).slice(0, take || 100)),
     update: async ({ where, data }) => { writes.push(where.id); return clone(Object.assign(rows.find((r) => r.id === where.id), clone(data))); },
     updateMany: async ({ where, data }) => { const hit = rows.filter((r) => matches(r, where)); for (const r of hit) { writes.push(r.id); Object.assign(r, clone(data)); } return { count: hit.length }; },
   },
-  charterOrder: { findMany: async ({ where }) => clone(orders.filter((o) => where.quoteId.in.includes(o.quoteId))) },
-} });
+  charterOrder: {
+    findMany: async ({ where }) => clone(orders.filter((o) => where.quoteId.in.includes(o.quoteId))),
+    findUnique: async ({ where }) => clone(orders.find((o) => o.quoteId === where.quoteId) || null),
+  },
+}) });
 mock('@/lib/adminQuoteAuth', { verifyAdminMutation: () => true, verifyAdminRequest: () => true, unauthorized: () => Response.json({}, { status: 401 }) });
 const pushed = [];
 mock('@/lib/lineApi', { pushLineText: async (to, text) => { pushed.push(text); } });
@@ -68,10 +72,10 @@ const VAN = { tripDate: '2026-12-20', passengerCount: 6, pickup: '台北車站',
 const BUS = { tripDate: '2026-12-20', passengerCount: 40, pickup: '台北', destination: '台中', remark: '' };
 const DEPOSIT = '需要訂金。金額與取消規則未定。';
 
-// ---- 1. reviewer v8 batch (unchanged script, pinned) ----
-test('reviewer v8 batch (unchanged script): all 39 soft-hyphen/LRM/variation-selector cases (36 leaked in v8) and the legacy deposit line now 409', () => {
+// ---- 1. reviewer v8 batch (pinned; v12: Prisma double wrapped in routeTx(), two lines, cases unchanged) ----
+test('reviewer v8 batch (pinned copy): all 39 soft-hyphen/LRM/variation-selector cases (36 leaked in v8) and the legacy deposit line now 409', () => {
   const file = path.join(__dirname, 'test-support/review/v8-new-proof.cjs');
-  assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), '52df9905fa5dbd8a344aa3945b187579fe1bece5e8d81f969c7b9e86ca4f473d');
+  assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), '107e5297af62e807c800eee4073a0468762357996c17bdea4293ffe0fcf9a66f');
   const r = spawnSync(process.execPath, [file, root], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
@@ -208,11 +212,11 @@ test('prefill, list summary and the fleet button use created_at: 8/7 (2026-06-25
 });
 
 
-// ---- 救火員 v9 review scripts, pinned. v9-new-proof.cjs is byte-identical to the reviewer's original.
+// ---- 救火員 v9 review scripts, pinned. v9-new-proof.cjs: v12 wraps its Prisma double in routeTx() (two lines).
 // v9-year-proof.cjs and v9-regenerate-db-proof.cjs differ only in their trip-date constants (now the fictional 8/7,
 // same created_at; boundary timestamps shifted by the same 7 days; weekdays unchanged), see the handoff notes. ----
 const V9_REVIEW = {
-  'v9-new-proof.cjs': '6bff73040e33d1c9cfaf0035e7e6fb47639c4dd37271094111c27768b0b6c44f',
+  'v9-new-proof.cjs': '9c519e0a912de2ed539cd04e0627cc75423a0cf08455aa9e52d661ae1c19b83e',
   'v9-year-proof.cjs': '4211fa31b83b2870227ff43089c655c86b08f46ea99ee5a97a64f522dd060e6b',
   // Needs a throwaway local PostgreSQL (DATABASE_URL); run by hand, not in the offline suite. Pinned here.
   'v9-regenerate-db-proof.cjs': 'a9d2fc85011345df3517303be0c2d005021cdaffc5dc2b3c209fb3b2b0c17ab7',
@@ -229,7 +233,7 @@ function runReview(name) {
   return out;
 }
 
-test('reviewer v9 batch (unchanged script): 280 bypass variants 409, 30 emoji/combining legit texts 200', () => {
+test('reviewer v9 batch (pinned copy): 280 bypass variants 409, 30 emoji/combining legit texts 200', () => {
   const out = runReview('v9-new-proof.cjs');
   assert.equal(out.summary.bypass, 280);
   assert.deepEqual(out.summary.bypassNot409, []);

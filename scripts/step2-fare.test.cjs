@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
+const { routeTx } = require('./test-support/route-prisma.cjs');
 let row;
 let order;
 const tx = {
@@ -15,7 +16,7 @@ const tx = {
     create: async ({ data }) => (order = { id: 'order-fixture', ...structuredClone(data) }),
   },
 };
-mock('@/lib/prisma', { prisma: { ...tx, $transaction: async (fn) => fn(tx) } });
+mock('@/lib/prisma', { prisma: routeTx(tx) }); // v12: guarded UPDATEs (route-prisma.cjs)
 let loggedIn = true;
 mock('@/lib/adminQuoteAuth', {
   verifyAdminMutation: () => loggedIn,
@@ -62,7 +63,13 @@ test('F3: draft → API reread → convert uses persisted inputs and ignores edi
   assert.equal(converted.ok, true);
   assert.equal(converted.order.baseAmountTwd, 7000);
   assert.equal((await readOrderForQuote('q')).stale, false);
-  await post({ hours: 9 });
+  // v12: the fleet button is refused once an order exists (409), so the order cannot be made stale from here.
+  const afterOrder = await post({ hours: 9 });
+  assert.equal(afterOrder.status, 409);
+  assert.equal(row.quoteOptions.fleetFare.hours, 10);
+  assert.equal((await readOrderForQuote('q')).stale, false);
+  // A change that still reaches the row (e.g. an older client or a direct DB edit) is caught as before.
+  row.quoteOptions = { ...row.quoteOptions, fleetFare: { ...row.quoteOptions.fleetFare, hours: 9 } };
   assert.equal((await readOrderForQuote('q')).stale, true);
   assert.equal((await convertConfirmedQuote('q')).status, 409);
 });

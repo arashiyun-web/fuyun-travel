@@ -51,7 +51,7 @@ function missingOrderTable(error: unknown) {
   return /charter_orders/.test(message) && /does not exist|不存在/.test(message);
 }
 
-async function hasOrder(tx: Prisma.TransactionClient, quoteId: string) {
+export async function hasOrder(tx: Prisma.TransactionClient, quoteId: string) {
   try {
     return Boolean(await tx.charterOrder.findUnique({ where: { quoteId }, select: { id: true } }));
   } catch (error) {
@@ -184,7 +184,7 @@ export function regenerateIds(value: unknown): string[] | null {
   return Array.from(new Set(value as string[]));
 }
 
-type QuoteRow = NonNullable<Awaited<ReturnType<typeof prisma.charterQuote.findUnique>>>;
+export type QuoteRow = NonNullable<Awaited<ReturnType<typeof prisma.charterQuote.findUnique>>>;
 
 /** Test seam only (like ConvertHooks in charterOrder.ts): runs inside the transaction right before the UPDATE. */
 export type DraftWriteHooks = { beforeWrite?: (tx: Prisma.TransactionClient, quoteId: string) => Promise<void> };
@@ -204,41 +204,49 @@ function snapshotOptions(value: unknown) {
   return out;
 }
 
-async function orderTablePresent(tx: Prisma.TransactionClient) {
+export async function orderTablePresent(tx: Prisma.TransactionClient) {
   const rows = await tx.$queryRaw<Array<{ present: boolean }>>`SELECT to_regclass('charter_orders') IS NOT NULL AS present`;
   return Boolean(rows[0] && rows[0].present);
 }
 
 /** Row lock shared with archiveQuote and convertConfirmedQuote (order creation), then a fresh read. */
-async function lockRow(tx: Prisma.TransactionClient, quoteId: string) {
+export async function lockRow(tx: Prisma.TransactionClient, quoteId: string) {
   const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM charter_quotes WHERE id = ${quoteId} FOR UPDATE`;
   if (!locked.length) return null;
   return tx.charterQuote.findUnique({ where: { id: quoteId } });
 }
 
-function jsonParam(value: unknown) {
+/** v12: the 「no order」 part of every guarded UPDATE (omitted only where charter_orders does not exist). */
+export function noOrderSql(ordersTable: boolean) {
+  return ordersTable ? Prisma.sql` AND NOT EXISTS (SELECT 1 FROM charter_orders o WHERE o.quote_id = q.id)` : Prisma.empty;
+}
+
+export function jsonParam(value: unknown) {
   return value === null || value === undefined ? null : JSON.stringify(value);
 }
 
 /**
- * v11: the only write used by regenerateLegacy and legacy-restore. The state guard is repeated in the
- * UPDATE itself: it changes the row only while it is exactly as read (status, sent_at, draft text,
- * recommended vehicle and quote_options), its status is none of DRAFT_LOCKED_STATUSES, sent_at is null and
- * no charter_orders row exists for it. Returns the number of rows written (0 or 1).
+ * v11: the only write used by regenerateLegacy and legacy-restore (v12: and, with `scope.locked` =
+ * ORDER_STATUSES and `scope.unsentOnly` = false, the fleet draft button). The state guard is repeated in the
+ * UPDATE itself: it changes the row only while it is exactly as read (status, draft text, recommended vehicle
+ * and quote_options), its status is none of `scope.locked` (default DRAFT_LOCKED_STATUSES), sent_at is null
+ * (unless unsentOnly is false) and no charter_orders row exists for it. Returns the number of rows written.
  */
-async function guardedDraftWrite(
+export async function guardedDraftWrite(
   tx: Prisma.TransactionClient,
   expected: QuoteRow,
   data: { quoteDraftText: string; recommendedVehicle: string | null; quoteOptions: Record<string, unknown> },
   ordersTable: boolean,
+  scope: { locked: readonly string[]; unsentOnly: boolean } = { locked: DRAFT_LOCKED_STATUSES, unsentOnly: true },
 ) {
-  const noOrder = ordersTable ? Prisma.sql` AND NOT EXISTS (SELECT 1 FROM charter_orders o WHERE o.quote_id = q.id)` : Prisma.empty;
+  const noOrder = noOrderSql(ordersTable);
+  const unsent = scope.unsentOnly ? Prisma.sql`
+      AND q.sent_at IS NULL` : Prisma.empty;
   const query = Prisma.sql`UPDATE charter_quotes AS q
     SET quote_draft_text = ${data.quoteDraftText}, recommended_vehicle = ${data.recommendedVehicle}, quote_options = CAST(${JSON.stringify(data.quoteOptions)} AS jsonb)
     WHERE q.id = ${expected.id}
       AND q.quote_status = ${expected.quoteStatus}
-      AND q.quote_status NOT IN (${Prisma.join(DRAFT_LOCKED_STATUSES.slice())})
-      AND q.sent_at IS NULL
+      AND q.quote_status NOT IN (${Prisma.join(scope.locked.slice())})${unsent}
       AND q.quote_draft_text IS NOT DISTINCT FROM ${expected.quoteDraftText}
       AND q.recommended_vehicle IS NOT DISTINCT FROM ${expected.recommendedVehicle}
       AND q.quote_options IS NOT DISTINCT FROM CAST(${jsonParam(expected.quoteOptions)} AS jsonb)${noOrder}`;

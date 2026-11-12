@@ -7,13 +7,14 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
+const { routeTx } = require('./test-support/route-prisma.cjs'); // v12: send / draft / PATCH run in a transaction
 
 const rows = [];
 const clone = (v) => (v == null ? v : structuredClone(v));
-mock('@/lib/prisma', { prisma: { charterQuote: {
+mock('@/lib/prisma', { prisma: routeTx({ charterQuote: {
   findUnique: async ({ where }) => clone(rows.find((r) => r.id === where.id) || null),
   update: async ({ where, data }) => clone(Object.assign(rows.find((r) => r.id === where.id), clone(data))),
-} } });
+} }) });
 mock('@/lib/adminQuoteAuth', { verifyAdminMutation: () => true, verifyAdminRequest: () => true, unauthorized: () => Response.json({}, { status: 401 }) });
 const pushed = [];
 mock('@/lib/lineApi', { pushLineText: async (to, text) => { pushed.push({ to, text }); } });

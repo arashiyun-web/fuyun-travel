@@ -1,6 +1,9 @@
 // The reviewer's own proof scripts, run UNCHANGED (byte-identical copies in scripts/test-support/review/,
 // sha256 checked below): v6 point-7 87 cases and the v7 extra set (621 paste variants, complete-row
 // sends, fleet-button hints, legit texts). Each runs in a child process against this checkout.
+// v12: in both copies the in-memory Prisma double is wrapped in routeTx() (scripts/test-support/route-prisma.cjs),
+// because send / fleet draft / PATCH now run in a transaction with a conditional UPDATE. Two lines per file
+// (the mock's first and last line); every case and expected value is the reviewer's. Diffs in the handoff notes.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -9,8 +12,8 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const SCRIPTS = {
-  'v6-87case-proof.cjs': 'b7bcf981a5895583e1cea4ebda82f95dd5a98f755fdaf8eee19598604dca02ae',
-  'v7-extra-proof.cjs': '45fdac8acc06457f4f39435f1fdc44e3bb6ebc0a2b2d153e5349be1c93b6077c',
+  'v6-87case-proof.cjs': '00957a9c28c69096b08cc5b7ccdafeaeb26a1db61cd146326171a099709525dd',
+  'v7-extra-proof.cjs': 'b97f2cd71d613c7f03d1c62e8fd0fc2cf6ef977429ee77128a7c743485ec954d',
 };
 function run(name) {
   const file = path.join(__dirname, 'test-support/review', name);
@@ -23,7 +26,7 @@ function run(name) {
   return out;
 }
 
-test('reviewer v6 87 cases (unchanged script): all as expected', () => {
+test('reviewer v6 87 cases (pinned copy): all as expected', () => {
   const out = run('v6-87case-proof.cjs');
   assert.equal(out.cases.length, 87);
   assert.deepEqual(out.summary.unexpected, []);
@@ -37,7 +40,7 @@ test('reviewer v6 87 cases (unchanged script): all as expected', () => {
   assert.equal(out.fleetButton.send.status, 200);
 });
 
-test('reviewer v7 extra set (unchanged script): 621/621 variants 409, complete rows 200, legit 200', () => {
+test('reviewer v7 extra set (pinned copy): 621/621 variants 409, complete rows 200, legit 200', () => {
   const out = run('v7-extra-proof.cjs');
   assert.deepEqual(out.summary.completeRowsUneditedNot200, [], '7a: complete big-bus drafts send unchanged');
   assert.equal(out.summary.bypassCases, 621);
@@ -54,12 +57,13 @@ test('reviewer v7 extra set (unchanged script): 621/621 variants 409, complete r
 
 // ---- v8 own tests: stored button hints, amount-only fragments, and the 200 invariant ----
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
+const { routeTx } = require('./test-support/route-prisma.cjs'); // v12: send / draft / PATCH run in a transaction
 const rows = [];
 const clone = (v) => (v == null ? v : structuredClone(v));
-mock('@/lib/prisma', { prisma: { charterQuote: {
+mock('@/lib/prisma', { prisma: routeTx({ charterQuote: {
   findUnique: async ({ where }) => clone(rows.find((r) => r.id === where.id) || null),
   update: async ({ where, data }) => clone(Object.assign(rows.find((r) => r.id === where.id), clone(data))),
-} } });
+} }) });
 mock('@/lib/adminQuoteAuth', { verifyAdminMutation: () => true, verifyAdminRequest: () => true, unauthorized: () => Response.json({}, { status: 401 }) });
 const pushed = [];
 mock('@/lib/lineApi', { pushLineText: async (to, text) => { pushed.push(text); } });

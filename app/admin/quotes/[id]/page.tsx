@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { savedFleetFare } from "@/lib/fleetFareInput";
 import { trackEvent } from "@/lib/analytics";
-import { draftReplaceBlock } from "@/lib/quoteDraftGuard";
+import { draftReplaceBlock, orderActionBlock } from "@/lib/quoteDraftGuard";
 import { legacyDraftView, panelLines } from "@/lib/quotePanelText";
 import { QuoteArchiveButton } from "../QuoteActions";
 
@@ -99,7 +99,9 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
   async function loadOrder() {
     const response = await fetch(`/api/admin/quotes/${params.id}/order`, { cache: "no-store" });
     const data = await response.json();
-    if (response.status === 404) {
+    // 404: no order. v12: 503 means charter_orders does not exist on this database, so there is no order either
+    // (the server guards treat a missing table the same way).
+    if (response.status === 404 || response.status === 503) {
       setOrderView(null);
       setOrderChecked(true);
       return;
@@ -207,6 +209,11 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
 
   if (error && !quote) return <div className="p-6 text-red-300">{error}</div>;
   if (!quote) return <div className="p-6 text-slate-300">讀取中...</div>;
+  // v12: 「依已核對車資產生草稿」 and 「送出給 LINE」 use the same order guard as the server (409 there); hidden
+  // for ORDER_PENDING / STAFF_PRICED or an order, and until the order lookup has answered.
+  const orderUnknownOrPresent = !orderChecked || Boolean(orderView);
+  const draftBlock = orderActionBlock(quote, orderUnknownOrPresent, "draft");
+  const sendBlocked = orderActionBlock(quote, orderUnknownOrPresent, "send");
 
   return (
     <div className="min-h-[calc(100vh-160px)] text-slate-100 space-y-6">
@@ -255,11 +262,12 @@ export default function QuoteEditPage({ params }: { params: { id: string } }) {
           <textarea value={quote.quoteDraftText || ""} onChange={(event) => setQuote({ ...quote, quoteDraftText: event.target.value })} rows={16} className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 font-mono text-sm focus:outline-none focus:border-amber-500" />
 
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>
+            {draftBlock ? null : <button onClick={() => fillCheckedFare().catch((err) => setError(err instanceof Error ? err.message : "草稿產生失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">依已核對車資產生草稿</button>}
             <button type="button" disabled={orderBusy} onClick={() => makeOrder().catch((err) => setError(err instanceof Error ? err.message : "轉成訂單失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50">記下待確認訂單</button>
             <button onClick={() => saveQuote().catch((err) => setError(err instanceof Error ? err.message : "儲存失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-amber-400 hover:bg-amber-300">儲存正式報價</button>
-            <button disabled={quote.quoteStatus === "ARCHIVED"} onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">送出給 LINE</button>
+            {sendBlocked ? null : <button disabled={quote.quoteStatus === "ARCHIVED"} onClick={() => sendQuote().catch((err) => setError(err instanceof Error ? err.message : "送出失敗"))} className="px-4 py-2 rounded-xl text-xs font-bold tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">送出給 LINE</button>}
           </div>
+          {orderChecked && sendBlocked ? <p className="text-xs text-slate-500">{sendBlocked}「依已核對車資產生草稿」也已停用。</p> : null}
         </div>
       </div>
 

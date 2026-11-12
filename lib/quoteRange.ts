@@ -53,6 +53,13 @@ const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
  * the next such date on or after `now` (Asia/Taipei) is used; callers that have the row pass its
  * created_at as `now` (yearBaseOf). Saturday/Sunday = 假日. National
  * holidays are not known here, so a weekday answer says staff confirm holidays.
+ *
+ * v12: a multi-day range written right after the start date (10/16 ~ 17, 10/16-10/17, 10/16〜17, 10月16-17日,
+ * 10月16日～10月17日, 2026/10/16-17, full-width forms, an optional （五） after each day) also returns `days`,
+ * `weekend` and a label for both ends. The year still comes from the start date only, so the start
+ * weekday is the same as for the single date; the end year follows the start (next year when the end
+ * month is before the start month). dayType is "holiday" when any day of the range is a Saturday or
+ * Sunday. A range that is not a valid later date within 14 days falls back to the start date alone.
  */
 /**
  * v9: base date for reading a trip date without a year: the inquiry's created_at, so an 8/7 asked on
@@ -65,12 +72,52 @@ export function yearBaseOf(createdAt: Date | string | null | undefined, fallback
   return Number.isFinite(at.getTime()) ? at : fallback;
 }
 
-export function dayTypeOf(date: string | null | undefined, now = new Date()): { dayType: DayType; label: string } | null {
+export type TripDay = {
+  dayType: DayType;
+  label: string;
+  /** v12, ranges only: number of days (2..14) and whether any of them is a Saturday or Sunday. */
+  days?: number;
+  weekend?: boolean;
+};
+
+export const TRIP_RANGE_MAX_DAYS = 14;
+const DAY_MS = 24 * 3600e3;
+// After NFKC: ~ (from ～), 〜 (wave dash), hyphen/dashes, 至, 到.
+const RANGE_END = /^(?:\s*[(（]\s*(?:週|周|星期|禮拜)?[一二三四五六日天]\s*[)）])?\s*(?:[~〜\-‐‑‒–—―−]|至|到)\s*(?:(\d{4})\s*[-/.年]\s*)?(?:(\d{1,2})\s*[-/.月]\s*)?(\d{1,2})\s*[日號号]?(?!\d|\s*[:：]|\.\d|\s*(?:人|位|名|座|吋|件|個|台|輛|車|點|時|小時|分|天|夜|晚|元))/;
+
+function weekdayLabel(at: Date) {
+  return `${at.getUTCMonth() + 1}/${at.getUTCDate()}（週${WEEKDAY_NAMES[at.getUTCDay()]}）`;
+}
+
+function isWeekend(at: Date) {
+  return at.getUTCDay() === 0 || at.getUTCDay() === 6;
+}
+
+function validDate(year: number, month: number, day: number) {
+  const at = new Date(Date.UTC(year, month - 1, day));
+  return at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day ? at : null;
+}
+
+/** v12: end of a range written right after the start date, or null (then only the start date is used). */
+function rangeEnd(rest: string, start: Date): Date | null {
+  const end = rest.match(RANGE_END);
+  if (!end) return null;
+  const month = end[2] ? Number(end[2]) : start.getUTCMonth() + 1;
+  let year = end[1] ? Number(end[1]) : start.getUTCFullYear();
+  if (!end[1] && month < start.getUTCMonth() + 1) year += 1;
+  const at = validDate(year, month, Number(end[3]));
+  if (!at) return null;
+  const days = Math.round((at.getTime() - start.getTime()) / DAY_MS) + 1;
+  return days >= 2 && days <= TRIP_RANGE_MAX_DAYS ? at : null;
+}
+
+export function dayTypeOf(date: string | null | undefined, now = new Date()): TripDay | null {
   const value = (date || "").normalize("NFKC");
   const full = value.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
   const short = value.match(/(?<!\d)(\d{1,2})\s*[/月]\s*(\d{1,2})\s*[日號]?/);
   let year: number, month: number, day: number;
   const today = new Date(now.getTime() + 8 * 3600e3);
+  const match = full || short;
   if (full) [year, month, day] = [Number(full[1]), Number(full[2]), Number(full[3])];
   else if (short) {
     [month, day] = [Number(short[1]), Number(short[2])];
@@ -80,6 +127,13 @@ export function dayTypeOf(date: string | null | undefined, now = new Date()): { 
   } else return null;
   const at = new Date(Date.UTC(year, month - 1, day));
   if (at.getUTCMonth() !== month - 1 || at.getUTCDate() !== day) return null;
+  const end = match && match.index != null ? rangeEnd(value.slice(match.index + match[0].length), at) : null;
+  if (end) {
+    const days = Math.round((end.getTime() - at.getTime()) / DAY_MS) + 1;
+    let weekend = false;
+    for (let i = 0; i < days; i += 1) if (isWeekend(new Date(at.getTime() + i * DAY_MS))) weekend = true;
+    return { dayType: weekend ? "holiday" : "weekday", label: `${weekdayLabel(at)}～${weekdayLabel(end)}`, days, weekend };
+  }
   const weekday = at.getUTCDay();
   return { dayType: weekday === 0 || weekday === 6 ? "holiday" : "weekday", label: `${month}/${day}（週${WEEKDAY_NAMES[weekday]}）` };
 }
@@ -92,6 +146,11 @@ function money(value: number) {
 export function busDriverFeeLine(date: string | null | undefined, now = new Date()) {
   const day = dayTypeOf(date, now);
   if (!day) return `司機服務費另計：平日 ${money(BUS_DRIVER_FEE.weekday)}、假日 ${money(BUS_DRIVER_FEE.holiday)}`;
+  // v12: multi-day trips are charged per day; the wording names both ends and never one weekday for all days.
+  if (day.days) {
+    if (day.weekend) return `司機服務費另計（每日計）：${day.label}含週末，平日 ${money(BUS_DRIVER_FEE.weekday)}、週末及國定假日 ${money(BUS_DRIVER_FEE.holiday)}`;
+    return `司機服務費另計（每日計）：${day.label}皆為平日，每日 ${money(BUS_DRIVER_FEE.weekday)}（如遇國定假日，該日以假日 ${money(BUS_DRIVER_FEE.holiday)} 計）`;
+  }
   if (day.dayType === "holiday") return `司機服務費另計：${day.label}為假日，${money(BUS_DRIVER_FEE.holiday)}`;
   return `司機服務費另計：${day.label}為平日，${money(BUS_DRIVER_FEE.weekday)}（如遇國定假日以假日 ${money(BUS_DRIVER_FEE.holiday)} 計）`;
 }

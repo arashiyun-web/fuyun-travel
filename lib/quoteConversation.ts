@@ -92,7 +92,9 @@ export function rangeLines(fields: ConversationFields, now = new Date()) {
   const price = rangeText(range);
   if (price) {
     const day = range.dayType ? dayTypeOf(fields.date, now) : null;
-    const dayLabel = day ? `，${day.label}${range.dayType === "holiday" ? "假日" : "平日"}` : range.holidayHigher ? "，平日" : "";
+    // v12: a multi-day range that touches a weekend says so (假日 band); it never names one weekday for all days.
+    const dayWord = day && day.days ? (day.weekend ? "含週末，假日" : "皆為平日") : range.dayType === "holiday" ? "假日" : "平日";
+    const dayLabel = day ? `，${day.label}${dayWord}` : range.holidayHigher ? "，平日" : "";
     lines.push(`初步行情：${range.routeLabel ? `${range.routeLabel}${dayLabel} ` : ""}${price}`);
     if (range.holidayHigher) lines.push("假日價格略高，確認日期後提供假日範圍。");
     if (range.note) lines.push(range.note);

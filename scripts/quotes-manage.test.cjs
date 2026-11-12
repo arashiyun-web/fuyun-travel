@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { mock, load } = require('./test-support/step2-load-ts.cjs');
+const { routeTx } = require('./test-support/route-prisma.cjs');
 
 let rows;
 let orders;
@@ -46,7 +47,7 @@ const lineSession = {
   findUnique: async ({ where }) => clone(sessions[where.userId] || null),
   upsert: async ({ where, create }) => { sessions[where.userId] = clone(create); return create; },
 };
-mock('@/lib/prisma', { prisma: { ...tx, lineSession, $transaction: async (fn) => fn(tx) } });
+mock('@/lib/prisma', { prisma: routeTx({ ...tx, lineSession }) }); // v12: guarded UPDATEs (route-prisma.cjs)
 let loggedIn = true;
 mock('@/lib/adminQuoteAuth', {
   verifyAdminMutation: () => loggedIn,
