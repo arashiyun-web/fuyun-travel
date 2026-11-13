@@ -4,6 +4,7 @@ import { requestOrigin } from '@/lib/adminAuth';
 import { aiApi } from '@/lib/aiApi/runtime';
 import { inputSchemas, type Operation } from './schema.mjs';
 import { AiApiError, errorResponse } from './errors';
+import type { Identity } from './store';
 
 const descriptions: Record<Operation, string> = {
   get_quote: 'Get an indicative charter price range. Vehicle and final price require human confirmation.',
@@ -11,9 +12,11 @@ const descriptions: Record<Operation, string> = {
   create_booking: 'Create a pending-review request. This does not confirm a booking or issue a formal quote. Use the HTTP Idempotency-Key header for safe replay within 24 hours.',
 };
 export async function serveMcp(request: Request) {
+  const auditRequest = request.clone(); const started = Date.now();
+  let operation: Operation | undefined; let auditInput: unknown; let identity: Identity | undefined; let executing = false;
   try {
     // Authorization and shared limits apply to every HTTP request, including discovery and unsupported verbs.
-    const identity = await aiApi.authorize(request);
+    identity = await aiApi.authorize(request);
     if (request.headers.has('Origin') && request.headers.get('Origin') !== requestOrigin(request)) {
       throw new AiApiError(403, 'Origin is not allowed');
     }
@@ -25,6 +28,7 @@ export async function serveMcp(request: Request) {
     if (rpc.jsonrpc !== '2.0' || typeof rpc.method !== 'string') throw new AiApiError(400, 'Invalid JSON-RPC request');
     // The SDK reports schema failures inside a 200 tool error. Public contract requires HTTP 400 with issue paths.
     if (rpc.method === 'tools/call' && rpc.params?.name && Object.hasOwn(inputSchemas, rpc.params.name)) {
+      operation = rpc.params.name as Operation; auditInput = rpc.params.arguments;
       if (rpc.id === undefined) throw new AiApiError(400, 'Tool calls require a JSON-RPC id');
       aiApi.validate(rpc.params.name as Operation, rpc.params.arguments);
     }
@@ -35,7 +39,8 @@ export async function serveMcp(request: Request) {
       server.registerTool(name, { description: descriptions[name], inputSchema: inputSchemas[name],
         annotations: { readOnlyHint: name !== 'create_booking', destructiveHint: false, openWorldHint: false } }, async (input) => {
         try {
-          const result = await aiApi.execute(name, input, identity, request.headers.get('Idempotency-Key'));
+          executing = true;
+          const result = await aiApi.execute(name, input, identity!, request.headers.get('Idempotency-Key'), { source: 'mcp' });
           return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
         } catch (error) {
           toolError = error;
@@ -50,5 +55,14 @@ export async function serveMcp(request: Request) {
       response.headers.set('Cache-Control', 'no-store');
       return response;
     } finally { await server.close(); }
-  } catch (error) { return errorResponse(error); }
+  } catch (error) {
+    if (!executing) {
+      if (!operation && request.method === 'POST') {
+        const audit = await auditRequest.json().catch(() => null);
+        if (audit?.method === 'tools/call' && Object.hasOwn(inputSchemas, audit?.params?.name || '')) { operation = audit.params.name; auditInput = audit.params.arguments; }
+      }
+      if (operation) await aiApi.observe(operation, auditInput, identity, started, error, 'mcp').catch(() => {});
+    }
+    return errorResponse(error);
+  }
 }

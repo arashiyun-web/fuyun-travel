@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 type ReviewStatus = "pending_review" | "confirmed" | "rejected";
 type Booking = {
-  id: string; bookingNumber: string; contactName: string; phone: string; email: string | null;
+  source: string; contactChannel: string; contactId: string | null; luggageCount: number | null;
+  id: string; bookingNumber: string; contactName: string; phone: string | null; email: string | null;
   date: string; endDate: string | null; time: string; pickup: string; destination: string;
   passengerCount: number; vehicle: string | null; notes: string | null; quoteRange: unknown;
   status: ReviewStatus; isTest: boolean; notificationStatus: string;
@@ -65,7 +66,9 @@ export default function AiBookingDetails({ id }: { id: string }) {
   }
 
   const fields = booking ? [
-    ['聯絡人', booking.contactName], ['電話', booking.phone], ['Email', booking.email || '未填'],
+    ['來源', booking.source === 'web_chat' ? '網頁客服' : 'API'], ['聯絡管道', booking.contactChannel || 'phone'],
+    ['通訊 ID', booking.contactId || '未填'], ['行李件數', String(booking.luggageCount ?? '未填')],
+    ['聯絡人', booking.contactName], ['電話', booking.phone || '未填'], ['Email', booking.email || '未填'],
     ['日期與時間', `${booking.date}${booking.endDate ? ` ～ ${booking.endDate}` : ''} ${booking.time}`],
     ['路線', `${booking.pickup} → ${booking.destination}`], ['人數與車型', `${booking.passengerCount} 人／${booking.vehicle || '未指定'}`],
   ] : [];

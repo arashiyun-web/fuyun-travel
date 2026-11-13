@@ -1,3 +1,4 @@
+import { emitToolEvent, toolEvent } from './events';
 import { customerRange, dayTypeOf, rangeVehicle, MIDIBUS_TERMS_NOTE, SURCHARGE_NOTE } from '@/lib/quoteRange';
 import { BUS_DRIVER_FEE } from '@/lib/busRangeTable';
 import { validateInput, type Operation, type BookingInput, type TripInput, type QuoteResult } from './schema.mjs';
@@ -15,7 +16,25 @@ export class AiApiService {
     if (!parsed.success) throw new AiApiError(400, 'Invalid input', undefined, parsed.error.issues.map(i => ({ path: i.path, message: i.message })));
     return parsed.data;
   }
-  async execute(name: Operation, raw: unknown, identity: Identity, idempotency: string | null) {
+  async observe(name: Operation, raw: unknown, identity: Identity | undefined, started: number, error?: unknown, source: 'api' | 'mcp' = 'api', bookingId: string | null = null) {
+    try {
+    const status = error instanceof AiApiError ? error.status : error ? 503 : 200;
+    await emitToolEvent(toolEvent({ source, tool: name, outcome: status === 200 ? 'ok' : status === 429 ? 'limited' : status < 500 ? 'invalid' : 'error',
+      latency_ms: Math.max(0, Date.now() - started), prompt_version: null, model_id: null, subject: identity?.id || (error instanceof AiApiError ? error.subject : null) || null, booking_id: bookingId, error_code: status === 200 ? null : String(status) }, raw), this.store.recordToolEvent);
+    } catch { /* Observation failures cannot change API behavior. */ }
+  }
+  async execute(name: Operation, raw: unknown, identity: Identity, idempotency: string | null, options: { record?: boolean; source?: 'api' | 'mcp' } = {}) {
+    const started = Date.now(); let bookingId: string | null = null;
+    try {
+      const result = await this.executeOperation(name, raw, identity, idempotency, id => { bookingId = id; });
+      if (options.record !== false) await this.observe(name, raw, identity, started, undefined, options.source, bookingId);
+      return result;
+    } catch (error) {
+      if (options.record !== false) await this.observe(name, raw, identity, started, error, options.source);
+      throw error;
+    }
+  }
+  private async executeOperation(name: Operation, raw: unknown, identity: Identity, idempotency: string | null, bookingCreated: (id: string) => void) {
     const input = this.validate(name, raw);
     if (name === 'get_quote') return this.quote(input);
     if (name === 'check_availability') return { status: 'pending_human_confirmation', requires_human_confirmation: true,
@@ -24,6 +43,7 @@ export class AiApiService {
       throw new AiApiError(400, 'Invalid input', undefined, [{ path: ['Idempotency-Key'], message: 'Use 1–200 printable ASCII characters without spaces' }]);
     }
     const result = await this.store.createBooking(identity, input as BookingInput, idempotency, this.now());
+    bookingCreated(result.booking.id);
     if (!result.replay) {
       try { await this.notify(result.booking.id); }
       catch { await this.store.notificationFailed(result.booking.id).catch(() => {}); }

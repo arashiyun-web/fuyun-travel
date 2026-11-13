@@ -16,12 +16,15 @@
     "openapi:check": "node scripts/ai-api-openapi.mjs --check"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.117",
+    "@ai-sdk/react": "4.0.176",
     "@anthropic-ai/sdk": "^0.120.0",
     "@aws-sdk/client-s3": "^3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@prisma/client": "^6.19.0",
     "@vercel/functions": "^2.2.13",
+    "ai": "7.0.172",
     "lucide-react": "^0.468.0",
     "next": "^14.2.18",
     "nodemailer": "^6.9.16",

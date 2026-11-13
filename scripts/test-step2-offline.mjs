@@ -13,7 +13,7 @@ const excluded = new Map([
   ['tools/vercel-ascii.test.mjs', 'requires Windows PowerShell'],
 ]);
 const files = [];
-for (const dir of ['scripts', 'scripts/ops', 'scripts/test-support']) {
+for (const dir of ['scripts', 'scripts/ops', 'scripts/test-support', 'scripts/ai-chat']) {
   for (const file of readdirSync(dir).sort()) {
     if (!/\.test\.(mjs|cjs)$/.test(file)) continue;
     if (excluded.has(file)) continue;
