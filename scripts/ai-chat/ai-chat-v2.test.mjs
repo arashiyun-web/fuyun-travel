@@ -25,8 +25,8 @@ const message = (text,id='a') => ({id,role:'assistant',parts:[{type:'text',text}
 test('v2 launcher has real readable approved label and raw scoped style text',()=>{
   const Widget=load('components/AIChatWidget.tsx').default;
   const html=renderToStaticMarkup(React.createElement(Widget));
-  assert.match(html,/>AI 旅遊管家</);
-  assert.match(html,/aria-label="開啟 AI 旅遊管家"/);
+  assert.match(html,/>AI travel concierge</);
+  assert.match(html,/aria-label="Open AI travel concierge"/);
   assert.doesNotMatch(html,/<style>[\s\S]*?&gt;/);
   assert.doesNotMatch(html,/富運/);
 });
@@ -43,7 +43,7 @@ test('v2 contact row has four real controls, placeholders cannot navigate, compa
 test('v2 language menu exposes exactly the approved three option names',()=>{
   const html=panel({menuOpen:true});
   const options=Array.from(html.matchAll(/role="option"[^>]*aria-label="([^"]+)"/g),m=>m[1]);
-  assert.deepEqual(options,['繁中','简中','English']);
+  assert.deepEqual(options,['繁體中文','简体中文','English']);
 });
 test('v2 paused, limited, long and network states have distinct actionable copy',()=>{
   for(const [issue,title] of [[{kind:'paused'},'AI 客服暫停服務中'],[{kind:'limited',retryAfter:73},'詢問太頻繁了'],[{kind:'tooLong'},'訊息太長'],[{kind:'network'},'網路連線中斷']]) {

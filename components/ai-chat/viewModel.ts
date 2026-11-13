@@ -5,7 +5,7 @@ export type ContactName = 'line' | 'whatsapp' | 'wechat' | 'phone';
 export type Contacts = { line: string | null; whatsapp: string | null; wechat: string | null; phone: string };
 export type ChatIssue = { kind: 'paused' | 'limited' | 'tooLong' | 'network'; retryAfter?: number };
 export type ContactHint = { channel: ContactName; message: string } | null;
-export type Summary = { messageId: string; text: string; rows: Array<[string, string]> };
+export type Summary = { messageId: string; text: string; rows: Array<[string, string]>; vehicle?: string };
 export function latestSummary(messages: UIMessage[]): Summary | null {
   const last = messages.at(-1);
   if (!last || last.role !== 'assistant' || last.parts.some(p => 'output' in p && p.output && typeof p.output === 'object' && 'kind' in p.output && p.output.kind === 'booking')) return null;
@@ -22,7 +22,32 @@ export function latestSummary(messages: UIMessage[]): Summary | null {
     const match = /^\s*(?:[-*•]\s*)?([^:：]{1,22})[:：]\s*(.+?)\s*$/.exec(line);
     if (match && /聯絡|联系|上車|上车|下車|下车|日期|時間|时间|人數|人数|行李|車型|车型|contact|name|pick|drop|date|time|passenger|party|luggage|bags|vehicle/i.test(match[1])) rows.push([match[1], match[2]]);
   }
-  return { messageId: last.id, text, rows };
+  let vehicle: string | undefined;
+  if (!rows.some(([label]) => /車型|车型|vehicle/i.test(label))) {
+    const part = messages.flatMap(message => message.parts).reverse().find(part =>
+      'output' in part && part.output && typeof part.output === 'object' && 'kind' in part.output && part.output.kind === 'quote');
+    if (part && 'input' in part && part.input && typeof part.input === 'object' && 'output' in part) {
+      const trip = part.input as Record<string, unknown>;
+      const result = part.output as { quote?: { vehicle?: unknown } };
+      const row = (label: RegExp) => rows.find(([name]) => label.test(name))?.[1] || '';
+      const party = /^(\d+)\s*(?:人|位|people|passengers?)$/i.exec(row(/人數|人数|passengers|party/i));
+      const matches = (value: unknown, label: RegExp) => typeof value === 'string' && !!value && row(label).includes(value);
+      if (party && Number(party[1]) === trip.passenger_count && matches(trip.date, /日期|date/i) &&
+          matches(trip.pickup, /上車|上车|pick.?up/i) && matches(trip.destination, /下車|下车|drop.?off/i) &&
+          typeof result.quote?.vehicle === 'string') vehicle = result.quote.vehicle;
+    }
+  }
+  return { messageId: last.id, text, rows, ...(vehicle ? { vehicle } : {}) };
+}
+// passenger_count is the total party size, including children (quoteSchema).
+// Never relabel this total as adults or derive counts from free-form notes.
+export function partyDetails(trip: Record<string, unknown>, locale: Locale): string | undefined {
+  const count = trip.passenger_count;
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) return undefined;
+  const people = locale === 'en' ? `${count} passenger${count === 1 ? '' : 's'}` : `${count} 人`;
+  const bags = trip.luggage_count;
+  if (typeof bags !== 'number' || !Number.isInteger(bags) || bags < 0) return people;
+  return people + (locale === 'en' ? ` · ${bags} bag${bags === 1 ? '' : 's'}` : `・行李 ${bags} 件`);
 }
 export function phoneHref(phone: string) { return 'tel:' + phone.replace(/[^\d+]/g, ''); }
 export function retrySeconds(value: string | null, now = Date.now()): number | undefined {
@@ -40,7 +65,8 @@ export function viewportVariables(viewport: { height: number; offsetTop: number 
   return { '--fy-viewport-height': Math.max(1, Math.round(viewport.height)) + 'px',
     '--fy-viewport-top': Math.max(0, Math.round(viewport.offsetTop)) + 'px' } as CSSProperties;
 }
-export function lockBodyScroll(body: Pick<HTMLElement, 'style'>, view: { scrollY: number; scrollTo: (x: number, y: number) => void }) {
+export function lockBodyScroll(body: Pick<HTMLElement, 'style'> & Partial<Pick<HTMLElement, 'getAttribute' | 'removeAttribute'>>, view: { scrollY: number; scrollTo: (x: number, y: number) => void }) {
+  const hadStyle = body.getAttribute?.('style') !== null;
   const properties = ['overflow', 'position', 'top', 'left', 'right', 'width'];
   const saved = properties.map(name => ({ name, value: body.style.getPropertyValue(name), priority: body.style.getPropertyPriority(name) }));
   const y = view.scrollY;
@@ -48,6 +74,8 @@ export function lockBodyScroll(body: Pick<HTMLElement, 'style'>, view: { scrollY
   properties.forEach((name, index) => body.style.setProperty(name, next[index]));
   return () => {
     saved.forEach(({ name, value, priority }) => value ? body.style.setProperty(name, value, priority) : body.style.removeProperty(name));
+    // Read the serialized attribute after CSSOM removals before removing it.
+    if (!hadStyle && body.getAttribute?.('style') === '') body.removeAttribute?.('style');
     view.scrollTo(0, y);
   };
 }

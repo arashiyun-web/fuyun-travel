@@ -17,7 +17,7 @@ const React = require('react');
 const { renderToString } = require('react-dom/server');
 test('widget SSR preserves raw scoped CSS for hydration and renders all three initial locales', () => {
   const Widget = load('components/AIChatWidget.tsx').default;
-  for (const [pathname, label] of [['/en','AI 旅遊管家'],['/zh-cn','AI 旅遊管家'],['/','AI 旅遊管家']]) {
+  for (const [pathname, label] of [['/en','AI travel concierge'],['/zh-cn','AI 旅遊管家'],['/','AI 旅遊管家']]) {
     path = pathname;
     const html = renderToString(React.createElement(Widget));
     assert.ok(html.includes(label), pathname);
