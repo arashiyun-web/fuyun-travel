@@ -25,7 +25,7 @@ async function events(response) {
 function handler(f, model, extras = {}) {
   const { createChatHandler } = feature('lib/chat/handler.ts');
   let notices = 0;
-  const POST = createChatHandler({ apiKey: () => 'offline-model-fixture', model: () => model, store: f.store, aiApi: f.api, notify: async () => { notices++; }, now: () => now, ...extras });
+  const POST = createChatHandler({ modelName: () => 'offline-configured-model', apiKey: () => 'offline-model-fixture', model: () => model, store: f.store, aiApi: f.api, notify: async () => { notices++; }, now: () => now, ...extras });
   return { POST, notices: () => notices };
 }
 test('mock SDK streams quote then summary then confirmed booking card; replay creates one pending_review order and one notice', async () => {
@@ -87,7 +87,7 @@ test('missing configuration, validation, 413 and 429 return safe no-store JSON w
   const f = await fixture();
   try {
     const model = new MockLanguageModelV4({ doStream: () => turn(null, null, 'hello') });
-    const off = handler(f, model, { apiKey: () => undefined });
+    const off = handler(f, model, { modelName: () => 'offline-configured-model', apiKey: () => undefined });
     const missing = await off.POST(request()); assert.equal(missing.status, 503);
     assert.equal(missing.headers.get('Cache-Control'), 'no-store');
     assert.doesNotMatch(await missing.text(), /OPENAI|KEY|DATABASE|offline-model-fixture/);

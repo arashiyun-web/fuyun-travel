@@ -37,7 +37,7 @@ for (const locale of ['zh-CN', 'en']) test('acceptance ' + (locale === 'zh-CN' ?
     const text = locale === 'en' ? 'With 4 passengers and 6 suitcases, I recommend a nine-seat van. ' : '参考范围报价如下。';
     const model = new MockLanguageModelV4({ doStream: [stream('get_quote', input), stream(null, null, text + QUOTE_NOTICES[locale])] });
     const { createChatHandler } = feature('lib/chat/handler.ts');
-    const POST = createChatHandler({ apiKey: () => 'offline', model: () => model, aiApi: f.api, store: f.store, notify: async () => {}, now: () => now });
+    const POST = createChatHandler({ modelName: () => 'offline-configured-model', apiKey: () => 'offline', model: () => model, aiApi: f.api, store: f.store, notify: async () => {}, now: () => now });
     const events = await result(POST, locale, [user(locale === 'en' ? 'Quote Taipei to Jiufen on 2099-12-04, 4 adults and 6 suitcases.' : '请问2099-12-04台北到九份，6人4件行李多少钱？')]);
     const card = events.find(e => e.type === 'tool-output-available').output;
     assert.equal(card.notice, QUOTE_NOTICES[locale]);
