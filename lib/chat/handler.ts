@@ -28,7 +28,8 @@ function logChatStreamError({ error }: { error: unknown }) {
   const status = rec.status ?? rec.statusCode ?? cause?.status ?? cause?.statusCode ?? inner?.status;
   const code = inner?.code ?? rec.code ?? cause?.code;
   const type = (typeof inner?.type === 'string' && inner.type) || (error instanceof Error ? error.name : typeof error);
-  const message = redactSecret(String(inner?.message ?? rec.message ?? cause?.message ?? (error instanceof Error ? error.message : '') || '')).slice(0, 500);
+  const rawMessage = inner?.message ?? rec.message ?? cause?.message ?? (error instanceof Error ? error.message : '');
+  const message = redactSecret(String(rawMessage ?? '')).slice(0, 500);
   console.error('chat.stream', { type, status: status ?? null, code: code ?? null, message });
 }
 export function createChatHandler(deps: Dependencies) {
