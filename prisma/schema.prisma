@@ -385,10 +385,14 @@ model ApiKey {
 model AiBooking {
   id                      String    @id @default(uuid())
   bookingNumber           String    @unique @map("booking_number")
-  apiKeyId                String    @map("api_key_id")
-  apiKey                  ApiKey    @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  apiKeyId                String?   @map("api_key_id")
+  apiKey                  ApiKey?   @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
   contactName             String    @map("contact_name")
-  phone                   String
+  phone                   String?
+  source                  String    @default("api")
+  contactChannel          String    @default("phone") @map("contact_channel")
+  contactId               String?   @map("contact_id")
+  luggageCount            Int?      @map("luggage_count")
   email                   String?
   date                    String
   endDate                 String?   @map("end_date")
@@ -435,3 +439,32 @@ model ApiRateCounter {
 }
 
 /// LINE raw message events (full capture, deduped by messageId + contentHash).
+
+model ChatRateCounter {
+  subject String
+  scope String
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  count Int @default(0)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  @@id([subject, scope, windowStart])
+  @@index([expiresAt])
+  @@map("chat_rate_counters")
+}
+
+model AiToolEvent {
+  id String @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  source String
+  tool String
+  outcome String
+  latencyMs Int @map("latency_ms")
+  promptVersion String? @map("prompt_version")
+  modelId String? @map("model_id")
+  subject String?
+  bookingId String? @map("booking_id")
+  inputDigest String @map("input_digest")
+  errorCode String? @map("error_code")
+  @@index([createdAt])
+  @@index([source, tool, createdAt])
+  @@map("ai_tool_events")
+}
