@@ -78,12 +78,13 @@ test('S28 pushLineText without options is unchanged: no retry key, no timeout, a
     fake.plan({ status: 500 });
     await assert.rejects(() => line.pushLineText('U9', 'n'), (e) => !(e instanceof line.LinePushError) && /^LINE Push API failed: 500 /.test(e.message));
   } finally { restore(); await fake.stop(); delete process.env.LINE_CHANNEL_ACCESS_TOKEN; }
-  // Only the send route passes options; every other caller (webhook, staff notifications) is untouched.
+  // Only the reviewed quote-send and AI staff-notification paths may supply push retry options.
   const callers = ['app', 'lib'].flatMap(function walk(dir) { return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : []); })
     .filter((f) => /pushLineText\(/.test(read(f)) && f !== path.join('lib', 'lineApi.ts'));
+  const retryOptionCallers = new Set([path.join('app', 'api', 'admin', 'quotes', '[id]', 'send', 'route.ts'), path.join('lib', 'aiApi', 'notify.ts')]);
   for (const f of callers) {
     const withKey = /pushLineText\([^)]*retryKey/.test(read(f).replace(/\n/g, ' '));
-    assert.equal(withKey, f === path.join('app', 'api', 'admin', 'quotes', '[id]', 'send', 'route.ts'), f);
+    assert.equal(withKey, retryOptionCallers.has(f), f);
   }
   assert.ok(callers.includes(path.join('app', 'api', 'admin', 'quotes', '[id]', 'send', 'route.ts')));
   assert.doesNotMatch(read('lib/lineApi.ts').split('export async function replyLineText')[1].split('\n}\n')[0], /Retry-Key|signal/);

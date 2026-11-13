@@ -1,0 +1,917 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fuyun Travel AI API",
+    "version": "1.0.0",
+    "description": "Owner-issued bearer key required. Shared limits per key: 30 requests/minute, 1,000/Taipei calendar day; 20 new booking requests/hour. No automatic confirmation or payment. Dates use Asia/Taipei."
+  },
+  "servers": [
+    {
+      "url": "https://fuyuntravel.com"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/public/v1/quote": {
+      "post": {
+        "operationId": "get_quote",
+        "description": "Indicative customerRange price only. Driver fee is separate. Staff confirm national holidays, taxes, vehicle and final fare.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/get_quoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; human confirmation required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/get_quoteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input; issues identify field paths",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or disabled key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the exhausted shared window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/v1/availability": {
+      "post": {
+        "operationId": "check_availability",
+        "description": "Always pending human confirmation. Does not query availability or reserve a vehicle.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/check_availabilityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; human confirmation required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/check_availabilityResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input; issues identify field paths",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or disabled key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the exhausted shared window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/v1/bookings": {
+      "post": {
+        "operationId": "create_booking",
+        "description": "Creates a pending-review request only. No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Same API key and same header return the same request for 24 hours. Replays return HTTP 200 with replay=true.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_bookingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; human confirmation required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/create_bookingResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input; issues identify field paths",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or disabled key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the exhausted shared window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "fyk_ + 32 random bytes encoded as base64url",
+        "description": "Obtain a key from the owner. Keys are never pre-provisioned."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[^\\u0000]*$"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "pattern": "^[^\\u0000]*$"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "get_quoteInput": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "date": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ],
+            "description": "Calendar date YYYY-MM-DD, today or later in Asia/Taipei."
+          },
+          "end_date": {
+            "description": "Optional inclusive trip end date; must be on or after date.",
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ]
+          },
+          "passenger_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "vehicle": {
+            "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "required": [
+          "pickup",
+          "destination",
+          "date",
+          "passenger_count"
+        ],
+        "additionalProperties": false
+      },
+      "get_quoteResult": {
+        "type": "object",
+        "properties": {
+          "price_available": {
+            "type": "boolean"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "const": "TWD"
+          },
+          "day_type": {
+            "type": "string",
+            "enum": [
+              "weekday",
+              "holiday"
+            ]
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "driver_fee": {
+            "type": "object",
+            "properties": {
+              "included": {
+                "type": "boolean",
+                "const": false
+              },
+              "weekday": {
+                "type": "number",
+                "const": 2500
+              },
+              "holiday": {
+                "type": "number",
+                "const": 3500
+              },
+              "amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "const": "per_day"
+              },
+              "note": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "required": [
+              "included",
+              "weekday",
+              "holiday",
+              "amount",
+              "unit",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          "tax_note": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "requires_human_confirmation": {
+            "type": "boolean",
+            "const": true
+          },
+          "note": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "note_en": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "pricing_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "price_available",
+          "low",
+          "high",
+          "currency",
+          "day_type",
+          "vehicle",
+          "route",
+          "driver_fee",
+          "tax_note",
+          "requires_human_confirmation",
+          "note",
+          "note_en",
+          "pricing_note"
+        ],
+        "additionalProperties": false
+      },
+      "check_availabilityInput": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "date": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ],
+            "description": "Calendar date YYYY-MM-DD, today or later in Asia/Taipei."
+          },
+          "end_date": {
+            "description": "Optional inclusive trip end date; must be on or after date.",
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ]
+          },
+          "passenger_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "vehicle": {
+            "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "required": [
+          "pickup",
+          "destination",
+          "date",
+          "passenger_count"
+        ],
+        "additionalProperties": false
+      },
+      "check_availabilityResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "pending_human_confirmation"
+          },
+          "requires_human_confirmation": {
+            "type": "boolean",
+            "const": true
+          },
+          "note": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "note_en": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "required": [
+          "status",
+          "requires_human_confirmation",
+          "note",
+          "note_en"
+        ],
+        "additionalProperties": false
+      },
+      "create_bookingInput": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "date": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ],
+            "description": "Calendar date YYYY-MM-DD, today or later in Asia/Taipei."
+          },
+          "end_date": {
+            "description": "Optional inclusive trip end date; must be on or after date.",
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ]
+          },
+          "passenger_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "vehicle": {
+            "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "contact_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\u0000]*$"
+          },
+          "phone": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^\\+?[0-9][0-9 ()-]{6,23}$"
+              }
+            ]
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "time": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[^\\u0000]*$"
+              },
+              {
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              }
+            ]
+          },
+          "quote_range": {
+            "description": "Optional reference quote only; never a confirmed fare.",
+            "type": "object",
+            "properties": {
+              "price_available": {
+                "type": "boolean"
+              },
+              "low": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "high": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "type": "string",
+                "const": "TWD"
+              },
+              "day_type": {
+                "type": "string",
+                "enum": [
+                  "weekday",
+                  "holiday"
+                ]
+              },
+              "vehicle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "route": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "driver_fee": {
+                "type": "object",
+                "properties": {
+                  "included": {
+                    "type": "boolean",
+                    "const": false
+                  },
+                  "weekday": {
+                    "type": "number",
+                    "const": 2500
+                  },
+                  "holiday": {
+                    "type": "number",
+                    "const": 3500
+                  },
+                  "amount": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "const": "per_day"
+                  },
+                  "note": {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  }
+                },
+                "required": [
+                  "included",
+                  "weekday",
+                  "holiday",
+                  "amount",
+                  "unit",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "tax_note": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              "requires_human_confirmation": {
+                "type": "boolean",
+                "const": true
+              },
+              "note": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              "note_en": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              "pricing_note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "price_available",
+              "low",
+              "high",
+              "currency",
+              "day_type",
+              "vehicle",
+              "route",
+              "driver_fee",
+              "tax_note",
+              "requires_human_confirmation",
+              "note",
+              "note_en",
+              "pricing_note"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "pickup",
+          "destination",
+          "date",
+          "passenger_count",
+          "contact_name",
+          "phone",
+          "time"
+        ],
+        "additionalProperties": false
+      },
+      "create_bookingResult": {
+        "type": "object",
+        "properties": {
+          "booking_number": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_review",
+              "confirmed",
+              "rejected"
+            ]
+          },
+          "replay": {
+            "type": "boolean"
+          },
+          "is_test": {
+            "type": "boolean"
+          },
+          "requires_human_confirmation": {
+            "type": "boolean",
+            "const": true
+          },
+          "note": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "note_en": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "required": [
+          "booking_number",
+          "status",
+          "replay",
+          "is_test",
+          "requires_human_confirmation",
+          "note",
+          "note_en"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

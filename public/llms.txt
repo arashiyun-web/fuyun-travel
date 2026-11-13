@@ -41,3 +41,9 @@
 - 合法登記旅行社與遊覽車公司（甲種旅行社登記證號 882200）
 - 品保協會會員（北2760），投保履約保證保險
 - 企業、學校、家族旅遊皆可安排
+
+## AI 代理 API 與 MCP
+
+- [OpenAPI 3.1 說明](https://fuyuntravel.com/openapi.json)：POST `/api/public/v1/quote`、`/api/public/v1/availability`、`/api/public/v1/bookings`，皆須老闆核發的 Bearer 金鑰。
+- [MCP Streamable HTTP](https://fuyuntravel.com/api/mcp)：`get_quote`、`check_availability`、`create_booking`，沿用相同金鑰與限流。
+- 報價為參考範圍，車況與最終價格須專人確認；送出訂單僅供待審，不會自動成交或付款。訂單重送請沿用 `Idempotency-Key`（24 小時）。

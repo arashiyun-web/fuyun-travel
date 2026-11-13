@@ -1,0 +1,16 @@
+import type { z } from 'zod';
+export type Operation = 'get_quote' | 'check_availability' | 'create_booking';
+export type TripInput = { pickup: string; destination: string; date: string; end_date?: string; passenger_count: number; vehicle?: string; notes?: string };
+export type QuoteResult = { price_available: boolean; low: number | null; high: number | null; currency: 'TWD'; day_type: 'weekday' | 'holiday'; vehicle: string | null; route: string | null; driver_fee: { included: false; weekday: 2500; holiday: 3500; amount: number | null; unit: 'per_day'; note: string }; tax_note: string; requires_human_confirmation: true; note: string; note_en: string; pricing_note: string | null };
+export type BookingInput = TripInput & { contact_name: string; phone: string; email?: string; time: string; quote_range?: QuoteResult };
+export const quoteSchema: z.ZodType<TripInput>;
+export const availabilitySchema: z.ZodType<TripInput>;
+export const bookingSchema: z.ZodType<BookingInput>;
+export const quoteResultSchema: z.ZodType<QuoteResult>;
+export const availabilityResultSchema: z.ZodType;
+export const bookingResultSchema: z.ZodType;
+export const errorSchema: z.ZodType;
+export const inputSchemas: Record<Operation, z.ZodType<TripInput | BookingInput>>;
+export const outputSchemas: Record<Operation, z.ZodType>;
+export function taipeiDate(now?: Date): string;
+export function validateInput(name: Operation, input: unknown, now?: Date, allowPastDate?: boolean): { success: true; data: TripInput | BookingInput } | { success: false; error: { issues: Array<{ path: PropertyKey[]; message: string }> } };

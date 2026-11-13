@@ -366,4 +366,72 @@ model LineWebhookEvent {
   @@map("line_webhook_events")
 }
 
+/// External AI API credentials: only SHA-256 of the full key is stored.
+model ApiKey {
+  id         String    @id @default(uuid())
+  keyHash    String    @unique @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  name       String
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  disabledAt DateTime? @map("disabled_at") @db.Timestamptz(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  bookings   AiBooking[]
+  counters   ApiRateCounter[]
+
+  @@map("api_keys")
+}
+
+/// A request for human review only; never a confirmed quote or CharterOrder.
+model AiBooking {
+  id                      String    @id @default(uuid())
+  bookingNumber           String    @unique @map("booking_number")
+  apiKeyId                String    @map("api_key_id")
+  apiKey                  ApiKey    @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  contactName             String    @map("contact_name")
+  phone                   String
+  email                   String?
+  date                    String
+  endDate                 String?   @map("end_date")
+  time                    String
+  pickup                  String
+  destination             String
+  passengerCount          Int       @map("passenger_count")
+  vehicle                 String?
+  notes                   String?
+  quoteRange              Json?     @map("quote_range")
+  status                  String    @default("pending_review")
+  isTest                  Boolean   @default(false) @map("is_test")
+  /// Active SHA-256 idempotency key; cleared only after its 24h expiry to release the unique slot.
+  idempotencyKey          String?   @map("idempotency_key")
+  idempotencyExpiresAt    DateTime? @map("idempotency_expires_at") @db.Timestamptz(6)
+  notificationStatus     String    @default("pending") @map("notification_status")
+  notificationAttempts   Int       @default(0) @map("notification_attempts")
+  notificationLastError  String?   @map("notification_last_error")
+  notificationRetryKey   String    @default(uuid()) @map("notification_retry_key")
+  notificationClaim      String?   @map("notification_claim")
+  notificationClaimExpiresAt DateTime? @map("notification_claim_expires_at") @db.Timestamptz(6)
+  notificationDeliveries Json?     @map("notification_deliveries")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([apiKeyId, idempotencyKey])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@map("ai_bookings")
+}
+
+/// Shared fixed-window limits; atomic PostgreSQL upsert, never process-local counters.
+model ApiRateCounter {
+  apiKeyId   String   @map("api_key_id")
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  scope      String
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  count      Int      @default(0)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@id([apiKeyId, scope, windowStart])
+  @@index([expiresAt])
+  @@map("api_rate_counters")
+}
+
 /// LINE raw message events (full capture, deduped by messageId + contentHash).
