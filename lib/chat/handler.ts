@@ -9,13 +9,14 @@ import { ipSubject } from './rateLimit';
 import { customerConfirmed, isConfirmation, safeModelText, replyLocale } from './guard';
 import { CHAT_SYSTEM_PROMPT, QUOTE_NOTICES, BOOKING_NOTICES, PROMPT_VERSION } from './systemPrompt';
 import type { ChatStore } from './store';
-type Dependencies = { apiKey: () => string | undefined; model: () => LanguageModel; store: ChatStore; aiApi: AiApiService; notify: (id: string) => Promise<unknown>; now?: () => Date };
+type Dependencies = { apiKey: () => string | undefined; modelName: () => string | undefined; model: (name: string) => LanguageModel; store: ChatStore; aiApi: AiApiService; notify: (id: string) => Promise<unknown>; now?: () => Date };
 export function createChatHandler(deps: Dependencies) {
   return async function POST(request: Request) {
     let releasePending: (() => Promise<void>) | undefined;
     try {
       const body = await parseChatRequest(request);
-      if (!deps.apiKey()?.trim()) throw new AiApiError(503, 'Service temporarily unavailable. Please use the contact buttons.');
+      const modelName = deps.modelName?.()?.trim();
+      if (!deps.apiKey()?.trim() || !modelName) throw new AiApiError(503, 'Service temporarily unavailable. Please use the contact buttons.');
       const now = deps.now?.() || new Date();
       const subject = ipSubject(request.headers);
       const latest = body.messages.at(-1)?.parts.filter(p => p.type === 'text').map(p => p.text).join('') || '';
@@ -94,7 +95,7 @@ export function createChatHandler(deps: Dependencies) {
         for (const event of pending.splice(0)) await emitToolEvent({ ...event, model_id: modelId }, deps.store.recordToolEvent);
       };
       const result = streamText({
-        model: deps.model(), system: CHAT_SYSTEM_PROMPT + '\nInterface language: ' + body.locale,
+        model: deps.model(modelName), system: CHAT_SYSTEM_PROMPT + '\nInterface language: ' + body.locale,
         messages: await convertToModelMessages(body.messages.slice(-20)),
         tools, maxOutputTokens: 800, stopWhen: stepCountIs(5), maxRetries: 0, abortSignal: request.signal,
         onError: () => {},

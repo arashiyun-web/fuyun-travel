@@ -9,6 +9,7 @@ export const maxDuration = 60;
 const store = createChatStore(aiDatabase);
 export const POST = createChatHandler({
   apiKey: () => process.env.OPENAI_API_KEY,
-  model: () => openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
+  modelName: () => process.env.OPENAI_MODEL,
+  model: name => openai(name),
   aiApi, store, notify: notifyBooking,
 });
