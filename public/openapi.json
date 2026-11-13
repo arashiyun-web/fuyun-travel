@@ -277,9 +277,11 @@
         "properties": {
           "error": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Safe public error message without credentials or private upstream details."
           },
           "issues": {
+            "description": "Field validation issues when available.",
             "type": "array",
             "items": {
               "type": "object",
@@ -296,11 +298,13 @@
                         "type": "number"
                       }
                     ]
-                  }
+                  },
+                  "description": "Path to the invalid input field, including nested indexes."
                 },
                 "message": {
                   "type": "string",
-                  "pattern": "^[^\\u0000]*$"
+                  "pattern": "^[^\\u0000]*$",
+                  "description": "Validation issue for the indicated field."
                 }
               },
               "required": [
@@ -321,13 +325,15 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Pickup address or departure location."
           },
           "destination": {
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Destination address or route name."
           },
           "date": {
             "type": "string",
@@ -356,7 +362,8 @@
           "passenger_count": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60
+            "maximum": 60,
+            "description": "Total passengers including adults and children, 1–60."
           },
           "vehicle": {
             "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
@@ -366,6 +373,7 @@
             "pattern": "^[^\\u0000]*$"
           },
           "notes": {
+            "description": "Optional trip requirements; never an authoritative price.",
             "type": "string",
             "maxLength": 2000,
             "pattern": "^[^\\u0000]*$"
@@ -377,13 +385,15 @@
           "date",
           "passenger_count"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Reference quote request; staff must confirm all prices."
       },
       "get_quoteResult": {
         "type": "object",
         "properties": {
           "price_available": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether an approved reference range is available."
           },
           "low": {
             "anyOf": [
@@ -394,7 +404,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Reference lower price in TWD; null when staff pricing is needed."
           },
           "high": {
             "anyOf": [
@@ -405,18 +416,21 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Reference upper price in TWD; null when staff pricing is needed."
           },
           "currency": {
             "type": "string",
-            "const": "TWD"
+            "const": "TWD",
+            "description": "Currency: New Taiwan dollars."
           },
           "day_type": {
             "type": "string",
             "enum": [
               "weekday",
               "holiday"
-            ]
+            ],
+            "description": "Existing weekday/holiday classification; staff verify public holidays."
           },
           "vehicle": {
             "anyOf": [
@@ -427,7 +441,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Recommended vehicle label, if known."
           },
           "route": {
             "anyOf": [
@@ -438,24 +453,29 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Matched route label, if known."
           },
           "driver_fee": {
             "type": "object",
             "properties": {
               "included": {
                 "type": "boolean",
-                "const": false
+                "const": false,
+                "description": "Driver service fee is always charged separately."
               },
               "weekday": {
                 "type": "number",
-                "const": 2500
+                "const": 2500,
+                "description": "Weekday reference driver service fee per day in TWD."
               },
               "holiday": {
                 "type": "number",
-                "const": 3500
+                "const": 3500,
+                "description": "Holiday reference driver service fee per day in TWD."
               },
               "amount": {
+                "description": "Applicable daily driver fee, or null for multi-day verification.",
                 "type": [
                   "number",
                   "null"
@@ -463,11 +483,13 @@
               },
               "unit": {
                 "type": "string",
-                "const": "per_day"
+                "const": "per_day",
+                "description": "Driver fee unit, per day."
               },
               "note": {
                 "type": "string",
-                "pattern": "^[^\\u0000]*$"
+                "pattern": "^[^\\u0000]*$",
+                "description": "Staff confirmation and driver service fee terms."
               }
             },
             "required": [
@@ -478,23 +500,28 @@
               "unit",
               "note"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Separate driver service fee details; never included in the reference range."
           },
           "tax_note": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Tax and vehicle-specific terms requiring staff confirmation."
           },
           "requires_human_confirmation": {
             "type": "boolean",
-            "const": true
+            "const": true,
+            "description": "Always true; this is not a formal quote or reservation."
           },
           "note": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Traditional Chinese reference-price disclaimer."
           },
           "note_en": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "English reference-price disclaimer."
           },
           "pricing_note": {
             "anyOf": [
@@ -505,7 +532,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Existing price-range explanation, surcharges or staff-pricing notice."
           }
         },
         "required": [
@@ -523,7 +551,8 @@
           "note_en",
           "pricing_note"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Unchanged indicative customerRange quote result."
       },
       "check_availabilityInput": {
         "type": "object",
@@ -532,13 +561,15 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Pickup address or departure location."
           },
           "destination": {
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Destination address or route name."
           },
           "date": {
             "type": "string",
@@ -567,7 +598,8 @@
           "passenger_count": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60
+            "maximum": 60,
+            "description": "Total passengers including adults and children, 1–60."
           },
           "vehicle": {
             "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
@@ -577,6 +609,7 @@
             "pattern": "^[^\\u0000]*$"
           },
           "notes": {
+            "description": "Optional trip requirements; never an authoritative price.",
             "type": "string",
             "maxLength": 2000,
             "pattern": "^[^\\u0000]*$"
@@ -588,26 +621,31 @@
           "date",
           "passenger_count"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Availability inquiry; always pending human confirmation, no live inventory."
       },
       "check_availabilityResult": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "const": "pending_human_confirmation"
+            "const": "pending_human_confirmation",
+            "description": "Always pending staff confirmation; no real-time availability is claimed."
           },
           "requires_human_confirmation": {
             "type": "boolean",
-            "const": true
+            "const": true,
+            "description": "Always true; no vehicle has been reserved."
           },
           "note": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Traditional Chinese pending-availability notice."
           },
           "note_en": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "English pending-availability notice."
           }
         },
         "required": [
@@ -625,13 +663,15 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Pickup address or departure location."
           },
           "destination": {
             "type": "string",
             "minLength": 1,
             "maxLength": 300,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Destination address or route name."
           },
           "date": {
             "type": "string",
@@ -660,7 +700,8 @@
           "passenger_count": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60
+            "maximum": 60,
+            "description": "Total passengers including adults and children, 1–60."
           },
           "vehicle": {
             "description": "Vehicle preference, e.g. 大巴, 中巴, 九人座. Omit to infer using existing quote rules.",
@@ -670,6 +711,7 @@
             "pattern": "^[^\\u0000]*$"
           },
           "notes": {
+            "description": "Optional trip requirements; never an authoritative price.",
             "type": "string",
             "maxLength": 2000,
             "pattern": "^[^\\u0000]*$"
@@ -678,7 +720,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Traveler or contact name."
           },
           "phone": {
             "type": "string",
@@ -689,9 +732,11 @@
               {
                 "pattern": "^\\+?[0-9][0-9 ()-]{6,23}$"
               }
-            ]
+            ],
+            "description": "Required contact phone with 8–15 digits; optional leading + and separators."
           },
           "email": {
+            "description": "Optional contact email address.",
             "type": "string",
             "maxLength": 254,
             "format": "email",
@@ -706,14 +751,16 @@
               {
                 "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
               }
-            ]
+            ],
+            "description": "Departure time HH:mm in Asia/Taipei."
           },
           "quote_range": {
             "description": "Optional reference quote only; never a confirmed fare.",
             "type": "object",
             "properties": {
               "price_available": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "Whether an approved reference range is available."
               },
               "low": {
                 "anyOf": [
@@ -724,7 +771,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Reference lower price in TWD; null when staff pricing is needed."
               },
               "high": {
                 "anyOf": [
@@ -735,18 +783,21 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Reference upper price in TWD; null when staff pricing is needed."
               },
               "currency": {
                 "type": "string",
-                "const": "TWD"
+                "const": "TWD",
+                "description": "Currency: New Taiwan dollars."
               },
               "day_type": {
                 "type": "string",
                 "enum": [
                   "weekday",
                   "holiday"
-                ]
+                ],
+                "description": "Existing weekday/holiday classification; staff verify public holidays."
               },
               "vehicle": {
                 "anyOf": [
@@ -757,7 +808,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Recommended vehicle label, if known."
               },
               "route": {
                 "anyOf": [
@@ -768,24 +820,29 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Matched route label, if known."
               },
               "driver_fee": {
                 "type": "object",
                 "properties": {
                   "included": {
                     "type": "boolean",
-                    "const": false
+                    "const": false,
+                    "description": "Driver service fee is always charged separately."
                   },
                   "weekday": {
                     "type": "number",
-                    "const": 2500
+                    "const": 2500,
+                    "description": "Weekday reference driver service fee per day in TWD."
                   },
                   "holiday": {
                     "type": "number",
-                    "const": 3500
+                    "const": 3500,
+                    "description": "Holiday reference driver service fee per day in TWD."
                   },
                   "amount": {
+                    "description": "Applicable daily driver fee, or null for multi-day verification.",
                     "type": [
                       "number",
                       "null"
@@ -793,11 +850,13 @@
                   },
                   "unit": {
                     "type": "string",
-                    "const": "per_day"
+                    "const": "per_day",
+                    "description": "Driver fee unit, per day."
                   },
                   "note": {
                     "type": "string",
-                    "pattern": "^[^\\u0000]*$"
+                    "pattern": "^[^\\u0000]*$",
+                    "description": "Staff confirmation and driver service fee terms."
                   }
                 },
                 "required": [
@@ -808,23 +867,28 @@
                   "unit",
                   "note"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Separate driver service fee details; never included in the reference range."
               },
               "tax_note": {
                 "type": "string",
-                "pattern": "^[^\\u0000]*$"
+                "pattern": "^[^\\u0000]*$",
+                "description": "Tax and vehicle-specific terms requiring staff confirmation."
               },
               "requires_human_confirmation": {
                 "type": "boolean",
-                "const": true
+                "const": true,
+                "description": "Always true; this is not a formal quote or reservation."
               },
               "note": {
                 "type": "string",
-                "pattern": "^[^\\u0000]*$"
+                "pattern": "^[^\\u0000]*$",
+                "description": "Traditional Chinese reference-price disclaimer."
               },
               "note_en": {
                 "type": "string",
-                "pattern": "^[^\\u0000]*$"
+                "pattern": "^[^\\u0000]*$",
+                "description": "English reference-price disclaimer."
               },
               "pricing_note": {
                 "anyOf": [
@@ -835,7 +899,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Existing price-range explanation, surcharges or staff-pricing notice."
               }
             },
             "required": [
@@ -872,7 +937,8 @@
         "properties": {
           "booking_number": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Request number FY-YYYYMMDD-XXXX, or FY-TEST-… for a test request."
           },
           "status": {
             "type": "string",
@@ -880,25 +946,31 @@
               "pending_review",
               "confirmed",
               "rejected"
-            ]
+            ],
+            "description": "Review state; new requests are pending_review. Replays reflect current state."
           },
           "replay": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when returning an existing request within the 24-hour idempotency window."
           },
           "is_test": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the request is explicitly marked as a test."
           },
           "requires_human_confirmation": {
             "type": "boolean",
-            "const": true
+            "const": true,
+            "description": "Always true; staff provide the formal quote and payment link separately."
           },
           "note": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "Traditional Chinese pending-review disclaimer."
           },
           "note_en": {
             "type": "string",
-            "pattern": "^[^\\u0000]*$"
+            "pattern": "^[^\\u0000]*$",
+            "description": "English pending-review disclaimer."
           }
         },
         "required": [

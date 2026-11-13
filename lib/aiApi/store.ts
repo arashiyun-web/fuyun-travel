@@ -1,3 +1,4 @@
+import type { ToolEvent } from './events';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { taipeiDate, validateInput, type BookingInput } from './schema.mjs';
 import { AiApiError } from './errors';
@@ -23,12 +24,19 @@ async function consume(db: SqlDatabase, id: string, scope: string, limit: number
 }
 export function createAiStore(db: SqlDatabase) {
   return {
+    async recordToolEvent(event: ToolEvent) {
+      const { id, created_at, source, tool, outcome, latency_ms, prompt_version, model_id, subject, booking_id, input_digest, error_code } = event;
+      await db.query("INSERT INTO ai_tool_events (id,created_at,source,tool,outcome,latency_ms,prompt_version,model_id,subject,booking_id,input_digest,error_code) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [id,created_at,source,tool,outcome,latency_ms,prompt_version,model_id,subject,booking_id,input_digest,error_code]);
+    },
+
     async authorize(key: string, now: Date): Promise<Identity> {
       return db.transaction(async tx => {
         const [identity] = await tx.query<Identity>('SELECT id,name FROM api_keys WHERE key_hash=$1 AND disabled_at IS NULL FOR UPDATE', [hash(key)]);
         if (!identity) throw new AiApiError(401, 'Invalid or disabled API key');
-        await consume(tx, identity.id, 'minute', 30, now);
-        await consume(tx, identity.id, 'day', 1000, now);
+        try {
+          await consume(tx, identity.id, 'minute', 30, now);
+          await consume(tx, identity.id, 'day', 1000, now);
+        } catch (error) { if (error instanceof AiApiError) error.subject = identity.id; throw error; }
         await tx.query('UPDATE api_keys SET last_used_at=$2 WHERE id=$1', [identity.id, now]);
         return identity;
       });

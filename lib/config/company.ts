@@ -38,21 +38,31 @@ export const companyConfig = {
   ],
 } as const;
 
-export const envConfig = {
+const publicEnvConfig = {
   lineOaUrl: process.env.NEXT_PUBLIC_LINE_OA_URL ?? "",
   legacyLineUrl: process.env.NEXT_PUBLIC_LINE_URL ?? "",
-  travelImportApiKey: process.env.TRAVEL_IMPORT_API_KEY ?? "",
-  indexNowKey: process.env.INDEXNOW_KEY ?? "",
-  gx10ApiUrl: process.env.GX10_AI_API_URL ?? "",
-  gx10ApiKey: process.env.GX10_AI_API_KEY ?? "",
-  gx10Model: process.env.GX10_MODEL ?? "",
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
-  openaiModel: process.env.OPENAI_MODEL ?? "",
   googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
 } as const;
 
+// Next replaces typeof window at compile time; private settings have no client branch.
+export const envConfig = {
+  ...publicEnvConfig,
+  ...(typeof window === "undefined" ? {
+    travelImportApiKey: process.env.TRAVEL_IMPORT_API_KEY ?? "",
+    indexNowKey: process.env.INDEXNOW_KEY ?? "",
+    gx10ApiUrl: process.env.GX10_AI_API_URL ?? "",
+    gx10ApiKey: process.env.GX10_AI_API_KEY ?? "",
+    gx10Model: process.env.GX10_MODEL ?? "",
+    openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+    openaiModel: process.env.OPENAI_MODEL ?? "",
+  } : {
+    travelImportApiKey: "", indexNowKey: "", gx10ApiUrl: "", gx10ApiKey: "",
+    gx10Model: "", openaiApiKey: "", openaiModel: "",
+  }),
+} as const;
+
 export function getLineOaUrl() {
-  return envConfig.lineOaUrl || envConfig.legacyLineUrl;
+  return (process.env.NEXT_PUBLIC_LINE_OA_URL ?? "") || (process.env.NEXT_PUBLIC_LINE_URL ?? "");
 }
 
 export const COMPANY = {
