@@ -4,15 +4,15 @@ import type { UIMessage } from 'ai';
 import { ChatIcon, type IconName } from './icons';
 import { COPY, LANGUAGES } from './copy';
 import type { MobileLayout } from './layout';
-import { partyDetails, phoneHref, type ChatIssue, type ContactHint, type ContactName, type Contacts, type Locale, type Summary } from './viewModel';
+import { partyDetails, type ChatIssue, type Contacts, type Locale, type Summary } from './viewModel';
 
 export type PanelActions = {
   close: () => void; toggleMenu: () => void; locale: (value: Locale) => void; input: (value: string) => void;
   submit: (event: FormEvent) => void; stop: () => void; retry: () => void; confirm: () => void;
-  contact: (channel: ContactName) => void; chip: (text: string) => void;
+  chip: (text: string) => void;
 };
 export type PanelProps = {
-  locale: Locale; messages: UIMessage[]; busy: boolean; input: string; issue: ChatIssue | null; hint: ContactHint;
+  locale: Locale; messages: UIMessage[]; busy: boolean; input: string; issue: ChatIssue | null;
   mobileLayout?: MobileLayout; modal?: boolean; menuOpen: boolean; summary: Summary | null; summaryRead: boolean; contacts: Contacts; actions: PanelActions; typingPhase?: number;
   historyRef: RefObject<HTMLDivElement>; inputRef: RefObject<HTMLTextAreaElement>; closeRef: RefObject<HTMLButtonElement>;
   summaryStartRef: RefObject<HTMLSpanElement>; summaryEndRef: RefObject<HTMLSpanElement>; languageRef?: RefObject<HTMLButtonElement>;
@@ -23,23 +23,12 @@ type Output = {
   booking_number?: string;
   quote?: { low?: number | null; high?: number | null; price_available?: boolean; vehicle?: string | null };
 };
-const channels: ContactName[] = ['line', 'whatsapp', 'wechat', 'phone'];
-function ContactStrip({ c, contacts, hint, onContact, compact = false }: {
-  c: Copy; contacts: Contacts; hint: ContactHint; onContact: (name: ContactName) => void; compact?: boolean;
+function ContactStrip({ c, contacts, compact = false }: {
+  c: Copy; contacts: Contacts; compact?: boolean;
 }) {
   return <nav className={compact ? 'fy-act' : 'fy-contacts'} aria-label={c.contactLabel}>
-    {channels.map((channel, index) => {
-      const value = contacts[channel];
-      const label = c.contacts[index];
-      const className = 'fy-contact fy-' + channel + (!value ? ' fy-pending' : '');
-      const children = <><ChatIcon name={channel} /><span>{label}</span>{!compact && hint?.channel === channel
-        ? <span className="fy-bubbletip" role="status">{hint.message}</span> : null}</>;
-      return value && channel !== 'wechat'
-        ? <a key={channel} data-contact={channel} className={className} href={channel === 'phone' ? phoneHref(value) : value}
-          target={channel === 'phone' ? undefined : '_blank'} rel={channel === 'phone' ? undefined : 'noopener noreferrer'} aria-label={label}>{children}</a>
-        : <button key={channel} data-contact={channel} type="button" className={className} aria-label={label}
-          aria-disabled={!value || undefined} title={!value ? c.pending : undefined} onClick={() => onContact(channel)}>{children}</button>;
-    })}
+    <a data-contact="line" className="fy-contact fy-line" href={contacts.line}
+      target="_blank" rel="noopener noreferrer" aria-label={c.contacts[0]}><ChatIcon name="line" /><span>{c.contacts[0]}</span></a>
   </nav>;
 }
 function Who({ c }: { c: Copy }) { return <div className="fy-who"><span className="fy-mini" aria-hidden="true">浮</span>{c.bot}</div>; }
@@ -53,7 +42,7 @@ function IssueCard({ issue, props }: { issue: ChatIssue; props: PanelProps }) {
     <h4><ChatIcon name={icon} />{title}</h4><p>{body}</p>
     {issue.kind === 'limited' && issue.retryAfter ? <p>{c.retryPrefix}{issue.retryAfter}{c.retrySuffix}</p> : null}
     {issue.kind === 'network' ? <button className="fy-retry" type="button" disabled={props.busy} onClick={props.actions.retry}><ChatIcon name="retry" />{c.retry}</button> : null}
-    <ContactStrip c={c} contacts={props.contacts} hint={null} onContact={props.actions.contact} compact />
+    <ContactStrip c={c} contacts={props.contacts} compact />
   </section>;
 }
 function Notice({ text }: { text: string }) { return <div className="fy-notice"><ChatIcon name="info" /><span>{text}</span></div>; }
@@ -64,14 +53,17 @@ function ToolCard({ output, input, props }: { output: Output; input: unknown; pr
   const trip = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   if (output.kind === 'quote') {
     const quote = output.quote;
+    const low = quote?.low, high = quote?.high;
+    const hasEndpoints = typeof low === 'number' && typeof high === 'number';
+    const price = hasEndpoints && low >= high ? '專人報價'
+      : quote?.price_available && hasEndpoints ? 'NT$ ' + low.toLocaleString('en-US') + ' – ' + high.toLocaleString('en-US') : c.staff;
     const rows: Array<[string, unknown]> = [[c.date, trip.date], [c.pickup, trip.pickup], [c.destination, trip.destination], [c.people, partyDetails(trip, props.locale)]];
     return <article className="fy-card" data-tool-card="quote">
       <div className="fy-card-head"><b>{c.quote}</b><span className="fy-tag fy-pend">{c.staffConfirm}</span></div>
       <div className="fy-card-body">
         {quote?.vehicle ? <div className="fy-vehicle">{c.vehicle}<b>{quote.vehicle}</b></div> : null}
         <div className={'fy-price' + (!quote?.price_available ? ' fy-staff' : '')}>
-          {quote?.price_available && typeof quote.low === 'number' && typeof quote.high === 'number'
-            ? 'NT$ ' + quote.low.toLocaleString('en-US') + ' – ' + quote.high.toLocaleString('en-US') : c.staff}
+          {price}
         </div>
         <dl className="fy-kv">{rows.filter(([, value]) => typeof value === 'string' || typeof value === 'number').map(([label, value]) => <div className="fy-kv-row" key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}
           <div className="fy-kv-row"><dt>{c.availability}</dt><dd className="fy-pc">{c.pendingAvailability}</dd></div>
@@ -121,7 +113,7 @@ export function ChatPanel(props: PanelProps) {
       </button>
       <button ref={props.closeRef} type="button" className="fy-ibtn" aria-label={c.close} onClick={actions.close}><ChatIcon name="chevron-down" /></button>
     </header>
-    <ContactStrip c={c} contacts={props.contacts} hint={props.hint} onContact={actions.contact} />
+    <ContactStrip c={c} contacts={props.contacts} />
     <div className="fy-body-wrap">
       <div className="fy-body" ref={props.historyRef} role="log" aria-live="polite" aria-relevant="additions text" aria-busy={busy}>
         <div className="fy-thread" data-welcome={messages.length === 0}>

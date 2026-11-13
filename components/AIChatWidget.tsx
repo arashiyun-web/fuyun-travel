@@ -4,14 +4,13 @@ import { usePathname } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { chatContacts, chatLocale } from '@/lib/chatContacts';
-import { companyConfig } from '@/lib/config/company';
 import { ChatPanel } from './ai-chat/ChatPanel';
 import { ChatIcon } from './ai-chat/icons';
 import { COPY, LAUNCHER_LABEL } from './ai-chat/copy';
 import { WIDGET_STYLES } from './ai-chat/styles';
 import { resolveMobileLayout } from './ai-chat/layout';
 import { ChatHttpError, latestSummary, lockBodyScroll, responseIssue, retrySeconds, viewportVariables,
-  type ChatIssue, type ContactHint, type ContactName, type Contacts, type Locale } from './ai-chat/viewModel';
+  type ChatIssue, type Locale } from './ai-chat/viewModel';
 
 export default function AIChatWidget() {
   const pathname = usePathname() || '/';
@@ -21,7 +20,6 @@ export default function AIChatWidget() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [input, setInput] = useState('');
   const [issue, setIssue] = useState<ChatIssue | null>(null);
-  const [hint, setHint] = useState<ContactHint>(null);
   const [viewport, setViewport] = useState<CSSProperties>({});
   const [typingPhase, setTypingPhase] = useState(0);
   const [reviewed, setReviewed] = useState('');
@@ -38,7 +36,6 @@ export default function AIChatWidget() {
   const confirmedSummary = useRef('');
   const c = COPY[locale];
   const mobileLayout = resolveMobileLayout(process.env.NEXT_PUBLIC_CHAT_MOBILE_LAYOUT);
-  const contacts: Contacts = useMemo(() => ({ ...chatContacts, phone: companyConfig.phone }), []);
   useEffect(() => { setLocale(chatLocale(pathname, navigator.language)); }, [pathname]);
   useEffect(() => {
     const media = window.matchMedia('(max-width:767px)');
@@ -145,11 +142,6 @@ export default function AIChatWidget() {
     return () => { if (timer !== undefined) window.clearInterval(timer); media.removeEventListener('change', update); };
   }, [busy]);
   useEffect(() => {
-    if (!hint) return;
-    const timer = window.setTimeout(() => setHint(null), 2500);
-    return () => window.clearTimeout(timer);
-  }, [hint]);
-  useEffect(() => {
     if (!menuOpen) return;
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Element && !event.target.closest('[data-ai-chat-widget] .fy-menu,[data-ai-chat-widget] .fy-lang')) setMenuOpen(false);
@@ -165,18 +157,10 @@ export default function AIChatWidget() {
   async function send(text: string) {
     if (busy || !text.trim()) return;
     if (Array.from(text).length > 1000) { setIssue({ kind: 'tooLong' }); return; }
-    setIssue(null); setHint(null); setMenuOpen(false); setInput('');
+    setIssue(null); setMenuOpen(false); setInput('');
     await sendMessage({ text: text.trim() });
   }
   function submit(event: FormEvent) { event.preventDefault(); void send(input); }
-  async function contact(channel: ContactName) {
-    setMenuOpen(false);
-    if (!contacts[channel]) { setHint({ channel, message: c.pending }); return; }
-    if (channel === 'wechat' && contacts.wechat) {
-      try { await navigator.clipboard.writeText(contacts.wechat); setHint({ channel, message: c.copied + contacts.wechat }); }
-      catch { setHint({ channel, message: c.copyFailed + contacts.wechat }); }
-    }
-  }
   function confirm() {
     if (!summaryRead || busy || confirmedSummary.current === summaryKey) return;
     confirmedSummary.current = summaryKey; setConsumed(summaryKey); void send(c.confirmToken);
@@ -206,15 +190,15 @@ export default function AIChatWidget() {
       <span className="fy-tooltip" role="tooltip" id="ai-chat-launcher-tip">{c.open}</span>
     </button>
     {open && mobileLayout === 'panel' ? <button type="button" className="fy-backdrop" tabIndex={-1} aria-label={c.close} onClick={close} /> : null}
-    {open ? <ChatPanel mobileLayout={mobileLayout} locale={locale} messages={messages} busy={busy} input={input} issue={issue} hint={hint} menuOpen={menuOpen}
-      summary={summary} summaryRead={summaryRead} contacts={contacts} modal={mobile} typingPhase={typingPhase}
+    {open ? <ChatPanel mobileLayout={mobileLayout} locale={locale} messages={messages} busy={busy} input={input} issue={issue} menuOpen={menuOpen}
+      summary={summary} summaryRead={summaryRead} contacts={chatContacts} modal={mobile} typingPhase={typingPhase}
       historyRef={history} inputRef={field} closeRef={closeButton} languageRef={languageButton} summaryStartRef={summaryStart} summaryEndRef={summaryEnd}
       actions={{ close, toggleMenu: () => { setMenuOpen(value => !value); },
-        locale: value => { setLocale(value); setMenuOpen(false); setHint(null); languageButton.current?.focus({ preventScroll: true }); },
+        locale: value => { setLocale(value); setMenuOpen(false); languageButton.current?.focus({ preventScroll: true }); },
         input: value => { setInput(value); if (Array.from(value).length > 1000) setIssue({ kind: 'tooLong' }); else if (issue?.kind === 'tooLong') setIssue(null); },
         submit, stop: () => { setIssue(null); void stop(); },
         retry: () => { if (!busy) { setIssue(null); void regenerate(); } },
-        confirm, contact: channel => { void contact(channel); }, chip: text => { void send(text); },
+        confirm, chip: text => { void send(text); },
       }} /> : null}
   </div>;
 }

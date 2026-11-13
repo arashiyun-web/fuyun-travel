@@ -10,7 +10,10 @@ test('chat requires both non-empty server key and configured model without any f
     const POST=createChatHandler({apiKey:()=>key,modelName:()=>name,model:()=>{calls++;},store:{admit:async()=>{calls++;}}});
     const response=await POST(request());
     assert.equal(response.status,503);assert.equal(response.headers.get('Cache-Control'),'no-store');
-    assert.doesNotMatch(await response.text(),/OPENAI|API_KEY|MODEL|offline-key/);
+    const body = await response.text();
+    assert.doesNotMatch(body,/OPENAI|API_KEY|MODEL|offline-key/);
+    assert.match(body,/official LINE/);
+    assert.doesNotMatch(body,/contact buttons/);
     assert.equal(calls,0);
   }
 });

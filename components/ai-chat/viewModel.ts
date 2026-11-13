@@ -1,10 +1,8 @@
 import type { CSSProperties } from 'react';
 import type { UIMessage } from 'ai';
 export type Locale = 'zh-TW' | 'zh-CN' | 'en';
-export type ContactName = 'line' | 'whatsapp' | 'wechat' | 'phone';
-export type Contacts = { line: string | null; whatsapp: string | null; wechat: string | null; phone: string };
+export type Contacts = { line: string };
 export type ChatIssue = { kind: 'paused' | 'limited' | 'tooLong' | 'network'; retryAfter?: number };
-export type ContactHint = { channel: ContactName; message: string } | null;
 export type Summary = { messageId: string; text: string; rows: Array<[string, string]>; vehicle?: string };
 export function latestSummary(messages: UIMessage[]): Summary | null {
   const last = messages.at(-1);
@@ -49,7 +47,6 @@ export function partyDetails(trip: Record<string, unknown>, locale: Locale): str
   if (typeof bags !== 'number' || !Number.isInteger(bags) || bags < 0) return people;
   return people + (locale === 'en' ? ` · ${bags} bag${bags === 1 ? '' : 's'}` : `・行李 ${bags} 件`);
 }
-export function phoneHref(phone: string) { return 'tel:' + phone.replace(/[^\d+]/g, ''); }
 export function retrySeconds(value: string | null, now = Date.now()): number | undefined {
   if (!value) return undefined;
   const seconds = /^\d+$/.test(value) ? Number(value) : Math.ceil((Date.parse(value) - now) / 1000);

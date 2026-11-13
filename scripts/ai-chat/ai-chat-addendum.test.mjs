@@ -83,13 +83,13 @@ test('real shared service records api/mcp source, booking id and outcome without
     assert.ok(rows.every(r => r.subject === identity.id && r.prompt_version === null && r.model_id === null));
   } finally { await f.pg.close(); }
 });
-test('contacts never create broken links and locale follows path before browser language', () => {
-  const { resolveChatContacts, chatLocale } = feature('lib/chatContacts.ts');
-  const empty = resolveChatContacts({});
-  assert.equal(empty.line, null); assert.equal(empty.whatsapp, null); assert.equal(empty.wechat, null);
-  assert.equal(resolveChatContacts({ line: 'javascript:alert(1)', whatsapp: 'placeholder', wechat: 'placeholder' }).line, null);
-  const valid = resolveChatContacts({ line: 'https://lin.ee/offline', whatsapp: '+886 912 345 678', wechat: 'offline_id' });
-  assert.equal(valid.whatsapp, 'https://wa.me/886912345678'); assert.equal(valid.wechat, 'offline_id');
+test('company contact is always the official LINE and locale follows path before browser language', () => {
+  const { resolveChatContacts, chatContacts, chatLocale } = feature('lib/chatContacts.ts');
+  const expected={line:'https://line.me/R/ti/p/@954fyicw'};
+  assert.deepEqual(chatContacts,expected);
+  for(const values of [{},{line:''},{line:'javascript:alert(1)',whatsapp:'placeholder',wechat:'placeholder'},{line:'https://lin.ee/offline',whatsapp:'+886 912 345 678',wechat:'offline_id'}]) {
+    assert.deepEqual(resolveChatContacts(values),expected);
+  }
   assert.equal(chatLocale('/en/travel', 'zh-CN'), 'en');
   assert.equal(chatLocale('/zh-cn', 'en-US'), 'zh-CN');
   assert.equal(chatLocale('/', 'zh-CN'), 'zh-CN'); assert.equal(chatLocale('/', 'ja'), 'zh-TW');

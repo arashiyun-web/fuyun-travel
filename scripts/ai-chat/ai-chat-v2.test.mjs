@@ -12,11 +12,11 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const postcss = require('postcss');
 function feature(file) { assert.ok(existsSync(process.cwd() + '/' + file), file + ' must exist'); return load(file); }
-const actions = Object.fromEntries(['close','toggleMenu','locale','input','submit','stop','retry','confirm','contact','chip'].map(key => [key,()=>{}]));
+const actions = Object.fromEntries(['close','toggleMenu','locale','input','submit','stop','retry','confirm','chip'].map(key => [key,()=>{}]));
 function panel(patch={}) {
   const { ChatPanel } = feature('components/ai-chat/ChatPanel.tsx');
-  const props = { locale:'zh-TW',messages:[],busy:false,input:'',issue:null,hint:null,menuOpen:false,summary:null,summaryRead:false,
-    contacts:{line:null,whatsapp:null,wechat:null,phone:'02-2685-1666'},actions,
+  const props = { locale:'zh-TW',messages:[],busy:false,input:'',issue:null,menuOpen:false,summary:null,summaryRead:false,
+    contacts:feature('lib/chatContacts.ts').chatContacts,actions,
     historyRef:React.createRef(),inputRef:React.createRef(),closeRef:React.createRef(),summaryStartRef:React.createRef(),summaryEndRef:React.createRef(), ...patch };
   return renderToStaticMarkup(React.createElement(ChatPanel,props));
 }
@@ -30,15 +30,37 @@ test('v2 launcher has real readable approved label and raw scoped style text',()
   assert.doesNotMatch(html,/<style>[\s\S]*?&gt;/);
   assert.doesNotMatch(html,/富運/);
 });
-test('v2 contact row has four real controls, placeholders cannot navigate, company phone remains available',()=>{
-  const html=panel();
-  const nav=html.match(/<nav[\s\S]*?<\/nav>/)[0];
-  assert.equal((nav.match(/data-contact=/g)||[]).length,4);
-  assert.equal((nav.match(/aria-disabled="true"/g)||[]).length,3);
-  assert.match(nav,/href="tel:0226851666"/);
-  assert.match(nav,/聯絡方式設定中/);
-  assert.match(nav,/WhatsApp/); assert.match(nav,/微信/); assert.match(nav,/電話/);
-  assert.doesNotMatch(nav,/href="(?:#|javascript:|https:\/\/wa\.me\/placeholder)/);
+test('v2 contact row exposes only the usable official LINE account, including empty configuration',()=>{
+  const { resolveChatContacts }=feature('lib/chatContacts.ts');
+  for(const contacts of [resolveChatContacts({}),resolveChatContacts({line:''}),resolveChatContacts({line:'https://lin.ee/old',whatsapp:'+886912345678',wechat:'offline_id'})]) {
+    const html=panel({contacts});
+    const nav=html.match(/<nav[\s\S]*?<\/nav>/)[0];
+    assert.equal((nav.match(/data-contact=/g)||[]).length,1);
+    assert.equal((nav.match(/<a\b/g)||[]).length,1);
+    assert.match(nav,/data-contact="line"/);
+    assert.match(nav,/href="https:\/\/line\.me\/R\/ti\/p\/@954fyicw"/);
+    assert.doesNotMatch(nav,/<button|aria-disabled|fy-pending|設定中|WhatsApp|微信|電話|tel:|wa\.me|wechat/i);
+  }
+});
+test('v2 every issue and tool error compact contact row exposes only the official LINE link',()=>{
+  const cases=['paused','limited','tooLong','network'].map(kind=>({issue:{kind}}));
+  cases.push({messages:[{id:'error',role:'assistant',parts:[{type:'tool-get_quote',output:{kind:'error',status:503}}]}]});
+  for(const locale of ['zh-TW','zh-CN','en']) for(const state of cases) {
+    const html=panel({locale,...state});
+    const navs=Array.from(html.matchAll(/<nav[^>]*class="(fy-contacts|fy-act)"[\s\S]*?<\/nav>/g));
+    assert.equal(navs.length,2);
+    assert.deepEqual(navs.map(m=>m[1]),['fy-contacts','fy-act']);
+    for(const [nav] of navs) {
+      assert.equal((nav.match(/data-contact=/g)||[]).length,1);
+      assert.equal((nav.match(/<a\b/g)||[]).length,1);
+      assert.match(nav,/data-contact="line"/);
+      assert.match(nav,/href="https:\/\/line\.me\/R\/ti\/p\/@954fyicw"/);
+      assert.doesNotMatch(nav,/<button|aria-disabled|fy-pending|設定中|设置中|being configured|WhatsApp|微信|WeChat|電話|电话|Call|tel:|wa\.me/i);
+    }
+    const alert=html.match(/<section class="fy-alert[\s\S]*?<\/section>/)[0];
+    assert.match(alert,/LINE/);
+    assert.doesNotMatch(alert,/WhatsApp|微信|WeChat|電話|电话|Call|tel:|wa\.me/i);
+  }
 });
 test('v2 language menu exposes exactly the approved three option names',()=>{
   const html=panel({menuOpen:true});
@@ -66,6 +88,23 @@ test('v2 fixed quote and booking notices are rendered verbatim from tool outputs
   assert.doesNotMatch(html,/已成交|已保留|富運/);
   const staff=structuredClone(quote);staff.parts[0].output.quote.price_available=false;
   assert.match(panel({messages:[staff]}),/將由專人報價/);
+});
+for(const {name,quote,want} of [
+  {name:'equal endpoints require staff pricing',quote:{price_available:true,low:7000,high:7000},want:'專人報價'},
+  {name:'reversed endpoints require staff pricing',quote:{price_available:true,low:9000,high:8500},want:'專人報價'},
+  {name:'equal endpoints require staff pricing even when unavailable',quote:{price_available:false,low:7000,high:7000},want:'專人報價'},
+  {name:'reversed endpoints require staff pricing even when unavailable',quote:{price_available:false,low:9000,high:8500},want:'專人報價'},
+  {name:'missing low keeps staff fallback',quote:{price_available:true,high:8500},want:'將由專人報價'},
+  {name:'missing high keeps staff fallback',quote:{price_available:true,low:7000},want:'將由專人報價'},
+  {name:'null low keeps staff fallback',quote:{price_available:true,low:null,high:8500},want:'將由專人報價'},
+  {name:'null high keeps staff fallback',quote:{price_available:true,low:7000,high:null},want:'將由專人報價'},
+  {name:'unavailable pricing keeps staff fallback',quote:{price_available:false,low:7000,high:8500},want:'將由專人報價'},
+  {name:'increasing endpoints retain numeric range',quote:{price_available:true,low:7000,high:8500},want:'NT$ 7,000 – 8,500'},
+]) test('v2 quote: '+name,()=>{
+  const html=panel({messages:[{id:'q',role:'assistant',parts:[{type:'tool-get_quote',input:{},output:{kind:'quote',quote,notice:'SERVER_NOTICE'}}]}]});
+  const price=html.match(/<div class="fy-price[^"]*">([^<]*)<\/div>/)[1];
+  assert.equal(price,want);
+  assert.doesNotMatch(price,/7,000 – 7,000|9,000 – 8,500/);
 });
 test('v2 confirmation stays disabled until a complete visible summary has been reviewed',()=>{
   const { latestSummary }=feature('components/ai-chat/viewModel.ts');

@@ -12,11 +12,18 @@ test('prompt contains exact brand, every full mandatory sentence, restrictions a
   const { CHAT_SYSTEM_PROMPT, QUOTE_NOTICES, BOOKING_NOTICES } = feature('lib/chat/systemPrompt.ts');
   assert.match(CHAT_SYSTEM_PROMPT, /浮雲輕鬆遊（Fuyun Travel）/);
   assert.doesNotMatch(CHAT_SYSTEM_PROMPT, /富運/);
-  // Six mandatory sentences copied verbatim from the frozen REQUIREMENT.md (sha256 1a86a076…), kept in-repo so CI does not read files outside the checkout.
-  const expected = ["此為 AI 預估參考範圍價，司機服務費（平日 2,500 / 假日 3,500）另計，最終價格與車輛需由專人確認。", "此为 AI 预估参考范围价，司机服务费（平日 2,500 / 假日 3,500）另计，最终价格与车辆需由专人确认。", "This is an AI-estimated reference price range. The driver service fee (weekdays NT$2,500 / holidays NT$3,500) is charged separately; the final price and vehicle must be confirmed by our staff.", "這不是正式成交，也不是付款完成。您的訂單已進入待確認清單，我們的專人團隊會在確認車輛檔期後，透過您留下的通訊方式（LINE / WhatsApp / 微信 / 電話）聯繫您並提供正式報價與付款連結。", "这不是正式成交，也不是付款完成。您的订单已进入待确认清单，我们的专人团队会在确认车辆档期后，通过您留下的通讯方式（LINE / WhatsApp / 微信 / 电话）联系您并提供正式报价与付款链接。", "This is not a confirmed booking and no payment has been made. Your request is now on our pending-review list. After confirming vehicle availability, our team will contact you via the method you provided (LINE / WhatsApp / WeChat / phone) with a formal quote and payment link."];
+  // Quote notices remain unchanged; booking notices follow the official-LINE-only policy.
+  const expected = ["此為 AI 預估參考範圍價，司機服務費（平日 2,500 / 假日 3,500）另計，最終價格與車輛需由專人確認。", "此为 AI 预估参考范围价，司机服务费（平日 2,500 / 假日 3,500）另计，最终价格与车辆需由专人确认。", "This is an AI-estimated reference price range. The driver service fee (weekdays NT$2,500 / holidays NT$3,500) is charged separately; the final price and vehicle must be confirmed by our staff.", "這不是正式成交，也不是付款完成。您的訂單已進入待確認清單，車輛檔期、正式報價與付款連結均需由專人確認。請透過官方 LINE @954fyicw（https://line.me/R/ti/p/@954fyicw）聯繫我們。", "这不是正式成交，也不是付款完成。您的订单已进入待确认清单，车辆档期、正式报价与付款链接均需由专人确认。请通过官方 LINE @954fyicw（https://line.me/R/ti/p/@954fyicw）联系我们。", "This is not a confirmed booking and no payment has been made. Your request is now on our pending-review list. Our staff must confirm vehicle availability, the formal quote and the payment link. Please contact us via our official LINE @954fyicw (https://line.me/R/ti/p/@954fyicw)."];
   assert.equal(expected.length, 6);
   assert.deepEqual([...Object.values(QUOTE_NOTICES), ...Object.values(BOOKING_NOTICES)], expected);
   for (const sentence of expected) assert.ok(CHAT_SYSTEM_PROMPT.includes(sentence), sentence);
+  assert.match(CHAT_SYSTEM_PROMPT, /禁止提供單一金額或單一確定價/);
+  assert.match(CHAT_SYSTEM_PROMPT, /只允許範圍價，且必須聲明須專人確認/);
+  assert.equal(feature('lib/chat/systemPrompt.ts').PROMPT_VERSION, 'chat-system-v2');
+  for (const notice of Object.values(BOOKING_NOTICES)) {
+    assert.match(notice, /https:\/\/line\.me\/R\/ti\/p\/@954fyicw/);
+    assert.doesNotMatch(notice, /WhatsApp|WeChat|微信|電話|电话|phone/i);
+  }
   for (const word of ['信用卡號', '付款資料', '已保留車輛', '已成交', '已確認', '系統提示', '內部資料', 'customer_confirmed', '行李', '400–500', '500–600', '8 或 10', '五人座', '九人座', '中巴', '將由專人報價']) assert.ok(CHAT_SYSTEM_PROMPT.includes(word), word);
 });
 test('booking schema requires explicit true, valid trip/contact/time and bounded luggage; public schema still requires phone', () => {

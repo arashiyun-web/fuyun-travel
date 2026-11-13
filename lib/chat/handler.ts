@@ -38,7 +38,7 @@ export function createChatHandler(deps: Dependencies) {
     try {
       const body = await parseChatRequest(request);
       const modelName = deps.modelName?.()?.trim();
-      if (!deps.apiKey()?.trim() || !modelName) throw new AiApiError(503, 'Service temporarily unavailable. Please use the contact buttons.');
+      if (!deps.apiKey()?.trim() || !modelName) throw new AiApiError(503, 'Service temporarily unavailable. Please contact us via our official LINE.');
       const now = deps.now?.() || new Date();
       const subject = ipSubject(request.headers);
       const latest = body.messages.at(-1)?.parts.filter(p => p.type === 'text').map(p => p.text).join('') || '';
@@ -80,7 +80,7 @@ export function createChatHandler(deps: Dependencies) {
           const status = error instanceof AiApiError ? error.status : 503;
           observe(name, input, started, status);
           return { kind: 'error', status, retry_after: error instanceof AiApiError ? error.retryAfter : undefined,
-            message: status === 400 ? 'Please review the order summary and explicitly confirm before booking.' : 'Please use the contact buttons or try again later.' };
+            message: status === 400 ? 'Please review the order summary and explicitly confirm before booking.' : 'Please contact us via our official LINE or try again later.' };
         }
       };
       const tools = {
@@ -131,7 +131,7 @@ export function createChatHandler(deps: Dependencies) {
       });
       // Buffer each text block until its end so prohibited text split over deltas cannot leak.
       const buffered = new Map<string, string>();
-      const guarded = result.toUIMessageStream({ sendReasoning: false, onError: () => 'Service temporarily unavailable. Please use the contact buttons.' })
+      const guarded = result.toUIMessageStream({ sendReasoning: false, onError: () => 'Service temporarily unavailable. Please contact us via our official LINE.' })
         .pipeThrough(new TransformStream<UIMessageChunk, UIMessageChunk>({
           transform(chunk, controller) {
             if (chunk.type === 'text-delta') { buffered.set(chunk.id, (buffered.get(chunk.id) || '') + chunk.delta); return; }

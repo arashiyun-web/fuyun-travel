@@ -11,10 +11,10 @@ mock('next/navigation', { usePathname: () => pathname });
 Module._extensions['.tsx'] = (mod, filename) => mod._compile(ts.transpileModule(readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
 const React = require('react');
 const { renderToStaticMarkup: render } = require('react-dom/server');
-const actions = Object.fromEntries(['close','toggleMenu','locale','input','submit','stop','retry','confirm','contact','chip'].map(key => [key, () => {}]));
+const actions = Object.fromEntries(['close','toggleMenu','locale','input','submit','stop','retry','confirm','chip'].map(key => [key, () => {}]));
 function panel(patch = {}) {
  const { ChatPanel } = load('components/ai-chat/ChatPanel.tsx');
- return render(React.createElement(ChatPanel, { locale:'zh-TW', messages:[], busy:false, input:'', issue:null, hint:null, menuOpen:false, summary:null, summaryRead:false, contacts:{line:null,whatsapp:null,wechat:null,phone:'02-2685-1666'}, actions, historyRef:React.createRef(), inputRef:React.createRef(), closeRef:React.createRef(), summaryStartRef:React.createRef(), summaryEndRef:React.createRef(), ...patch }));
+ return render(React.createElement(ChatPanel, { locale:'zh-TW', messages:[], busy:false, input:'', issue:null, menuOpen:false, summary:null, summaryRead:false, contacts:load('lib/chatContacts.ts').chatContacts, actions, historyRef:React.createRef(), inputRef:React.createRef(), closeRef:React.createRef(), summaryStartRef:React.createRef(), summaryEndRef:React.createRef(), ...patch }));
 }
 const quote = input => ({ id:'q', role:'assistant', parts:[{type:'tool-get_quote', input, output:{kind:'quote',quote:{price_available:true,low:7000,high:8500,vehicle:'九人座'},notice:'SERVER_QUOTE_NOTICE'}}] });
 const summaryText = '訂單摘要\n聯絡人：離線旅客\n聯絡方式：line offline_guest\n上車：台北 → 九份\n下車：九份\n日期時間：2099-12-04 09:00\n人數：4 人\n行李：6 件\n請回覆「我確認」。';
@@ -34,9 +34,9 @@ test('v3 launcher follows all three initial URL locales and aria names',()=>{
  const Widget=load('components/AIChatWidget.tsx').default;
  for(const [url,label,aria,sub] of [['/','AI 旅遊管家','開啟 AI 旅遊管家','24 小時・繁中 / 简中 / EN'],['/zh-cn','AI 旅遊管家','开启 AI 旅游管家','24 小時・繁中 / 简中 / EN'],['/en','AI travel concierge','Open AI travel concierge','24/7 · 繁中 / 简中 / EN']]){pathname=url;const html=render(React.createElement(Widget));assert.ok(html.includes('>'+label+'</b>'));assert.ok(html.includes('aria-label="'+aria+'"'));assert.ok(html.includes(sub));}
 });
-test('v3 quote and booking use amber fy-pend, contacts keep fy-pending',()=>{
+test('v3 quote and booking use amber fy-pend, official LINE is usable',()=>{
  const messages=[quote({passenger_count:4}),{id:'b',role:'assistant',parts:[{type:'tool-create_booking',output:{kind:'booking',booking_number:'FY-TEST-OFFLINE',notice:'SERVER_BOOKING_NOTICE'}}]}];
- const html=panel({messages});assert.equal((html.match(/class="fy-tag fy-pend"/g)||[]).length,2);assert.doesNotMatch(html,/fy-tag fy-pending/);assert.equal((html.match(/fy-contact fy-\w+ fy-pending/g)||[]).length,3);
+ const html=panel({messages});assert.equal((html.match(/class="fy-tag fy-pend"/g)||[]).length,2);assert.doesNotMatch(html,/fy-tag fy-pending/);const nav=html.match(/<nav[\s\S]*?<\/nav>/)[0];assert.equal((nav.match(/data-contact=/g)||[]).length,1);assert.match(nav,/href="https:\/\/line\.me\/R\/ti\/p\/@954fyicw"/);assert.doesNotMatch(nav,/fy-pending|aria-disabled|WhatsApp|微信|電話|tel:/);
 });
 test('v3 passengers use actual total schema count, optional luggage uses units without inventing adults',()=>{
  for(const [locale,total,withBags] of [['zh-TW','4 人','4 人・行李 6 件'],['zh-CN','4 人','4 人・行李 6 件'],['en','4 passengers','4 passengers · 6 bags']]){
@@ -63,7 +63,7 @@ test('v3 language labels, booking steps, footer and 413 copy match review',()=>{
  const {COPY,LANGUAGES}=load('components/ai-chat/copy.ts');assert.deepEqual(LANGUAGES.map(l=>[l.label,l.detail]),[['繁體中文','台灣'],['简体中文','简体'],['English','']]);
  assert.deepEqual(COPY.en.steps,['Our staff confirm vehicle availability',"We'll contact you via your preferred method","We'll send a formal quote and payment link"]);
  assert.equal(COPY.en.meta,'AI replies are for reference · staff confirm price');
- assert.ok(COPY['zh-TW'].longBody.includes('請縮短後再送出，或直接聯絡專人：'));assert.ok(COPY['zh-CN'].longBody.includes('请缩短后再发送，或直接联系专人：'));
+ assert.ok(COPY['zh-TW'].longBody.includes('請縮短後再送出，或透過官方 LINE 聯絡專人：'));assert.ok(COPY['zh-CN'].longBody.includes('请缩短后再发送，或通过官方 LINE 联系专人：'));
 });
 test('v3 body unlock removes only an originally absent, now-empty style attribute',()=>{
  const {lockBodyScroll}=load('components/ai-chat/viewModel.ts');
