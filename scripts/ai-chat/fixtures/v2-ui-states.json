@@ -1,0 +1,128 @@
+{
+  "summary": {
+    "text": "訂單摘要\n聯絡人：王先生\n聯絡方式：line widget_offline\n上車：台北車站\n下車：九份老街\n日期時間：2099-12-04 09:00\n人數：4 人\n行李：6 件\n請回覆「我確認」。"
+  },
+  "long": {
+    "text": "可以的！請提供日期、人數與行李件數。\n行程參考：https://fuyuntravel.com/itineraries\nJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggageJiufenShifenYehliuOneDayCharterWithKidsAndLuggage"
+  },
+  "plain": {
+    "text": "您好！請問預計哪一天出發？總共有幾位大人／小孩和幾件行李？"
+  },
+  "quote-zh-TW": {
+    "toolName": "get_quote",
+    "input": {
+      "pickup": "台北車站",
+      "destination": "九份老街",
+      "date": "2099-12-04",
+      "passenger_count": 4,
+      "vehicle": "van"
+    },
+    "output": {
+      "kind": "quote",
+      "quote": {
+        "price_available": true,
+        "low": 7000,
+        "high": 8500,
+        "vehicle": "九人座保母車"
+      },
+      "notice": "此為 AI 預估參考範圍價，司機服務費（平日 2,500 / 假日 3,500）另計，最終價格與車輛需由專人確認。"
+    },
+    "text": "參考範圍如下，價格與車況由專人確認。"
+  },
+  "booking-zh-TW": {
+    "toolName": "create_booking",
+    "input": {},
+    "output": {
+      "kind": "booking",
+      "booking_number": "FY-TEST-20991204-AB12",
+      "status": "pending_review",
+      "notice": "這不是正式成交，也不是付款完成。您的訂單已進入待確認清單，我們的專人團隊會在確認車輛檔期後，透過您留下的通訊方式（LINE / WhatsApp / 微信 / 電話）聯繫您並提供正式報價與付款連結。"
+    },
+    "text": "您的需求已進入待確認清單。"
+  },
+  "quote-zh-CN": {
+    "toolName": "get_quote",
+    "input": {
+      "pickup": "台北車站",
+      "destination": "九份老街",
+      "date": "2099-12-04",
+      "passenger_count": 4,
+      "vehicle": "van"
+    },
+    "output": {
+      "kind": "quote",
+      "quote": {
+        "price_available": true,
+        "low": 7000,
+        "high": 8500,
+        "vehicle": "九人座保母車"
+      },
+      "notice": "此为 AI 预估参考范围价，司机服务费（平日 2,500 / 假日 3,500）另计，最终价格与车辆需由专人确认。"
+    },
+    "text": "参考范围如下，价格与车况由专人确认。"
+  },
+  "booking-zh-CN": {
+    "toolName": "create_booking",
+    "input": {},
+    "output": {
+      "kind": "booking",
+      "booking_number": "FY-TEST-20991204-AB12",
+      "status": "pending_review",
+      "notice": "这不是正式成交，也不是付款完成。您的订单已进入待确认清单，我们的专人团队会在确认车辆档期后，通过您留下的通讯方式（LINE / WhatsApp / 微信 / 电话）联系您并提供正式报价与付款链接。"
+    },
+    "text": "您的需求已進入待確認清單。"
+  },
+  "quote-en": {
+    "toolName": "get_quote",
+    "input": {
+      "pickup": "台北車站",
+      "destination": "九份老街",
+      "date": "2099-12-04",
+      "passenger_count": 4,
+      "vehicle": "van"
+    },
+    "output": {
+      "kind": "quote",
+      "quote": {
+        "price_available": true,
+        "low": 7000,
+        "high": 8500,
+        "vehicle": "9-seater van"
+      },
+      "notice": "This is an AI-estimated reference price range. The driver service fee (weekdays NT$2,500 / holidays NT$3,500) is charged separately; the final price and vehicle must be confirmed by our staff."
+    },
+    "text": "With 4 adults and 6 suitcases, I suggest a 9-seater van."
+  },
+  "booking-en": {
+    "toolName": "create_booking",
+    "input": {},
+    "output": {
+      "kind": "booking",
+      "booking_number": "FY-TEST-20991204-AB12",
+      "status": "pending_review",
+      "notice": "This is not a confirmed booking and no payment has been made. Your request is now on our pending-review list. After confirming vehicle availability, our team will contact you via the method you provided (LINE / WhatsApp / WeChat / phone) with a formal quote and payment link."
+    },
+    "text": "Your request is now pending staff review."
+  },
+  "staff": {
+    "toolName": "get_quote",
+    "input": {
+      "pickup": "台北車站",
+      "destination": "九份老街",
+      "date": "2099-12-04",
+      "passenger_count": 4,
+      "vehicle": "五人座"
+    },
+    "output": {
+      "kind": "quote",
+      "quote": {
+        "price_available": false,
+        "low": null,
+        "high": null,
+        "vehicle": "五人座"
+      },
+      "notice": "此为 AI 预估参考范围价，司机服务费（平日 2,500 / 假日 3,500）另计，最终价格与车辆需由专人确认。"
+    },
+    "text": "目前没有表价，将由专人为您报价。"
+  }
+}
