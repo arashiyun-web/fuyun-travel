@@ -1,0 +1,398 @@
+[
+ {
+  "name": "啟動鈕文字",
+  "fg": "#1d1d19",
+  "bg": "#d2b86f",
+  "type": "text",
+  "ratio": 8.72,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "啟動鈕 hover 文字",
+  "fg": "#1d1d19",
+  "bg": "#ddc47d",
+  "type": "text",
+  "ratio": 9.88,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "標頭標題（漸層最暗端）",
+  "fg": "#2b2b2b",
+  "bg": "#efe8d6",
+  "type": "text",
+  "ratio": 11.59,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "標頭標題（漸層亮端）",
+  "fg": "#2b2b2b",
+  "bg": "#f4f1e8",
+  "type": "text",
+  "ratio": 12.54,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "標頭副標",
+  "fg": "#3d3d3d",
+  "bg": "#efe8d6",
+  "type": "text",
+  "ratio": 8.89,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "語言鈕文字",
+  "fg": "#2b2b2b",
+  "bg": "#f8f6f0",
+  "type": "text",
+  "ratio": 13.1,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "收合鈕圖示",
+  "fg": "#2b2b2b",
+  "bg": "#eff0ed",
+  "type": "non-text",
+  "ratio": 12.38,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "AI 泡泡文字",
+  "fg": "#e8e8e8",
+  "bg": "#2f2f2f",
+  "type": "text",
+  "ratio": 10.93,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "客人泡泡文字",
+  "fg": "#1d1d19",
+  "bg": "#d2b86f",
+  "type": "text",
+  "ratio": 8.72,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "泡泡內連結",
+  "fg": "#9cc4ff",
+  "bg": "#2f2f2f",
+  "type": "text",
+  "ratio": 7.49,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "次要字（對話區）",
+  "fg": "#9aa0a6",
+  "bg": "#1f1f1f",
+  "type": "text",
+  "ratio": 6.24,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "次要字（輸入區/聯絡列）",
+  "fg": "#9aa0a6",
+  "bg": "#1a1a1a",
+  "type": "text",
+  "ratio": 6.59,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "輸入框 placeholder",
+  "fg": "#9aa0a6",
+  "bg": "#2f2f2f",
+  "type": "text",
+  "ratio": 5.07,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "日期標籤",
+  "fg": "#9aa0a6",
+  "bg": "#2a2a2a",
+  "type": "text",
+  "ratio": 5.44,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "快捷回覆字",
+  "fg": "#ddc47d",
+  "bg": "#252421",
+  "type": "text",
+  "ratio": 9.07,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "快捷回覆框線",
+  "fg": "#b89b5e",
+  "bg": "#1f1f1f",
+  "type": "non-text",
+  "ratio": 6.19,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "卡片標題",
+  "fg": "#ddc47d",
+  "bg": "#2d2a22",
+  "type": "text",
+  "ratio": 8.37,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "卡片欄位名",
+  "fg": "#9aa0a6",
+  "bg": "#242424",
+  "type": "text",
+  "ratio": 5.88,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "卡片欄位值",
+  "fg": "#e8e8e8",
+  "bg": "#242424",
+  "type": "text",
+  "ratio": 12.67,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "參考價格／待專人確認",
+  "fg": "#ffd479",
+  "bg": "#242424",
+  "type": "text",
+  "ratio": 11.05,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "免責句",
+  "fg": "#f7f3ea",
+  "bg": "#1a1a1a",
+  "type": "text",
+  "ratio": 15.72,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "「須專人確認／待確認」標籤",
+  "fg": "#ffd479",
+  "bg": "#2a2414",
+  "type": "text",
+  "ratio": 10.98,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "訂單編號",
+  "fg": "#f7f3ea",
+  "bg": "#242424",
+  "type": "text",
+  "ratio": 14.02,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "步驟序號",
+  "fg": "#ddc47d",
+  "bg": "#3a3a3a",
+  "type": "text",
+  "ratio": 6.64,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "LINE 鈕",
+  "fg": "#ffffff",
+  "bg": "#066d2b",
+  "type": "text",
+  "ratio": 6.5,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "聯絡鈕（WhatsApp/微信/電話）",
+  "fg": "#e8e8e8",
+  "bg": "#3a3a3a",
+  "type": "text",
+  "ratio": 9.28,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "聯絡方式設定中（虛線鈕字）",
+  "fg": "#cccccc",
+  "bg": "#1a1a1a",
+  "type": "text",
+  "ratio": 10.84,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "停用「確認建立訂單」",
+  "fg": "#cccccc",
+  "bg": "#3a3a3a",
+  "type": "text",
+  "ratio": 7.08,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "停用送出鈕圖示",
+  "fg": "#cccccc",
+  "bg": "#3a3a3a",
+  "type": "non-text",
+  "ratio": 7.08,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "啟用「確認建立訂單」",
+  "fg": "#1d1d19",
+  "bg": "#d2b86f",
+  "type": "text",
+  "ratio": 8.72,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "停止鈕外框",
+  "fg": "#e8e8e8",
+  "bg": "#2f2f2f",
+  "type": "non-text",
+  "ratio": 10.93,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "錯誤標題（暫停/網路）",
+  "fg": "#ff8a8a",
+  "bg": "#2a1f1f",
+  "type": "text",
+  "ratio": 7.04,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "錯誤內文",
+  "fg": "#e8e8e8",
+  "bg": "#2a1f1f",
+  "type": "text",
+  "ratio": 13.04,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "警告標題（太頻繁/太長）",
+  "fg": "#ffd479",
+  "bg": "#2a2414",
+  "type": "text",
+  "ratio": 10.98,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "警告內文",
+  "fg": "#e8e8e8",
+  "bg": "#2a2414",
+  "type": "text",
+  "ratio": 12.59,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "字數超過（1,186/1000）",
+  "fg": "#ff8a8a",
+  "bg": "#1a1a1a",
+  "type": "text",
+  "ratio": 7.67,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "提示泡泡／toast",
+  "fg": "#1d1d19",
+  "bg": "#f7f3ea",
+  "type": "text",
+  "ratio": 15.27,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "語言選單文字",
+  "fg": "#2b2b2b",
+  "bg": "#ffffff",
+  "type": "text",
+  "ratio": 14.16,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "語言選單說明",
+  "fg": "#5c5c5c",
+  "bg": "#ffffff",
+  "type": "text",
+  "ratio": 6.69,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "語言選單選中列說明",
+  "fg": "#5c5c5c",
+  "bg": "#f4efe1",
+  "type": "text",
+  "ratio": 5.82,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "「目前」標籤",
+  "fg": "#1d1d19",
+  "bg": "#d2b86f",
+  "type": "text",
+  "ratio": 8.72,
+  "required": 4.5,
+  "pass_": true
+ },
+ {
+  "name": "focus 外環（深底）",
+  "fg": "#ffd479",
+  "bg": "#1f1f1f",
+  "type": "non-text",
+  "ratio": 11.73,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "focus 內環（米白底）",
+  "fg": "#1d1d19",
+  "bg": "#f4f1e8",
+  "type": "non-text",
+  "ratio": 14.97,
+  "required": 3.0,
+  "pass_": true
+ },
+ {
+  "name": "focus 外環（金色鈕旁，與內環對比）",
+  "fg": "#ffd479",
+  "bg": "#1d1d19",
+  "type": "non-text",
+  "ratio": 12.03,
+  "required": 3.0,
+  "pass_": true
+ }
+]
