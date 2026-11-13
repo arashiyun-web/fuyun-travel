@@ -1,7 +1,7 @@
 import type { Locale } from './viewModel';
 export const LAUNCHER_LABEL = 'AI 旅遊管家';
 export const LANGUAGES: Array<{ value: Locale; label: string; detail: string }> = [
-  { value: 'zh-TW', label: '繁中', detail: '台灣' }, { value: 'zh-CN', label: '简中', detail: '简体' }, { value: 'en', label: 'English', detail: '' },
+  { value: 'zh-TW', label: '繁體中文', detail: '台灣' }, { value: 'zh-CN', label: '简体中文', detail: '简体' }, { value: 'en', label: 'English', detail: '' },
 ];
 export const COPY = {
   'zh-TW': {
@@ -18,7 +18,7 @@ export const COPY = {
     steps: ['專人確認車輛檔期', '透過您留下的方式聯繫您', '提供正式報價與付款連結'],
     pausedTitle: 'AI 客服暫停服務中', pausedBody: 'AI 旅遊管家目前暫時無法回覆。請改用下面的方式，直接聯絡專人：',
     limitedTitle: '詢問太頻繁了', limitedBody: '目前詢問較多，請稍後再試，或直接聯絡專人：', retryPrefix: '請在 ', retrySuffix: ' 秒後再試。',
-    longTitle: '訊息太長', longBody: '單則訊息上限 1,000 字。請縮短訊息；對話過長時可直接聯絡專人：',
+    longTitle: '訊息太長', longBody: '單則訊息上限 1,000 字。請縮短後再送出，或直接聯絡專人：',
     networkTitle: '網路連線中斷', networkBody: '剛剛的回覆未能完成。請檢查網路後重試，或直接聯絡專人：', retry: '重新傳送',
   },
   'zh-CN': {
@@ -35,7 +35,7 @@ export const COPY = {
     steps: ['专人确认车辆档期', '通过您留下的方式联系您', '提供正式报价与付款链接'],
     pausedTitle: 'AI 客服暂停服务中', pausedBody: 'AI 旅游管家目前暂时无法回复。请使用下面的方式，直接联系专人：',
     limitedTitle: '咨询太频繁了', limitedBody: '目前咨询较多，请稍后再试，或直接联系专人：', retryPrefix: '请在 ', retrySuffix: ' 秒后再试。',
-    longTitle: '消息太长', longBody: '单条消息上限 1,000 字。请缩短消息；对话过长时可直接联系专人：',
+    longTitle: '消息太长', longBody: '单条消息上限 1,000 字。请缩短后再发送，或直接联系专人：',
     networkTitle: '网络连接中断', networkBody: '刚才的回复未能完成。请检查网络后重试，或直接联系专人：', retry: '重新发送',
   },
   en: {
@@ -46,13 +46,13 @@ export const COPY = {
     quoteChips: ['Ask our staff', 'Overtime fees?'],
     contacts: ['LINE', 'WhatsApp', 'WeChat', 'Call'], contactLabel: 'Contact our staff', pending: 'Contact details are being configured', copied: 'WeChat ID copied: ', copyFailed: 'Could not copy. WeChat ID: ',
     confirm: 'Confirm & create request', confirmHint: '(after reviewing the summary)', confirmToken: 'I confirm', input: 'Tell us about your trip…', send: 'Send message', stop: 'Stop replying',
-    meta: 'AI replies are for reference; staff confirm price & vehicle', typing: 'AI travel concierge is replying…', stopping: 'Replying… tap ■ to stop', counter: 'Characters',
+    meta: 'AI replies are for reference · staff confirm price', typing: 'AI travel concierge is replying…', stopping: 'Replying… tap ■ to stop', counter: 'Characters',
     quote: 'AI reference range', staff: 'Our staff will provide a quote', staffConfirm: 'Staff to confirm', vehicle: 'Vehicle', date: 'Date', pickup: 'Pick-up', destination: 'Drop-off', people: 'Passengers', availability: 'Availability', pendingAvailability: 'Pending staff confirmation',
     summary: 'Order summary · please review', unsent: 'Not submitted', booking: 'Pending-review request', pendingBooking: 'Pending', number: 'Request no.', payment: 'Payment', unpaid: 'Not paid (link sent by staff later)',
-    steps: ['Staff confirm vehicle availability', 'Our team contact you using your preferred method', 'Staff provide a formal quote and payment link'],
+    steps: ['Our staff confirm vehicle availability', "We'll contact you via your preferred method", "We'll send a formal quote and payment link"],
     pausedTitle: 'AI chat is temporarily unavailable', pausedBody: 'Our AI concierge cannot reply right now. Please contact our staff below:',
     limitedTitle: 'Too many requests', limitedBody: 'Please try again later, or contact our staff:', retryPrefix: 'Please try again in ', retrySuffix: ' seconds.',
-    longTitle: 'Message is too long', longBody: 'Messages can contain up to 1,000 characters. Please shorten your message, or contact our staff if the conversation is too long:',
+    longTitle: 'Message is too long', longBody: 'Messages can contain up to 1,000 characters. Please shorten your message and try again, or contact our staff directly:',
     networkTitle: 'Network connection interrupted', networkBody: 'The reply could not be completed. Check your connection and retry, or contact our staff:', retry: 'Retry message',
   },
 };

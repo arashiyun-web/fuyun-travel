@@ -3,7 +3,8 @@ import type { FormEvent, RefObject } from 'react';
 import type { UIMessage } from 'ai';
 import { ChatIcon, type IconName } from './icons';
 import { COPY, LANGUAGES } from './copy';
-import { phoneHref, type ChatIssue, type ContactHint, type ContactName, type Contacts, type Locale, type Summary } from './viewModel';
+import type { MobileLayout } from './layout';
+import { partyDetails, phoneHref, type ChatIssue, type ContactHint, type ContactName, type Contacts, type Locale, type Summary } from './viewModel';
 
 export type PanelActions = {
   close: () => void; toggleMenu: () => void; locale: (value: Locale) => void; input: (value: string) => void;
@@ -12,7 +13,7 @@ export type PanelActions = {
 };
 export type PanelProps = {
   locale: Locale; messages: UIMessage[]; busy: boolean; input: string; issue: ChatIssue | null; hint: ContactHint;
-  modal?: boolean; menuOpen: boolean; summary: Summary | null; summaryRead: boolean; contacts: Contacts; actions: PanelActions; typingPhase?: number;
+  mobileLayout?: MobileLayout; modal?: boolean; menuOpen: boolean; summary: Summary | null; summaryRead: boolean; contacts: Contacts; actions: PanelActions; typingPhase?: number;
   historyRef: RefObject<HTMLDivElement>; inputRef: RefObject<HTMLTextAreaElement>; closeRef: RefObject<HTMLButtonElement>;
   summaryStartRef: RefObject<HTMLSpanElement>; summaryEndRef: RefObject<HTMLSpanElement>; languageRef?: RefObject<HTMLButtonElement>;
 };
@@ -63,9 +64,9 @@ function ToolCard({ output, input, props }: { output: Output; input: unknown; pr
   const trip = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   if (output.kind === 'quote') {
     const quote = output.quote;
-    const rows: Array<[string, unknown]> = [[c.date, trip.date], [c.pickup, trip.pickup], [c.destination, trip.destination], [c.people, trip.passenger_count]];
+    const rows: Array<[string, unknown]> = [[c.date, trip.date], [c.pickup, trip.pickup], [c.destination, trip.destination], [c.people, partyDetails(trip, props.locale)]];
     return <article className="fy-card" data-tool-card="quote">
-      <div className="fy-card-head"><b>{c.quote}</b><span className="fy-tag fy-pending">{c.staffConfirm}</span></div>
+      <div className="fy-card-head"><b>{c.quote}</b><span className="fy-tag fy-pend">{c.staffConfirm}</span></div>
       <div className="fy-card-body">
         {quote?.vehicle ? <div className="fy-vehicle">{c.vehicle}<b>{quote.vehicle}</b></div> : null}
         <div className={'fy-price' + (!quote?.price_available ? ' fy-staff' : '')}>
@@ -80,7 +81,7 @@ function ToolCard({ output, input, props }: { output: Output; input: unknown; pr
     </article>;
   }
   if (output.kind === 'booking') return <article className="fy-card" data-tool-card="booking">
-    <div className="fy-card-head"><b>{c.booking}</b><span className="fy-tag fy-pending"><ChatIcon name="hourglass" />{c.pendingBooking}</span></div>
+    <div className="fy-card-head"><b>{c.booking}</b><span className="fy-tag fy-pend"><ChatIcon name="hourglass" />{c.pendingBooking}</span></div>
     <div className="fy-card-body"><div className="fy-vehicle">{c.number}</div><p className="fy-booking-number">{output.booking_number}</p>
       <dl className="fy-kv"><div className="fy-kv-row"><dt>{c.availability}</dt><dd className="fy-pc">{c.pendingAvailability}</dd></div><div className="fy-kv-row"><dt>{c.payment}</dt><dd>{c.unpaid}</dd></div></dl>
       <Notice text={output.notice} /><ol className="fy-steps">{c.steps.map((text, index) => <li key={text}><span>{index + 1}</span>{text}</li>)}</ol>
@@ -90,12 +91,17 @@ function ToolCard({ output, input, props }: { output: Output; input: unknown; pr
 }
 function SummaryCard({ summary, props }: { summary: Summary; props: PanelProps }) {
   const c = COPY[props.locale];
+  const rows = summary.rows.filter(([label]) => !/^(?:車況|车况|availability)$/i.test(label.trim()))
+    .map(([label, value]) => [/車型|车型|vehicle/i.test(label) ? c.vehicle : label, value]);
+  if (summary.vehicle) rows.push([c.vehicle, summary.vehicle]);
   return <article className="fy-card" data-order-summary>
     <span className="fy-review-marker" ref={props.summaryStartRef} aria-hidden="true" />
     <div className="fy-card-head"><b>{c.summary}</b><span className="fy-tag">{c.unsent}</span></div>
     <div className="fy-card-body">{summary.rows.length >= 5
-      ? <dl className="fy-kv">{summary.rows.map(([label, value], index) => <div className="fy-kv-row" key={index}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-      : <p className="fy-summary-raw">{summary.text}</p>}</div>
+      ? <dl className="fy-kv">{rows.map(([label, value], index) => <div className="fy-kv-row" key={index}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      : <p className="fy-summary-raw">{summary.text}</p>}
+      <dl className="fy-kv"><div className="fy-kv-row"><dt>{c.availability}</dt><dd className="fy-pc">{c.pendingAvailability}</dd></div></dl>
+    </div>
     <span className="fy-review-marker" ref={props.summaryEndRef} aria-hidden="true" />
   </article>;
 }
@@ -105,6 +111,7 @@ export function ChatPanel(props: PanelProps) {
   const count = Array.from(input).length;
   const hasQuote = messages.some(m => m.parts.some(p => 'output' in p && p.output && typeof p.output === 'object' && 'kind' in p.output && p.output.kind === 'quote'));
   return <section className="fy-panel" id="ai-chat-panel" role="dialog" aria-modal={props.modal || undefined} aria-label={c.title}>
+    {props.mobileLayout === 'panel' ? <div className="fy-handle" aria-hidden="true"><span /></div> : null}
     <header className="fy-header">
       <div className="fy-avatar" aria-hidden="true">浮<span className="fy-dot" /></div>
       <div className="fy-brand"><strong>{c.title}</strong><span>{c.subtitle}</span></div>

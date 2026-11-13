@@ -9,6 +9,7 @@ import { ChatPanel } from './ai-chat/ChatPanel';
 import { ChatIcon } from './ai-chat/icons';
 import { COPY, LAUNCHER_LABEL } from './ai-chat/copy';
 import { WIDGET_STYLES } from './ai-chat/styles';
+import { resolveMobileLayout } from './ai-chat/layout';
 import { ChatHttpError, latestSummary, lockBodyScroll, responseIssue, retrySeconds, viewportVariables,
   type ChatIssue, type ContactHint, type ContactName, type Contacts, type Locale } from './ai-chat/viewModel';
 
@@ -36,6 +37,7 @@ export default function AIChatWidget() {
   const scrolledSummary = useRef('');
   const confirmedSummary = useRef('');
   const c = COPY[locale];
+  const mobileLayout = resolveMobileLayout(process.env.NEXT_PUBLIC_CHAT_MOBILE_LAYOUT);
   const contacts: Contacts = useMemo(() => ({ ...chatContacts, phone: companyConfig.phone }), []);
   useEffect(() => { setLocale(chatLocale(pathname, navigator.language)); }, [pathname]);
   useEffect(() => {
@@ -93,7 +95,17 @@ export default function AIChatWidget() {
   }, [open, mobile]);
   useEffect(() => {
     const element = field.current;
-    if (element) { element.style.height = 'auto'; element.style.height = Math.min(120, element.scrollHeight) + 'px'; }
+    if (element) {
+      element.style.height = 'auto';
+      const overflowing = element.scrollHeight > 120;
+      element.toggleAttribute('data-overflow', overflowing);
+      const size = getComputedStyle(element);
+      const line = parseFloat(size.lineHeight);
+      const padding = parseFloat(size.paddingTop) + parseFloat(size.paddingBottom);
+      // Keep whole lines visible when the textarea reaches its height limit.
+      const limit = Math.floor((120 - padding) / line) * line + padding;
+      element.style.height = Math.min(overflowing ? limit : 120, element.scrollHeight) + 'px';
+    }
   }, [input, open]);
   useEffect(() => {
     const element = history.current;
@@ -134,7 +146,7 @@ export default function AIChatWidget() {
   }, [busy]);
   useEffect(() => {
     if (!hint) return;
-    const timer = window.setTimeout(() => setHint(null), 4500);
+    const timer = window.setTimeout(() => setHint(null), 2500);
     return () => window.clearTimeout(timer);
   }, [hint]);
   useEffect(() => {
@@ -184,16 +196,17 @@ export default function AIChatWidget() {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
   }
-  return <div ref={root} data-ai-chat-widget data-open={open} lang={locale === 'zh-TW' ? 'zh-Hant' : locale === 'zh-CN' ? 'zh-Hans' : 'en'}
+  return <div ref={root} data-ai-chat-widget data-mobile-layout={mobileLayout} data-open={open} lang={locale === 'zh-TW' ? 'zh-Hant' : locale === 'zh-CN' ? 'zh-Hans' : 'en'}
     style={viewport} onKeyDown={keydown} onFocusCapture={event => { if (event.target instanceof HTMLTextAreaElement) setMenuOpen(false); }}>
     <style dangerouslySetInnerHTML={{ __html: WIDGET_STYLES }} />
-    <button ref={trigger} type="button" className="fy-launch" hidden={open} aria-label="開啟 AI 旅遊管家" aria-expanded={open} aria-controls="ai-chat-panel"
+    <button ref={trigger} type="button" className="fy-launch" hidden={open} aria-label={c.open} aria-expanded={open} aria-controls="ai-chat-panel"
       aria-describedby="ai-chat-launcher-tip" onClick={() => setOpen(true)}>
       <span className="fy-ic"><ChatIcon name="chat" /><span className="fy-dot" /></span>
-      <span><b>{LAUNCHER_LABEL}</b><small>24 小時・繁中 / 简中 / EN</small></span>
+      <span><b>{locale === 'en' ? c.bot : LAUNCHER_LABEL}</b><small>{locale === 'en' ? '24/7 · 繁中 / 简中 / EN' : '24 小時・繁中 / 简中 / EN'}</small></span>
       <span className="fy-tooltip" role="tooltip" id="ai-chat-launcher-tip">{c.open}</span>
     </button>
-    {open ? <ChatPanel locale={locale} messages={messages} busy={busy} input={input} issue={issue} hint={hint} menuOpen={menuOpen}
+    {open && mobileLayout === 'panel' ? <button type="button" className="fy-backdrop" tabIndex={-1} aria-label={c.close} onClick={close} /> : null}
+    {open ? <ChatPanel mobileLayout={mobileLayout} locale={locale} messages={messages} busy={busy} input={input} issue={issue} hint={hint} menuOpen={menuOpen}
       summary={summary} summaryRead={summaryRead} contacts={contacts} modal={mobile} typingPhase={typingPhase}
       historyRef={history} inputRef={field} closeRef={closeButton} languageRef={languageButton} summaryStartRef={summaryStart} summaryEndRef={summaryEnd}
       actions={{ close, toggleMenu: () => { setMenuOpen(value => !value); },
