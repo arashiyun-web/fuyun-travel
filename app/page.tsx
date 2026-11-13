@@ -59,11 +59,7 @@ export default function HomePage() {
             ))}
           </nav>
 
-          <div className="home-nav__actions">
-            <a className="home-nav__login" href="/platform/index.html?v=official-member-register-v1#login">
-              平台登入
-            </a>
-          </div>
+          <div className="home-nav__actions" />
         </header>
 
         <HomeHeroV2 />
