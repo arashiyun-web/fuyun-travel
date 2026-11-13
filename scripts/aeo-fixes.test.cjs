@@ -119,3 +119,12 @@ test('public page sources no longer show internal build wording', () => {
   const jsx = tool.slice(tool.indexOf('return ('));
   assert.doesNotMatch(jsx, /WebMCP tool|ChatGPT|Codex|agentic|AI 可直接調用/);
 });
+
+test('organization JSON-LD only uses properties schema.org defines for Organization', () => {
+  const { organizationJsonLd, websiteJsonLd } = load('lib/site.ts');
+  const org = organizationJsonLd();
+  assert.equal('serviceType' in org, false);
+  assert.equal('dateModified' in org, false);
+  assert.ok(Array.isArray(org.knowsAbout) && org.knowsAbout.length > 0);
+  assert.match(websiteJsonLd().dateModified, /^\d{4}-\d{2}-\d{2}$/, 'freshness date stays on WebSite');
+});
