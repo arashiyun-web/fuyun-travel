@@ -29,7 +29,7 @@ export default function ReviewsPage() {
   return (
     <>
       <h1>旅客評價</h1>
-      <p className="lead">未來可串接 Google Business、Facebook 評價與站內審核流程，形成 Review Schema。</p>
+      <p className="lead">旅客回饋依服務類型整理如下。</p>
       <section className="card-grid">
         {reviews.map((review) => (
           <article className="card" key={review.name}>

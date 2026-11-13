@@ -135,11 +135,9 @@ export default function WebMCPQuoteTool() {
 
   return (
     <section className="card webmcp-quote-tool" aria-label="包車報價請求">
-      <h3>包車報價請求（AI 可直接調用 / 人類可手動填）</h3>
+      <h3>包車報價請求</h3>
       <p>
-        此表單同時是一個 <code>WebMCP tool</code>（experimental, origin-trial）。
-        客人的 ChatGPT / Codex / 任何 agentic 瀏覽器可直接呼叫 <code>get_quote</code>，
-        不用靠模擬點擊表單。人可直接在下面手動填——同一套邏輯。
+        填寫出發地、目的地、日期與人數，即可產生 LINE 詢價內容，客服收到後由專人報價。
       </p>
 
       <form onSubmit={onSubmit} onInput={onInput} noValidate>

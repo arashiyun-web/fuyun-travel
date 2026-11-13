@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/site";
 import { fleetItems, serviceItems } from "@/lib/siteContent";
-import { locationPages, moneyPages } from "@/lib/growthPages";
+import { locationPages } from "@/lib/growthPages";
+import { DEFAULT_CONTENT_DATE, SECTION_DATES, STATIC_PAGE_DATES, laterDate, taipeiDate } from "@/lib/contentDates";
 import { toursData } from "@/lib/tours";
 import { listPublishedTravelArticles } from "@/lib/dynamicTravelArticles";
 import { schoolTrips } from "@/lib/travelExplore";
@@ -45,21 +46,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/th",
   ];
 
-  const dynamicPaths = [
-    ...serviceItems.map((item) => `/services/${item.slug}`),
-    ...fleetItems.map((item) => `/fleet/${item.slug}`),
-    ...articles.map((article) => `/travel/${article.slug}`),
-    ...schoolTrips.map((item) => `/school-trips/${item.slug}`),
-    ...toursData.map((tour) => `/itineraries/${tour.id}`),
-    ...locationPages.map((page) => `/charter-bus/${page.slug}`),
-    ...moneyPages.map((page) => `/service/${page.slug}`),
+  // /service/* 已 301 到 /services/*（正本），sitemap 只列正本。
+  const dynamicPaths: Array<[string, string]> = [
+    ...serviceItems.map((item): [string, string] => [`/services/${item.slug}`, SECTION_DATES.services]),
+    ["/services/price", SECTION_DATES.services],
+    ...fleetItems.map((item): [string, string] => [`/fleet/${item.slug}`, SECTION_DATES.fleet]),
+    ...articles.map((article): [string, string] => [`/travel/${article.slug}`, laterDate(article.publishDate || DEFAULT_CONTENT_DATE, SECTION_DATES.travelTemplate)]),
+    ...schoolTrips.map((item): [string, string] => [`/school-trips/${item.slug}`, SECTION_DATES.schoolTrips]),
+    ...toursData.map((tour): [string, string] => [`/itineraries/${tour.id}`, SECTION_DATES.itineraries]),
+    ...locationPages.map((page): [string, string] => [`/charter-bus/${page.slug}`, SECTION_DATES.charterBus]),
   ];
 
-  const standardEntries: MetadataRoute.Sitemap = [...staticPaths, ...dynamicPaths].filter((path) => !unindexedPaths.has(path)).map((path) => ({
+  const datedPaths: Array<[string, string]> = [
+    ...staticPaths.map((path): [string, string] => [path, STATIC_PAGE_DATES[path] || DEFAULT_CONTENT_DATE]),
+    ...dynamicPaths,
+  ];
+
+  const standardEntries: MetadataRoute.Sitemap = datedPaths.filter(([path]) => !unindexedPaths.has(path)).map(([path, date]) => ({
     url: absoluteUrl(path),
-    lastModified: new Date(),
+    lastModified: taipeiDate(date),
     changeFrequency: path === "/" ? "daily" : "weekly",
-    priority: path === "/" ? 1 : path.includes("/service/") || path.includes("/charter-bus/") ? 0.85 : 0.7,
+    priority: path === "/" ? 1 : path.startsWith("/services/") || path.includes("/charter-bus/") ? 0.85 : 0.7,
   }));
 
   const knowledgeSitemapEntries: MetadataRoute.Sitemap = knowledgeEntries.map((entry) => ({

@@ -29,7 +29,7 @@ export default function FeaturedTripsPage() {
   return (
     <>
       <h1>熱門旅遊內容</h1>
-      <p className="lead">第一版以站內內容與社群互動欄位示範，未來可串接 Facebook Graph API 同步貼文、圖片、影片、按讚數、留言數與分享數。</p>
+      <p className="lead">精選站內熱門旅遊內容，點進文章可看行程重點與包車建議。</p>
       <section className="card-grid">
         {ranked.map((item) => (
           <article className="card" key={item.slug}>

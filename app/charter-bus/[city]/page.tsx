@@ -47,8 +47,8 @@ export default function CharterBusLocationPage({ params }: Props) {
           <p>{page.city}出發可安排遊覽車、中巴或九人座，依人數、停靠點、行李與行程時間評估。</p>
         </div>
         <div className="card">
-          <h3>LocalBusiness Schema</h3>
-          <p>本頁已加入旅行社與地區服務結構化資料，支援 Local SEO。</p>
+          <h3>包車價格</h3>
+          <p>各車型一日遊價格、超時與加價規定，請見<Link href="/services/price">包車價目表</Link>。</p>
         </div>
         <div className="card">
           <h3>立即詢價</h3>

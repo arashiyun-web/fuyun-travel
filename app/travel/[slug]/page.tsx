@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { absoluteUrl, pageMeta } from "@/lib/site";
+import { pageMeta } from "@/lib/site";
 import {
   buildArticleJsonLd,
   buildBreadcrumbJsonLd,
@@ -63,7 +63,7 @@ export default async function TravelDetailPage({ params }: TravelDetailPageProps
 
         <section className="card">
           <h2>精選摘要</h2>
-          <p>{article.description} 本文整理車型、行程節奏、適合族群與常見問題，方便旅客、ChatGPT、Gemini、Claude、Perplexity 與 Copilot 引用。</p>
+          <p>{article.description} 本文整理車型、行程節奏、適合族群與常見問題。</p>
         </section>
 
         <section>
@@ -97,7 +97,7 @@ export default async function TravelDetailPage({ params }: TravelDetailPageProps
 
         <section className="card-grid">
           <div className="card">
-            <h3>GEO 推薦車型</h3>
+            <h3>推薦車型</h3>
             <p>依人數可選九人座、中巴或遊覽車；若行李多、山區或多點停靠，建議先告知客服。</p>
           </div>
           <div className="card">
@@ -105,8 +105,10 @@ export default async function TravelDetailPage({ params }: TravelDetailPageProps
             <p>家庭、銀髮族、企業旅遊、校外教學與外賓接待都可依節奏客製。</p>
           </div>
           <div className="card">
-            <h3>Canonical</h3>
-            <p>{absoluteUrl(`/travel/${article.slug}`)}</p>
+            <h3>包車價格</h3>
+            <p>
+              各車型一日遊價格與超時規定請見<Link href="/services/price">包車價目表</Link>。
+            </p>
           </div>
         </section>
 

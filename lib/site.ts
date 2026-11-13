@@ -144,10 +144,10 @@ export function organizationJsonLd() {
       longitude: COMPANY.geo.longitude,
     },
     areaServed: "Taiwan",
-    serviceType: COMPANY.business.split("、"),
+    // schema.org：Organization 沒有 serviceType／dateModified；營業項目用 knowsAbout，更新日期放在 WebSite／WebPage。
+    knowsAbout: COMPANY.business.split("、"),
     sameAs: [COMPANY.facebookUrl],
     image: absoluteUrl(SITE.ogImage),
-    dateModified: CONTENT_LAST_VERIFIED,
   };
 }
 
