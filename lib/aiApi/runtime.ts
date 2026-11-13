@@ -10,8 +10,8 @@ function adapter(client: Prisma.TransactionClient): SqlDatabase {
     transaction: fn => fn(adapter(client)),
   };
 }
-const db: SqlDatabase = {
+export const aiDatabase: SqlDatabase = {
   ...adapter(prisma),
   transaction: fn => prisma.$transaction(tx => fn(adapter(tx)), { timeout: 15000 }),
 };
-export const aiApi = new AiApiService(createAiStore(db), notifyBooking);
+export const aiApi = new AiApiService(createAiStore(aiDatabase), notifyBooking);

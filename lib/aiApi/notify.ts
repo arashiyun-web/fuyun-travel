@@ -21,7 +21,7 @@ type NotificationBooking = {
   passengerCount: number;
   vehicle: string | null;
   contactName: string;
-  phone: string;
+  phone: string | null;
 };
 type Delivery = {
   recipient: string;
@@ -62,7 +62,7 @@ export function bookingNotificationText(booking: NotificationBooking): string {
     `人數：${booking.passengerCount}`,
     `車型：${singleLine(booking.vehicle || "未指定", 60)}`,
     `聯絡人：${singleLine(booking.contactName, 60)}`,
-    `電話末三碼：${booking.phone.replace(/\D/g, "").slice(-3)}`,
+    `電話末三碼：${(booking.phone || "").replace(/\D/g, "").slice(-3)}`,
     `https://fuyuntravel.com/admin/ai-bookings/${encodeURIComponent(booking.id)}`,
   ].join("\n");
 }
@@ -120,7 +120,7 @@ async function deliver(id: string, owner: string, options: NotifyOptions) {
   if (!booking) return null;
   const saved = readDeliveries(booking.notificationDeliveries);
   const text = bookingNotificationText(booking);
-  const deliveries: Delivery[] = saved ?? lineAdminRecipients(process.env.LINE_ADMIN_USER_ID, process.env.ADMIN_LINE_USER_ID)
+  const deliveries: Delivery[] = saved ?? lineAdminRecipients(process.env.LINE_ADMIN_USER_ID, booking.source === "web_chat" ? undefined : process.env.ADMIN_LINE_USER_ID)
     .map(recipient => ({ recipient, text, retryKey: bookingNotificationRetryKey(booking.notificationRetryKey, recipient),
       status: "pending", attempts: 0 }));
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds)));
