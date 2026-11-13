@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import "./globals.css";
 import FloatingContactBarV2 from "@/components/FloatingContactBar_v2";
@@ -95,6 +96,7 @@ export default function RootLayout({
         <Footer />
         <FloatingContactBarV2 />
         <FloatingLineButton />
+        <Analytics />
       </body>
     </html>
   );
