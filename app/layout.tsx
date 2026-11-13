@@ -6,6 +6,7 @@ import "./globals.css";
 import FloatingContactBarV2 from "@/components/FloatingContactBar_v2";
 import FloatingLineButton from "@/components/FloatingLineButton";
 import Footer from "@/components/Footer";
+import AIChatWidget from '@/components/AIChatWidget';
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -95,6 +96,7 @@ export default function RootLayout({
         <Footer />
         <FloatingContactBarV2 />
         <FloatingLineButton />
+        <AIChatWidget />
       </body>
     </html>
   );

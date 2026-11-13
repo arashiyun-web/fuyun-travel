@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type BookingRow = {
+  source: string; contactChannel: string; contactId: string | null; luggageCount: number | null;
   id: string; bookingNumber: string; date: string; endDate: string | null;
   pickup: string; destination: string; passengerCount: number; vehicle: string | null;
   status: string; isTest: boolean; notificationStatus: string;
@@ -40,11 +41,12 @@ export default function AiBookingList() {
       <table className="w-full text-left text-sm">
         <caption className="sr-only">最近 100 筆 AI 待確認訂單</caption>
         <thead className="text-xs text-slate-400"><tr>
-          {['單號', '日期', '路線', '人數／車型', '審核', 'LINE 通知'].map(label => <th key={label} scope="col" className="p-4">{label}</th>)}
+          {['單號', '來源／聯絡', '日期', '路線', '人數／車型', '審核', 'LINE 通知'].map(label => <th key={label} scope="col" className="p-4">{label}</th>)}
         </tr></thead>
         <tbody>{rows?.map(row => <tr key={row.id} className="border-t border-slate-800">
           <td className="p-4"><Link href={`/admin/ai-bookings/${encodeURIComponent(row.id)}`} className="font-mono text-amber-300 underline">{row.bookingNumber}</Link>
             {row.isTest ? <span className="mt-1 block text-xs text-sky-300">測試單</span> : null}</td>
+          <td className="p-4">{row.source === "web_chat" ? "網頁客服" : "API"}<br />{row.contactChannel || "phone"}：{row.contactId || "—"}<br />行李 {row.luggageCount ?? "未填"} 件</td>
           <td className="p-4">{row.date}{row.endDate ? ` ～ ${row.endDate}` : ""}</td>
           <td className="p-4">{row.pickup} → {row.destination}</td>
           <td className="p-4">{row.passengerCount} 人／{row.vehicle || "未指定"}</td>
