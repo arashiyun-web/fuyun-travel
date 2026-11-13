@@ -240,6 +240,12 @@ export default function AdminPage() {
             <button type="button" onClick={() => window.location.assign("/admin/quotes")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               報價草稿
             </button>
+            <a href="/admin/api-keys" className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              AI API 金鑰
+            </a>
+            <a href="/admin/ai-bookings" className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
+              AI 待確認訂單
+            </a>
             <button type="button" onClick={() => window.location.assign("/admin/members")} className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 transition-all">
               會員
             </button>
