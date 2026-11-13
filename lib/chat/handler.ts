@@ -10,6 +10,27 @@ import { customerConfirmed, isConfirmation, safeModelText, replyLocale } from '.
 import { CHAT_SYSTEM_PROMPT, QUOTE_NOTICES, BOOKING_NOTICES, PROMPT_VERSION } from './systemPrompt';
 import type { ChatStore } from './store';
 type Dependencies = { apiKey: () => string | undefined; modelName: () => string | undefined; model: (name: string) => LanguageModel; store: ChatStore; aiApi: AiApiService; notify: (id: string) => Promise<unknown>; now?: () => Date };
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+}
+function redactSecret(value: string) {
+  return value
+    .replace(/sk-[A-Za-z0-9_\-]+/g, '[redacted]')
+    .replace(/fyk_[A-Za-z0-9_\-]+/g, '[redacted]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, 'postgresql://[redacted]');
+}
+function logChatStreamError({ error }: { error: unknown }) {
+  const rec = asRecord(error) || {};
+  const cause = asRecord(rec.cause);
+  const data = asRecord(rec.data);
+  const inner = asRecord(data?.error) || asRecord(rec.error);
+  const status = rec.status ?? rec.statusCode ?? cause?.status ?? cause?.statusCode ?? inner?.status;
+  const code = inner?.code ?? rec.code ?? cause?.code;
+  const type = (typeof inner?.type === 'string' && inner.type) || (error instanceof Error ? error.name : typeof error);
+  const message = redactSecret(String(inner?.message ?? rec.message ?? cause?.message ?? (error instanceof Error ? error.message : '') || '')).slice(0, 500);
+  console.error('chat.stream', { type, status: status ?? null, code: code ?? null, message });
+}
 export function createChatHandler(deps: Dependencies) {
   return async function POST(request: Request) {
     let releasePending: (() => Promise<void>) | undefined;
@@ -98,7 +119,7 @@ export function createChatHandler(deps: Dependencies) {
         model: deps.model(modelName), system: CHAT_SYSTEM_PROMPT + '\nInterface language: ' + body.locale,
         messages: await convertToModelMessages(body.messages.slice(-20)),
         tools, maxOutputTokens: 800, stopWhen: stepCountIs(5), maxRetries: 0, abortSignal: request.signal,
-        onError: () => {},
+        onError: logChatStreamError,
         onStepEnd: async event => {
           for (const call of event.toolCalls) if (Object.hasOwn(tools, call.toolName) && !seen.has(call.toolCallId)) {
             seen.add(call.toolCallId); observe(call.toolName as Operation, call.input, Date.now(), 400);
