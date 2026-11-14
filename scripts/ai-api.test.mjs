@@ -22,7 +22,9 @@ async function fixture(name = 'TEST-offline') {
   const { createAiStore } = load('lib/aiApi/store.ts');
   const pg = new PGlite();
   await pg.exec(readFileSync(root + '/prisma/migrations/202611130001_ai_api/migration.sql', 'utf8'));
-  const adapter = (client) => ({ query: async (sql, values = []) => (await client.query(sql, values)).rows,
+  if (existsSync(root + '/prisma/migrations/202611140001_ai_confirm_flow/migration.sql')) await pg.exec(readFileSync(root + '/prisma/migrations/202611140001_ai_confirm_flow/migration.sql', 'utf8'));
+  let statements = 0;
+  const adapter = (client) => ({ query: async (sql, values = []) => { statements++; return (await client.query(sql, values)).rows; },
     transaction: (fn) => client.transaction(tx => fn(adapter(tx))) });
   let now = new Date('2099-12-01T00:00:00Z');
   await pg.query('INSERT INTO api_keys (id,key_hash,key_prefix,name) VALUES ($1,$2,$3,$4)', ['key-1', createHash('sha256').update(token).digest('hex'), 'fyk_aaaa', name]);
@@ -33,7 +35,7 @@ async function fixture(name = 'TEST-offline') {
   activeService = service;
   const routes = ['quote', 'availability', 'bookings'].map(p => load(`app/api/public/v1/${p}/route.ts`));
   const mcp = load('app/api/mcp/route.ts');
-  return { pg, service, store, database, routes, mcp, notices: () => notices, time: value => { now = new Date(value); } };
+  return { pg, service, store, database, routes, mcp, notices: () => notices, statements: () => statements, time: value => { now = new Date(value); } };
 }
 
 for (const [index, name] of ['get_quote', 'check_availability', 'create_booking'].entries()) {
@@ -47,7 +49,7 @@ for (const [index, name] of ['get_quote', 'check_availability', 'create_booking'
       const value = await ok.json();
       if (index === 0) { assert.equal(value.low, 9500); assert.equal(value.high, 11000); assert.equal(value.requires_human_confirmation, true); }
       if (index === 1) assert.equal(value.status, 'pending_human_confirmation');
-      if (index === 2) { assert.match(value.booking_number, /^FY-TEST-20991201-[A-Z0-9]{4}$/); assert.equal(value.status, 'pending_review'); }
+      if (index === 2) { assert.match(value.booking_number, /^FY-TEST-20991201-[A-Z0-9]{4}$/); assert.equal(value.status, 'pending'); }
       for (const invalid of [{ passenger_count: 0 }, { passenger_count: 61 }, { date: '2000-01-01' }, { date: '2099-02-30' }, ...(index === 2 ? [{ phone: 'abc' }] : [])]) {
         const res = await route.POST(request({ ...body, ...invalid })); assert.equal(res.status, 400);
         assert.ok((await res.json()).issues.some(issue => issue.path.length > 0));
@@ -70,7 +72,7 @@ for (const [index, name] of ['get_quote', 'check_availability', 'create_booking'
       const result = JSON.parse(value.result.content[0].text);
       if (index === 0) assert.equal(result.low, 9500);
       if (index === 1) assert.equal(result.status, 'pending_human_confirmation');
-      if (index === 2) assert.equal(result.status, 'pending_review');
+      if (index === 2) assert.equal(result.status, 'pending');
       assert.equal((await call({ ...body, passenger_count: 0 })).status, 400);
       assert.equal((await call({ ...body, date: '1990-01-01' })).status, 400);
       await f.pg.query("UPDATE api_rate_counters SET count=30 WHERE scope='minute'");
@@ -212,16 +214,18 @@ test('notification failure preserves a new booking and marks failed; plain key h
   } finally { await f.pg.close(); }
 });
 
-test('MCP initializes and lists exactly three tools; GET/DELETE still require a key', async () => {
+test('MCP initializes and lists exactly four tools; GET/DELETE still require a key', async () => {
   const f = await fixture();
   try {
     for (const method of ['GET', 'DELETE']) assert.equal((await f.mcp[method](new Request('http://localhost/api/mcp', { method }))).status, 401);
     for (const method of ['initialize', 'tools/list']) {
       const response = await f.mcp.POST(request({ jsonrpc: '2.0', id: 5, method, ...(method === 'initialize' ? { params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'offline', version: '1' } } } : {}) }, token, { Accept: 'application/json, text/event-stream' }));
       assert.equal(response.status, 200); const body = await response.json();
-      if (method === 'tools/list') assert.deepEqual(body.result.tools.map(t => t.name).sort(), ['check_availability', 'create_booking', 'get_quote']);
+      if (method === 'tools/list') { assert.deepEqual(body.result.tools.map(t => t.name).sort(), ['check_availability', 'create_booking', 'get_booking_status', 'get_quote']); assert.equal(body.result.tools.find(t=>t.name==='get_booking_status').annotations.readOnlyHint,true); }
       else assert.equal(body.result.serverInfo.name, 'fuyun-travel');
     }
+    for(const method of ['GET','DELETE']) assert.equal((await f.mcp[method](new Request('http://localhost/api/mcp',{method,headers:{Authorization:'Bearer '+token}}))).status,405);
+    assert.equal((await f.pg.query("SELECT count(*)::int n FROM ai_api_audit_logs WHERE http_status=503")).rows[0].n,0,'unsupported HTTP methods must not be audited as a service failure');
   } finally { await f.pg.close(); }
 });
 
@@ -271,7 +275,7 @@ test('official MCP client negotiates stateless transport, lists tools and calls 
   });
   try {
     await client.connect(transport);
-    assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), ['check_availability', 'create_booking', 'get_quote']);
+    assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), ['check_availability', 'create_booking', 'get_booking_status', 'get_quote']);
     const result = await client.callTool({ name: 'get_quote', arguments: trip });
     const quote = JSON.parse(result.content[0].text); assert.equal(quote.low, 9500); assert.equal(quote.high, 11000);
     assert.equal(quote.requires_human_confirmation, true);
@@ -334,4 +338,196 @@ test('a booking replay across Taipei midnight returns the existing order even wh
     assert.equal(f.notices(), 1);
     assert.equal((await f.pg.query('SELECT count(*)::int AS n FROM ai_bookings')).rows[0].n, 1);
   } finally { await f.pg.close(); }
+});
+
+
+test('query code is shown once, stored only as hash and hidden on replay', async () => {
+  const f = await fixture();
+  try {
+    const send = () => f.routes[2].POST(request(booking, token, { 'Idempotency-Key': 'query-once' }));
+    const first = await (await send()).json();
+    assert.match(first.query_code, /^fyq_[A-Za-z0-9_-]{43}$/);
+    assert.equal(first.query_code_note, '請妥善保存，僅此一次顯示；遺失可用單號＋電話末四碼查詢');
+    const row = (await f.pg.query('SELECT * FROM ai_bookings')).rows[0];
+    assert.equal(row.query_code_hash, createHash('sha256').update(first.query_code).digest('hex'));
+    assert.equal(JSON.stringify(row).includes(first.query_code), false);
+    const replay = await (await send()).json();
+    assert.equal(replay.query_code, null); assert.equal(replay.query_code_note, first.query_code_note);
+  } finally { await f.pg.close(); }
+});
+
+const statusKeys = ['booking_number','status','status_label','is_test','created_at','status_updated_at','trip','requires_human_confirmation','disclaimer','disclaimer_en'].sort();
+const noMatch = { error: 'No matching booking for the supplied booking number and verification' };
+function assertStatusOnly(value) {
+  assert.deepEqual(Object.keys(value).sort(), statusKeys);
+  assert.deepEqual(Object.keys(value.trip).sort(), ['date','end_date','time','passenger_count','vehicle'].sort());
+  for (const field of ['contact_name','phone','email','pickup','destination','notes','quote_range','id','notification_status','query_code','query_code_hash','api_key_id']) {
+    assert.equal(field in value, false, field); assert.equal(field in value.trip, false, field);
+  }
+  assert.equal(value.requires_human_confirmation, true);
+}
+function statusCalls(f) {
+  assert.ok(existsSync(root + '/app/api/public/v1/bookings/status/route.ts'), 'status POST route exists');
+  const route = load('app/api/public/v1/bookings/status/route.ts');
+  return [
+    async (body, auth = token) => route.POST(request(body, auth)),
+    async (body, auth = token) => f.mcp.POST(request({ jsonrpc:'2.0',id:12,method:'tools/call',params:{name:'get_booking_status',arguments:body}}, auth, { Accept:'application/json, text/event-stream' })),
+  ];
+}
+const statusValue = async (response, index) => { const body = await response.json(); return index ? JSON.parse(body.result.content[0].text) : body; };
+test('REST and MCP status share strict verification and a non-PII whitelist for all four states', async () => {
+  const f = await fixture();
+  try {
+    const created = await (await f.routes[2].POST(request(booking))).json();
+    const calls = statusCalls(f);
+    for (const [internal, publicStatus, label] of [['pending_review','pending','待專人確認'],['confirmed','confirmed_by_staff','專人已確認'],['rejected','rejected','已婉拒'],['cancelled','cancelled','已取消']]) {
+      await f.pg.query('UPDATE ai_bookings SET status=$1,status_changed_at=$2 WHERE booking_number=$3', [internal,new Date('2099-12-01T01:00:00Z'),created.booking_number]);
+      for (const [index, call] of calls.entries()) {
+        const response = await call({ booking_number:created.booking_number,query_code:created.query_code }); assert.equal(response.status,200);
+        const value = await statusValue(response,index); assertStatusOnly(value);
+        assert.equal(value.status,publicStatus); assert.equal(value.status_label,label); assert.equal(value.status_updated_at,'2099-12-01T01:00:00.000Z');
+        assert.equal(value.disclaimer.includes('車況與價格一律待專人確認'),true);
+        assert.equal(value.disclaimer.includes('本接口不處理付款'),internal === 'confirmed');
+      }
+    }
+    for(const [index,call] of calls.entries()) {
+      const response=await call({booking_number:created.booking_number,phone_last4:'5678'});assert.equal(response.status,200);assertStatusOnly(await statusValue(response,index));
+      assert.equal((await call({booking_number:created.booking_number,phone_last4:'5678'},null)).status,401);
+      for(const verification of [{phone_last4:'123'},{phone_last4:'abcd'},{phone_last4:'5678',query_code:created.query_code},{phone_last4:'5678',status:'confirmed'}]) assert.equal((await call({booking_number:created.booking_number,...verification})).status,400);
+    }
+  } finally { await f.pg.close(); }
+});
+test('wrong code, unknown number, foreign key and wrong phone give identical 404 bodies in REST and MCP', async () => {
+  const f=await fixture();
+  try {
+    const created=await (await f.routes[2].POST(request(booking))).json();
+    const token2='fyk_'+'b'.repeat(43);
+    await f.pg.query('INSERT INTO api_keys (id,key_hash,key_prefix,name) VALUES ($1,$2,$3,$4)',['key-2',createHash('sha256').update(token2).digest('hex'),'fyk_bbbb','TEST-other']);
+    const queryCounts=[];
+    for(const call of statusCalls(f)) {
+      for(const [body,auth] of [
+        [{booking_number:created.booking_number,query_code:'fyq_'+'x'.repeat(43)},token],
+        [{booking_number:'FY-TEST-20991201-ZZZZ',query_code:created.query_code},token],
+        [{booking_number:created.booking_number,query_code:created.query_code},token2],
+        [{booking_number:created.booking_number,phone_last4:'0000'},token],
+        [{booking_number:created.booking_number,query_code:'incorrect'},token],
+        [{booking_number:'does-not-exist',query_code:created.query_code},token],
+      ]) {const before=f.statements();const response=await call(body,auth);queryCounts.push(f.statements()-before);assert.equal(response.status,404);assert.deepEqual(await response.json(),noMatch);}
+    }
+    assert.equal(new Set(queryCounts).size,1,'all failed verifications use the same number of DB statements');
+  } finally { await f.pg.close(); }
+});
+test('status failure quota persists across 404 transactions; 11th failure is 429 and success is not counted', async () => {
+  const f=await fixture();
+  try {
+    const created=await (await f.routes[2].POST(request({...booking,phone:'+886 (912) 345-678'}))).json();
+    const [rest,mcp]=statusCalls(f);
+    const good={booking_number:created.booking_number,phone_last4:'5678'};
+    assert.equal((await rest(good)).status,200);
+    assert.equal((await f.pg.query("SELECT count(*)::int n FROM api_rate_counters WHERE scope='status_fail_hour'")).rows[0].n,0);
+    for(let n=0;n<10;n++)assert.equal((await (n%2?mcp:rest)({...good,phone_last4:'0000'})).status,404);
+    const limited=await rest({...good,phone_last4:'0000'});assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'3600');
+    assert.equal((await mcp(good)).status,200,'correct verification does not consume failure quota');
+    f.time('2099-12-01T01:00:00Z');assert.equal((await rest({...good,phone_last4:'0000'})).status,404);
+  } finally {await f.pg.close();}
+});
+test('status minute quota is 20 across both channels and service instances, with minute reset', async () => {
+  const f=await fixture();
+  try {
+    const created=await (await f.routes[2].POST(request(booking))).json();
+    const calls=statusCalls(f);const body={booking_number:created.booking_number,query_code:created.query_code};
+    for(let n=0;n<20;n++)assert.equal((await calls[n%2](body)).status,200);
+    const response=await calls[0](body);assert.equal(response.status,429);assert.equal(response.headers.get('Retry-After'),'60');
+    const {AiApiService}=load('lib/aiApi/service.ts');const {createAiStore}=load('lib/aiApi/store.ts');
+    const another=new AiApiService(createAiStore(f.database),async()=>{},()=>new Date('2099-12-01T00:00:00Z'));
+    await assert.rejects(()=>another.authorize(request(body),'get_booking_status'),error=>error.status===429);
+    f.time('2099-12-01T00:01:00Z');assert.equal((await calls[1](body)).status,200);
+  } finally {await f.pg.close();}
+});
+test('tool audit captures 401/400/404/429 and replay without recording any input, credentials or PII', async () => {
+  const f=await fixture();
+  try {
+    const created=await (await f.routes[2].POST(request(booking,token,{'Idempotency-Key':'audit-replay'}))).json();
+    await f.routes[2].POST(request(booking,token,{'Idempotency-Key':'audit-replay'}));
+    const [rest,mcp]=statusCalls(f);const good={booking_number:created.booking_number,query_code:created.query_code};
+    for(const call of [rest,mcp]) {
+      await call(good,null);await call({...good,phone_last4:'5678'});await call({...good,query_code:'fyq_'+'z'.repeat(43)});
+      await call(good);
+    }
+    await f.pg.query("UPDATE api_rate_counters SET count=20 WHERE scope='status_minute'");await rest(good);await mcp(good);
+    const logs=(await f.pg.query("SELECT * FROM ai_api_audit_logs WHERE event_type='tool_call' ORDER BY created_at")).rows;
+    assert.equal(logs.length,12);assert.ok(logs.some(l=>l.detail.replay === true));
+    for(const channel of ['rest','mcp']) for(const status of [200,400,401,404,429]) assert.ok(logs.some(l=>l.channel===channel&&l.http_status===status),channel+status);
+    assert.ok(logs.filter(l=>l.http_status===401).every(l=>l.api_key_id===null));
+    const serialized=JSON.stringify(logs);
+    for(const secret of [token,created.query_code,booking.phone,booking.contact_name,booking.pickup,booking.destination,'5678','audit-replay'])assert.equal(serialized.includes(secret),false,secret);
+    assert.ok(logs.every(l=>l.duration_ms>=0&&typeof l.request_id==='string'));
+    await f.pg.exec('DROP TABLE ai_api_audit_logs');
+    assert.equal((await f.routes[0].POST(request(trip))).status,200,'audit failure must not fail API');
+  } finally {await f.pg.close();}
+});
+test('external AI cannot inject confirmed status through create or status in either channel', async()=>{
+  const f=await fixture();try {
+    assert.equal((await f.routes[2].POST(request({...booking,status:'confirmed'}))).status,400);
+    const created=await (await f.routes[2].POST(request(booking))).json();
+    for(const call of statusCalls(f))assert.equal((await call({booking_number:created.booking_number,phone_last4:'5678',status:'confirmed'})).status,400);
+    const response=await f.mcp.POST(request({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'create_booking',arguments:{...booking,status:'confirmed'}}},token,{Accept:'application/json, text/event-stream'}));assert.equal(response.status,400);
+    assert.deepEqual((await f.pg.query('SELECT status FROM ai_bookings')).rows.map(r=>r.status),['pending_review']);
+  } finally {await f.pg.close();}
+});
+
+
+test('incremental migration preserves existing bookings, adds safe constraints/FKs and rollback refuses cancelled data',async()=>{
+  const pg=new PGlite();
+  try {
+    await pg.exec(readFileSync(root+'/prisma/migrations/202611130001_ai_api/migration.sql','utf8'));
+    await pg.query('INSERT INTO api_keys(id,key_hash,key_prefix,name) VALUES ($1,$2,$3,$4)',['legacy-key','a'.repeat(64),'fyk_fixture','TEST-legacy']);
+    await pg.exec("INSERT INTO ai_bookings(id,booking_number,api_key_id,contact_name,phone,date,time,pickup,destination,passenger_count,notification_retry_key) VALUES ('legacy','FY-TEST-20991201-AAAA','legacy-key','fixture','0912345678','2099-12-04','09:00','fixture','fixture',2,'fixture')");
+    const before=(await pg.query('SELECT * FROM ai_bookings')).rows[0];
+    await pg.exec(readFileSync(root+'/prisma/migrations/202611140001_ai_confirm_flow/migration.sql','utf8'));
+    const after=(await pg.query('SELECT * FROM ai_bookings')).rows[0];
+    for(const key of Object.keys(before))assert.deepEqual(after[key],before[key]);
+    assert.equal(after.query_code_hash,null);assert.equal(after.status_changed_at,null);assert.equal(after.status_changed_by,null);
+    await assert.rejects(()=>pg.exec("UPDATE ai_bookings SET query_code_hash='plaintext'"));
+    await assert.rejects(()=>pg.exec("UPDATE ai_bookings SET status='paid'"));
+    await pg.exec("INSERT INTO ai_api_audit_logs(id,event_type,channel,api_key_id,booking_id,outcome) VALUES ('audit','status_change','admin','legacy-key','legacy','success')");
+    await assert.rejects(()=>pg.exec("DELETE FROM ai_bookings WHERE id='legacy'"));
+    await assert.rejects(()=>pg.exec("UPDATE ai_api_audit_logs SET event_type='body'"));
+    await pg.exec("UPDATE ai_bookings SET status='cancelled'");
+    const rollback=readFileSync(root+'/prisma/migrations/202611140001_ai_confirm_flow/rollback.sql.txt','utf8');
+    await assert.rejects(()=>pg.exec(rollback),/cancelled bookings/);await pg.exec('ROLLBACK');
+    assert.equal((await pg.query('SELECT status FROM ai_bookings')).rows[0].status,'cancelled');
+    await pg.exec("UPDATE ai_bookings SET status='pending_review'");await pg.exec(rollback);
+    assert.equal((await pg.query('SELECT id,status FROM ai_bookings')).rows[0].id,'legacy');
+    await assert.rejects(()=>pg.exec("UPDATE ai_bookings SET status='cancelled'"));
+  } finally {await pg.close();}
+});
+test('legacy bookings without a query hash remain accessible through phone suffix only',async()=>{
+  const f=await fixture();try{
+    const created=await (await f.routes[2].POST(request(booking))).json();
+    await f.pg.exec('UPDATE ai_bookings SET query_code_hash=NULL');
+    const [rest]=statusCalls(f);
+    const phone=await rest({booking_number:created.booking_number,phone_last4:'5678'});assert.equal(phone.status,200);const value=await phone.json();assert.equal(value.status_updated_at,value.created_at);
+    for(const query_code of [created.query_code,'']) { const code=await rest({booking_number:created.booking_number,query_code});assert.equal(code.status,404);assert.deepEqual(await code.json(),noMatch); }
+  }finally{await f.pg.close();}
+});
+
+
+test('a key revoked after authorization still yields a 401 audit with null api_key_id',async()=>{
+  const f=await fixture();try{
+    const create=f.store.createBooking.bind(f.store);
+    f.store.createBooking=async(...args)=>{await f.pg.exec("UPDATE api_keys SET disabled_at=now() WHERE id='key-1'");return create(...args);};
+    const response=await f.routes[2].POST(request(booking));assert.equal(response.status,401);
+    const log=(await f.pg.query("SELECT api_key_id FROM ai_api_audit_logs WHERE http_status=401")).rows;
+    assert.deepEqual(log,[{api_key_id:null}]);
+  }finally{await f.pg.close();}
+});
+
+
+test('status minute quota also counts malformed authenticated REST and MCP attempts',async()=>{
+  const f=await fixture();try{
+    const calls=statusCalls(f);
+    for(let n=0;n<20;n++) assert.equal((await calls[n%2]({phone_last4:'bad'})).status,400);
+    const response=await calls[0]({phone_last4:'bad'});assert.equal(response.status,429);assert.equal(response.headers.get('Retry-After'),'60');
+  }finally{await f.pg.close();}
 });

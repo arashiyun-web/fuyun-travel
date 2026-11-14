@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-test('generated OpenAPI is deterministic, 3.1, authenticated and describes all three operations', async () => {
+test('generated OpenAPI is deterministic, 3.1, authenticated and describes all four operations', async () => {
   assert.ok(existsSync('scripts/ai-api-openapi.mjs'), 'OpenAPI generator must exist');
   const check = spawnSync(process.execPath, ['scripts/ai-api-openapi.mjs', '--check'], { encoding: 'utf8' });
   assert.equal(check.status, 0, check.stderr);
@@ -11,7 +11,7 @@ test('generated OpenAPI is deterministic, 3.1, authenticated and describes all t
   assert.ok(doc.paths['/api/public/v1/bookings'].post.responses['200']);
   assert.equal(doc.paths['/api/public/v1/bookings'].post.responses['201'], undefined);
   assert.equal(doc.components.securitySchemes.bearerAuth.scheme, 'bearer');
-  assert.deepEqual(Object.values(doc.paths).map(p => p.post.operationId).sort(), ['check_availability','create_booking','get_quote']);
+  assert.deepEqual(Object.values(doc.paths).map(p => p.post.operationId).sort(), ['check_availability','create_booking','get_booking_status','get_quote']);
   assert.equal(doc.components.schemas.create_bookingInput.properties.passenger_count.maximum, 60);
   const { default: Ajv2020 } = await import('ajv/dist/2020.js');
   const validateTime = new Ajv2020().compile(doc.components.schemas.create_bookingInput.properties.time);

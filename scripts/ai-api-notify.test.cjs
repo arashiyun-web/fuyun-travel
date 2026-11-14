@@ -4,7 +4,7 @@ const { load, mock } = require('./test-support/step2-load-ts.cjs');
 
 const staff = ['1', '2', '3'].map(digit => 'U' + digit.repeat(32));
 const copy = value => structuredClone(value);
-let row, pushes, changes, push;
+let row, pushes, changes, push, audits;
 function matches(where) {
   if (where.id !== row.id) return false;
   if ('notificationClaim' in where && where.notificationClaim !== row.notificationClaim) return false;
@@ -12,7 +12,7 @@ function matches(where) {
     ? row.notificationClaim === null
     : row.notificationClaimExpiresAt !== null && row.notificationClaimExpiresAt <= condition.notificationClaimExpiresAt.lte);
 }
-mock('@/lib/prisma', { prisma: { aiBooking: {
+mock('@/lib/prisma', { prisma: { aiApiAuditLog: { create: async ({data}) => {audits.push(copy(data));return data;} }, aiBooking: {
   findUnique: async ({ where }) => where.id === row.id ? copy(row) : null,
   updateMany: async ({ where, data }) => {
     if (!matches(where)) return { count: 0 };
@@ -21,10 +21,10 @@ mock('@/lib/prisma', { prisma: { aiBooking: {
 } } });
 mock('@/lib/lineApi', { pushLineText: async (to, text, options) => {
   // A crash after this boundary must leave a recoverable, identical retry payload.
-  assert.ok(row.notificationDeliveries?.some(delivery => delivery.recipient === to && delivery.text === text && delivery.retryKey === options.retryKey));
+  if (!text.includes('狀態已更新為：')) assert.ok(row.notificationDeliveries?.some(delivery => delivery.recipient === to && delivery.text === text && delivery.retryKey === options.retryKey));
   pushes.push({ to, text, ...options }); return push(to);
 } });
-const { notifyBooking, lineAdminRecipients, bookingNotificationText, bookingNotificationRetryKey } = load('lib/aiApi/notify.ts');
+const { notifyBooking, notifyStaffStatus, lineAdminRecipients, bookingNotificationText, bookingNotificationRetryKey } = load('lib/aiApi/notify.ts');
 const noDelay = { sleep: async () => {} };
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 beforeEach(() => {
@@ -33,10 +33,10 @@ beforeEach(() => {
     vehicle: '中巴', notificationRetryKey: 'ec500ad8-61ef-4d3b-97d4-986127d522e5', notificationDeliveries: null,
     notificationStatus: 'pending', notificationAttempts: 0, notificationLastError: null,
     notificationClaim: null, notificationClaimExpiresAt: null };
-  pushes = []; changes = []; push = async () => ({ result: 'accepted' });
-  delete process.env.LINE_ADMIN_USER_ID; delete process.env.ADMIN_LINE_USER_ID;
+  audits = []; pushes = []; changes = []; push = async () => ({ result: 'accepted' });
+  delete process.env.AI_BOOKING_STATUS_NOTIFY; delete process.env.AI_BOOKING_ADMIN_BASE_URL; delete process.env.LINE_ADMIN_USER_ID; delete process.env.ADMIN_LINE_USER_ID;
 });
-afterEach(() => { delete process.env.LINE_ADMIN_USER_ID; delete process.env.ADMIN_LINE_USER_ID; });
+afterEach(() => { delete process.env.AI_BOOKING_STATUS_NOTIFY; delete process.env.AI_BOOKING_ADMIN_BASE_URL; delete process.env.LINE_ADMIN_USER_ID; delete process.env.ADMIN_LINE_USER_ID; });
 
 test('staff parsing filters C/R and invalid IDs, deduplicates case-insensitively and caps at two', () => {
   const lower = 'U' + 'a'.repeat(32), upper = 'U' + 'A'.repeat(32);
@@ -149,4 +149,38 @@ test('an expired lease is recoverable with the same deterministic recipient key'
   assert.equal((await notifyBooking(row.id, noDelay)).notificationStatus, 'sent');
   assert.equal(pushes[0].retryKey, bookingNotificationRetryKey(row.notificationRetryKey, staff[0]));
   assert.equal(row.notificationClaim, null);
+});
+
+
+test('notification links accept only an HTTPS admin base and audit missing recipients without PII',async()=>{
+  process.env.AI_BOOKING_ADMIN_BASE_URL='https://admin.example.test/';
+  assert.ok(bookingNotificationText(row).includes('https://admin.example.test/admin/ai-bookings/booking-1'));
+  for(const base of ['http://bad.example','javascript:bad','https://','https://user:pass@example.test','https://example.test/\nspoof']){
+    process.env.AI_BOOKING_ADMIN_BASE_URL=base;assert.ok(bookingNotificationText(row).includes('https://fuyuntravel.com/admin/ai-bookings/booking-1'));
+  }
+  await notifyBooking(row.id,noDelay);assert.deepEqual(pushes,[]);
+  assert.equal(audits.length,1);assert.equal(audits[0].eventType,'notification');assert.equal(audits[0].outcome,'skipped');
+  assert.equal(audits[0].detail.reason,'notification skipped: missing recipient');assert.equal(audits[0].detail.recipient_count,0);
+});
+test('successful and failed initial notifications audit only recipient count and outcome',async()=>{
+  process.env.LINE_ADMIN_USER_ID=staff.slice(0,2).join(',');
+  await notifyBooking(row.id,noDelay);assert.equal(audits.at(-1).outcome,'sent');assert.equal(audits.at(-1).detail.recipient_count,2);
+  row.notificationDeliveries=null;push=async()=>{throw Error('upstream private');};
+  await notifyBooking(row.id,noDelay);assert.equal(audits.at(-1).outcome,'failed');
+  const text=JSON.stringify(audits);for(const secret of [...staff,row.phone,row.contactName,'upstream private'])assert.equal(text.includes(secret),false);
+});
+test('staff status notifications default disabled, skip absent recipients, and send only to admins',async()=>{
+  const booking={id:row.id,bookingNumber:row.bookingNumber,status:'confirmed'};
+  await notifyStaffStatus(booking,'staff');assert.equal(audits.at(-1).outcome,'disabled');assert.equal(pushes.length,0);
+  process.env.AI_BOOKING_STATUS_NOTIFY='1';
+  await notifyStaffStatus(booking,'staff');assert.equal(audits.at(-1).outcome,'skipped');assert.equal(audits.at(-1).detail.reason,'notification skipped: missing recipient');assert.equal(pushes.length,0);
+  process.env.LINE_ADMIN_USER_ID=staff.slice(0,2).join(',');
+  // Status pushes are deliberately separate from the existing new-booking delivery payload.
+  push=async()=>({result:'accepted'});
+  await notifyStaffStatus(booking,'staff');assert.equal(audits.at(-1).outcome,'sent');assert.equal(pushes.length,2);
+  assert.ok(pushes.every(call=>call.text.includes('狀態已更新為：專人已確認（staff）')&&call.text.includes('/admin/ai-bookings/booking-1')));
+  for(const status of ['rejected','cancelled'])await notifyStaffStatus({...booking,status},'staff');
+  assert.ok(pushes.some(call=>call.text.includes('已婉拒')));assert.ok(pushes.some(call=>call.text.includes('已取消')));
+  push=async()=>{throw Error('private upstream');};await notifyStaffStatus(booking,'staff');assert.equal(audits.at(-1).outcome,'failed');
+  for(const secret of [...staff,row.phone,row.contactName,'private upstream'])assert.equal(JSON.stringify(audits).includes(secret),false);
 });
