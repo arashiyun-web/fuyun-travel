@@ -4,7 +4,7 @@ export function GET() {
     description: 'Fuyun Travel indicative charter quotes, pending availability and human-reviewed booking requests.',
     transport: { type: 'streamable-http', url: 'https://fuyuntravel.com/api/mcp', stateless: true },
     authentication: { type: 'http', scheme: 'bearer', description: 'Owner-issued API key required for every HTTP request.' },
-    tools: ['get_quote', 'check_availability', 'create_booking'],
+    tools: ['get_quote', 'check_availability', 'create_booking', 'get_booking_status'],
     openapi: 'https://fuyuntravel.com/openapi.json',
     requires_human_confirmation: true,
   });
