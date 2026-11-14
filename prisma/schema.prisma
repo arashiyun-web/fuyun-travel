@@ -377,6 +377,7 @@ model ApiKey {
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
   bookings   AiBooking[]
   counters   ApiRateCounter[]
+  auditLogs  AiApiAuditLog[]
 
   @@map("api_keys")
 }
@@ -400,6 +401,10 @@ model AiBooking {
   notes                   String?
   quoteRange              Json?     @map("quote_range")
   status                  String    @default("pending_review")
+  queryCodeHash           String?   @map("query_code_hash")
+  statusChangedAt         DateTime? @map("status_changed_at") @db.Timestamptz(6)
+  statusChangedBy         String?   @map("status_changed_by")
+  auditLogs               AiApiAuditLog[]
   isTest                  Boolean   @default(false) @map("is_test")
   /// Active SHA-256 idempotency key; cleared only after its 24h expiry to release the unique slot.
   idempotencyKey          String?   @map("idempotency_key")
@@ -435,3 +440,29 @@ model ApiRateCounter {
 }
 
 /// LINE raw message events (full capture, deduped by messageId + contentHash).
+
+/// Safe operational metadata only; never store request payloads or credentials here.
+model AiApiAuditLog {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  eventType   String   @map("event_type")
+  channel     String
+  tool        String?
+  apiKeyId    String?  @map("api_key_id")
+  apiKey      ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  bookingId   String?  @map("booking_id")
+  booking     AiBooking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  outcome     String
+  httpStatus  Int?     @map("http_status")
+  durationMs  Int?     @map("duration_ms")
+  fromStatus  String?  @map("from_status")
+  toStatus    String?  @map("to_status")
+  actor       String?
+  detail      Json?
+  requestId   String?  @map("request_id")
+
+  @@index([bookingId, createdAt])
+  @@index([createdAt])
+  @@index([apiKeyId, createdAt])
+  @@map("ai_api_audit_logs")
+}

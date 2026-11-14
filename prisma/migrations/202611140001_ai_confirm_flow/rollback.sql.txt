@@ -1,0 +1,19 @@
+-- MANUAL, owner-approved rollback only. Back up audit/query hashes before running.
+-- This loses audit history, query hashes and status attribution; legacy rows can still use phone_last4.
+-- STOP if cancelled rows exist: reverting the CHECK would fail. Do not delete or silently
+-- convert cancelled rows. Export/preserve them and obtain an explicit owner decision first.
+BEGIN;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM ai_bookings WHERE status='cancelled') THEN
+    RAISE EXCEPTION 'Rollback blocked: cancelled bookings require an owner-approved preservation plan';
+  END IF;
+END $$;
+DROP TABLE ai_api_audit_logs;
+ALTER TABLE ai_bookings DROP COLUMN query_code_hash, DROP COLUMN status_changed_at, DROP COLUMN status_changed_by;
+ALTER TABLE ai_bookings DROP CONSTRAINT IF EXISTS ai_bookings_status_check;
+ALTER TABLE ai_bookings ADD CONSTRAINT ai_bookings_status_check CHECK (status IN ('pending_review','confirmed','rejected'));
+-- Only rate counters for the removed status feature are discarded, never booking data.
+DELETE FROM api_rate_counters WHERE scope IN ('status_minute','status_fail_hour');
+ALTER TABLE api_rate_counters DROP CONSTRAINT IF EXISTS api_rate_counters_scope_check;
+ALTER TABLE api_rate_counters ADD CONSTRAINT api_rate_counters_scope_check CHECK (scope IN ('minute','day','booking_hour'));
+COMMIT;
