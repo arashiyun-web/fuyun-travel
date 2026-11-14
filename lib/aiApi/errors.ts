@@ -1,4 +1,5 @@
 export class AiApiError extends Error {
+  apiKeyId?: string;
   constructor(public status: number, message: string, public retryAfter?: number,
     public issues?: Array<{ path: PropertyKey[]; message: string }>) { super(message); }
 }

@@ -1,3 +1,4 @@
+import type { AuditEvent } from './audit';
 import { randomUUID } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -53,6 +54,22 @@ function tripDate(value: string | Date) {
     : singleLine(value, 20);
 }
 
+function adminBookingLink(id: string): string {
+  const configured = process.env.AI_BOOKING_ADMIN_BASE_URL ?? '';
+  let base = 'https://fuyuntravel.com';
+  if (configured.startsWith('https://') && !/\s/.test(configured)) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) base = url.origin;
+    } catch { /* Invalid configuration uses the fixed public HTTPS origin. */ }
+  }
+  return base + '/admin/ai-bookings/' + encodeURIComponent(id);
+}
+async function notificationAudit(event: Omit<AuditEvent, 'eventType'>) {
+  try { await prisma.aiApiAuditLog.create({ data: { id: randomUUID(), eventType: 'notification', ...event } }); }
+  catch { /* Delivery/audit errors never leak credentials or fail a saved booking. */ }
+}
+
 export function bookingNotificationText(booking: NotificationBooking): string {
   const period = booking.endDate ? `${tripDate(booking.date)} ～ ${tripDate(booking.endDate)}` : tripDate(booking.date);
   return [
@@ -63,7 +80,7 @@ export function bookingNotificationText(booking: NotificationBooking): string {
     `車型：${singleLine(booking.vehicle || "未指定", 60)}`,
     `聯絡人：${singleLine(booking.contactName, 60)}`,
     `電話末三碼：${booking.phone.replace(/\D/g, "").slice(-3)}`,
-    `https://fuyuntravel.com/admin/ai-bookings/${encodeURIComponent(booking.id)}`,
+    adminBookingLink(booking.id),
   ].join("\n");
 }
 
@@ -108,6 +125,9 @@ export async function notifyBooking(id: string, options: NotifyOptions = {}) {
   }
   try {
     return await deliver(id, owner, options);
+  } catch (error) {
+    await notificationAudit({ channel: 'system', bookingId: id, outcome: 'failed', detail: { recipient_count: 0, reason: 'notification delivery failed' } });
+    throw error;
   } finally {
     // An expired worker may release only its own lease, never a replacement worker's.
     await prisma.aiBooking.updateMany({ where: { id, notificationClaim: owner },
@@ -120,18 +140,20 @@ async function deliver(id: string, owner: string, options: NotifyOptions) {
   if (!booking) return null;
   const saved = readDeliveries(booking.notificationDeliveries);
   const text = bookingNotificationText(booking);
-  const deliveries: Delivery[] = saved ?? lineAdminRecipients(process.env.LINE_ADMIN_USER_ID, process.env.ADMIN_LINE_USER_ID)
+  const configured = lineAdminRecipients(process.env.LINE_ADMIN_USER_ID, process.env.ADMIN_LINE_USER_ID);
+  const missingRecipient = configured.length === 0;
+  const deliveries: Delivery[] = saved ?? configured
     .map(recipient => ({ recipient, text, retryKey: bookingNotificationRetryKey(booking.notificationRetryKey, recipient),
       status: "pending", attempts: 0 }));
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds)));
 
   async function persist() {
-    const notificationStatus = deliveries.length === 0 ? "failed"
+    const notificationStatus = missingRecipient || deliveries.length === 0 ? "failed"
       : deliveries.some(item => item.status === "pending") ? "pending"
       : deliveries.every(item => item.status === "sent") ? "sent" : "failed";
     const notificationAttempts = deliveries.reduce((total, item) => total + item.attempts, 0);
     const notificationLastError = notificationStatus === "failed"
-      ? deliveries.length === 0 ? RECIPIENT_FAILURE : DELIVERY_FAILURE : null;
+      ? missingRecipient || deliveries.length === 0 ? RECIPIENT_FAILURE : DELIVERY_FAILURE : null;
     const written = await prisma.aiBooking.updateMany({ where: { id, notificationClaim: owner }, data: {
       notificationStatus, notificationAttempts, notificationLastError,
       notificationDeliveries: deliveries as unknown as Prisma.InputJsonValue,
@@ -143,6 +165,11 @@ async function deliver(id: string, owner: string, options: NotifyOptions) {
 
   // Save recipients and the exact LINE payload before crossing the network boundary.
   await persist();
+  if (missingRecipient) {
+    await notificationAudit({ channel: 'system', bookingId: id, outcome: 'skipped',
+      detail: { recipient_count: 0, reason: 'notification skipped: missing recipient' } });
+    return persist();
+  }
   for (const item of deliveries) {
     if (item.status === "sent") continue;
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -161,5 +188,28 @@ async function deliver(id: string, owner: string, options: NotifyOptions) {
       if (item.status === "sent") break;
     }
   }
-  return persist();
+  const result = await persist();
+  await notificationAudit({ channel: 'system', bookingId: id, outcome: result.notificationStatus,
+    detail: { recipient_count: deliveries.length } });
+  return result;
+}
+
+/** Post-commit staff-only status notice; never contacts customers or external agents. */
+export async function notifyStaffStatus(booking: { id: string; bookingNumber: string; status: string }, actor: string) {
+  const labels: Record<string, string> = { confirmed: '專人已確認', rejected: '已婉拒', cancelled: '已取消' };
+  if (!Object.hasOwn(labels, booking.status)) return;
+  const common = { channel: 'admin' as const, bookingId: booking.id, actor };
+  if (process.env.AI_BOOKING_STATUS_NOTIFY !== '1') {
+    await notificationAudit({ ...common, outcome: 'disabled', detail: { recipient_count: 0 } });
+    return;
+  }
+  const recipients = lineAdminRecipients(process.env.LINE_ADMIN_USER_ID, process.env.ADMIN_LINE_USER_ID);
+  if (recipients.length === 0) {
+    await notificationAudit({ ...common, outcome: 'skipped', detail: { recipient_count: 0, reason: 'notification skipped: missing recipient' } });
+    return;
+  }
+  const text = 'AI 訂單 ' + singleLine(booking.bookingNumber, 50) + ' 狀態已更新為：' + labels[booking.status] + '（' + singleLine(actor, 100) + '）\n' + adminBookingLink(booking.id);
+  const results = await Promise.allSettled(recipients.map(recipient => pushLineText(recipient, text, { retryKey: randomUUID(), timeoutMs: 1500 })));
+  await notificationAudit({ ...common, outcome: results.every(result => result.status === 'fulfilled') ? 'sent' : 'failed',
+    detail: { recipient_count: recipients.length } });
 }
