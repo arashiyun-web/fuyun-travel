@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type ReviewStatus = "pending_review" | "confirmed" | "rejected";
+type ReviewStatus = "pending_review" | "confirmed" | "rejected" | "cancelled";
 type Booking = {
   id: string; bookingNumber: string; contactName: string; phone: string; email: string | null;
   date: string; endDate: string | null; time: string; pickup: string; destination: string;
@@ -10,7 +10,8 @@ type Booking = {
   status: ReviewStatus; isTest: boolean; notificationStatus: string;
   notificationAttempts: number; notificationLastError: string | null;
 };
-const reviewLabels: Record<ReviewStatus, string> = { pending_review: "待審核", confirmed: "已確認", rejected: "已拒絕" };
+type AuditRow = { createdAt: string; eventType: string; outcome: string; fromStatus: string | null; toStatus: string | null; actor: string | null };
+const reviewLabels: Record<ReviewStatus, string> = { pending_review: "待審核", confirmed: "已確認", rejected: "已拒絕", cancelled: "已取消" };
 const deliveryLabels: Record<string, string> = { pending: "通知處理中", sent: "通知已送達", failed: "通知未送達" };
 const buttonClass = "rounded-lg border border-slate-700 px-4 py-2 text-sm text-amber-300 disabled:opacity-50";
 async function bookingRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -21,23 +22,34 @@ async function bookingRequest<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function AiBookingDetails({ id }: { id: string }) {
+  const [audits, setAudits] = useState<AuditRow[] | null>(null);
+  const [auditError, setAuditError] = useState("");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [status, setStatus] = useState<ReviewStatus>("pending_review");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const url = `/api/admin/ai-bookings/${encodeURIComponent(id)}`;
+  const refreshAudits = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const body = await bookingRequest<{ audits: AuditRow[] }>(url + '/audit', { signal });
+      if (!signal?.aborted) { setAudits(body.audits); setAuditError(''); }
+    } catch {
+      if (!signal?.aborted) setAuditError('紀錄讀取失敗，請稍後重試。');
+    }
+  }, [url]);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const body = await bookingRequest<{ booking: Booking }>(url, { signal });
     if (!signal?.aborted) { setBooking(body.booking); setStatus(body.booking.status); }
   }, [url]);
   useEffect(() => {
     const controller = new AbortController();
+    void refreshAudits(controller.signal);
     refresh(controller.signal).catch(cause => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "AI 訂單讀取失敗。");
     });
     return () => controller.abort();
-  }, [refresh]);
+  }, [refresh, refreshAudits]);
 
   async function saveStatus() {
     if (busy || !booking) return;
@@ -47,6 +59,7 @@ export default function AiBookingDetails({ id }: { id: string }) {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
       });
       setBooking(body.booking); setStatus(body.booking.status); setMessage("審核狀態已儲存。");
+      await refreshAudits();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "狀態儲存失敗。");
     } finally { setBusy(false); }
@@ -58,7 +71,7 @@ export default function AiBookingDetails({ id }: { id: string }) {
       const body = await bookingRequest<{ notificationStatus: string }>(`${url}/retry-notification`, { method: "POST" });
       setMessage(body.notificationStatus === "sent" ? "通知已送達。"
         : body.notificationStatus === "pending" ? "通知處理中，請稍後重新整理。" : "通知未送達，請檢查通知設定後重送。");
-      await refresh();
+      await Promise.all([refresh(), refreshAudits()]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "通知未送達，請稍後重送。");
     } finally { setBusy(false); }
@@ -99,6 +112,19 @@ export default function AiBookingDetails({ id }: { id: string }) {
         <h2 className={booking.notificationStatus === "failed" ? "font-bold text-red-300" : "font-bold text-slate-300"}>LINE：{deliveryLabels[booking.notificationStatus] || "通知未送達"}</h2>
         <p className="text-sm text-slate-400">已嘗試 {booking.notificationAttempts} 次。{booking.notificationLastError || ""}</p>
         {booking.notificationStatus !== "sent" ? <button type="button" disabled={busy} onClick={() => void retryNotification()} className={buttonClass}>{busy ? "處理中…" : "重送通知"}</button> : null}
+      </section>
+      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <h2 className="font-bold text-slate-300">狀態與工具紀錄</h2>
+        {auditError ? <p role="alert" className="text-sm text-red-300">{auditError}</p> : null}
+        <button type="button" disabled={busy} onClick={() => void refreshAudits()} className={buttonClass}>重新整理紀錄</button>
+        {audits ? audits.length ? <ul className="space-y-2 text-sm text-slate-400">
+          {audits.map((entry, index) => <li key={entry.createdAt + ':' + index}>
+            <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</time>
+            {' ／ '}{entry.eventType}{' ／ '}{entry.outcome}
+            {entry.fromStatus || entry.toStatus ? ' ／ ' + (entry.fromStatus || '—') + ' → ' + (entry.toStatus || '—') : ''}
+            {entry.actor ? ' ／ ' + entry.actor : ''}
+          </li>)}
+        </ul> : <p className="text-sm text-slate-400">尚無紀錄。</p> : !auditError ? <p className="text-sm text-slate-400">讀取中…</p> : null}
       </section>
     </> : error ? null : <p className="p-6 text-slate-400">讀取中…</p>}
   </div>;

@@ -44,6 +44,8 @@
 
 ## AI 代理 API 與 MCP
 
-- [OpenAPI 3.1 說明](https://fuyuntravel.com/openapi.json)：POST `/api/public/v1/quote`、`/api/public/v1/availability`、`/api/public/v1/bookings`，皆須老闆核發的 Bearer 金鑰。
-- [MCP Streamable HTTP](https://fuyuntravel.com/api/mcp)：`get_quote`、`check_availability`、`create_booking`，沿用相同金鑰與限流。
+- [OpenAPI 3.1 說明](https://fuyuntravel.com/openapi.json)：POST `/api/public/v1/quote`、`/api/public/v1/availability`、`/api/public/v1/bookings`、`/api/public/v1/bookings/status`，皆須老闆核發的 Bearer 金鑰。
+- [MCP Streamable HTTP](https://fuyuntravel.com/api/mcp)：`get_quote`、`check_availability`、`create_booking`、`get_booking_status`，沿用相同金鑰與限流。
 - 報價為參考範圍，車況與最終價格須專人確認；送出訂單僅供待審，不會自動成交或付款。訂單重送請沿用 `Idempotency-Key`（24 小時）。
+
+- 狀態查詢只接受 POST：同一把 API key 提供單號與 query_code 或 phone_last4（二擇一）；查詢碼首次建單僅顯示一次，冪等重送不回明碼。查詢每分鐘 20 次，失敗每小時 10 次。狀態為 pending／confirmed_by_staff／rejected／cancelled；車況與價格待專人確認，本接口不代表成交、不處理付款。

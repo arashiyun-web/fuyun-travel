@@ -8,7 +8,7 @@ type BookingRow = {
   pickup: string; destination: string; passengerCount: number; vehicle: string | null;
   status: string; isTest: boolean; notificationStatus: string;
 };
-const reviewLabels: Record<string, string> = { pending_review: "待審核", confirmed: "已確認", rejected: "已拒絕" };
+const reviewLabels: Record<string, string> = { pending_review: "待審核", confirmed: "已確認", rejected: "已拒絕", cancelled: "已取消" };
 const deliveryLabels: Record<string, string> = { pending: "通知處理中", sent: "通知已送達", failed: "通知未送達" };
 
 export default function AiBookingList() {
