@@ -25,7 +25,7 @@ export class AiApiService {
       const row = await this.store.getBookingStatus(identity, input as StatusInput, this.now());
       context.bookingId = row.id;
       const confirmed = row.status === 'confirmed';
-      return { booking_number: row.booking_number, status: publicStatuses[row.status], status_label: statusLabels[row.status],
+      return { booking_number: row.booking_number, status: publicStatuses[row.status], review_status: publicStatuses[row.status], status_label: statusLabels[row.status],
         is_test: row.is_test, created_at: row.created_at.toISOString(), status_updated_at: (row.status_changed_at ?? row.created_at).toISOString(),
         trip: { date: row.date, end_date: row.end_date, time: row.time, passenger_count: row.passenger_count, vehicle: row.vehicle },
         requires_human_confirmation: true,
@@ -45,7 +45,8 @@ export class AiApiService {
       try { await this.notify(result.booking.id); }
       catch { await this.store.notificationFailed(result.booking.id).catch(() => {}); }
     }
-    return { booking_number: result.booking.booking_number, status: publicStatuses[result.booking.status], query_code: result.queryCode, query_code_note: '請妥善保存，僅此一次顯示；遺失可用單號＋電話末四碼查詢', replay: result.replay, is_test: result.booking.is_test,
+    // Preserve the legacy creation acknowledgement; expose current review state separately.
+    return { booking_number: result.booking.booking_number, status: 'pending_review', review_status: publicStatuses[result.booking.status], query_code: result.queryCode, query_code_note: '請妥善保存，僅此一次顯示；遺失可用單號＋電話末四碼查詢', replay: result.replay, is_test: result.booking.is_test,
       requires_human_confirmation: true, note: '這不是成交，專人確認後會聯絡您並提供正式報價',
       note_en: 'This is not a confirmed booking. Our team will contact you after review and provide a formal quote.' };
   }

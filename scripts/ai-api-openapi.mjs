@@ -12,10 +12,10 @@ export function buildOpenApi() {
   const schemas = { Error: jsonSchema(errorSchema) };
   const endpoints = { get_quote: 'quote', check_availability: 'availability', create_booking: 'bookings', get_booking_status: 'bookings/status' };
   const descriptions = {
-    get_booking_status: 'Read-only status for bookings created by the same API key. Supply booking_number and exactly one of query_code or phone_last4. POST keeps verification out of URLs. 20 status queries/minute; only failures consume the 10/hour failure quota. All missing, foreign and incorrect verifications return the same 404. Status is pending, confirmed_by_staff, rejected or cancelled; it never implies a sale or payment.',
+    get_booking_status: 'Read-only status for bookings created by the same API key. Supply booking_number and exactly one of query_code or phone_last4. POST keeps verification out of URLs. 20 status queries/minute; only failures consume the 10/hour failure quota. All missing, foreign and incorrect verifications return the same 404. Status and review_status are identical: pending, confirmed_by_staff, rejected or cancelled; it never implies a sale or payment.',
     get_quote: 'Indicative customerRange price only. Driver fee is separate. Staff confirm national holidays, taxes, vehicle and final fare.',
     check_availability: 'Always pending human confirmation. Does not query availability or reserve a vehicle.',
-    create_booking: 'Creates a pending-review request only. No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry. The query_code is shown only on the first response; a replay returns query_code=null. Preserve it securely or use booking_number plus phone_last4.',
+    create_booking: 'Creates a pending-review request only. Creation and replay acknowledgements keep legacy status=pending_review; review_status carries the current public review state (pending for a new request). No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry. The query_code is shown only on the first response; a replay returns query_code=null. Preserve it securely or use booking_number plus phone_last4.',
   };
   for (const [name, endpoint] of Object.entries(endpoints)) {
     schemas[`${name}Input`] = jsonSchema(inputSchemas[name]);

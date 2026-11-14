@@ -48,4 +48,4 @@
 - [MCP Streamable HTTP](https://fuyuntravel.com/api/mcp)：`get_quote`、`check_availability`、`create_booking`、`get_booking_status`，沿用相同金鑰與限流。
 - 報價為參考範圍，車況與最終價格須專人確認；送出訂單僅供待審，不會自動成交或付款。訂單重送請沿用 `Idempotency-Key`（24 小時）。
 
-- 狀態查詢只接受 POST：同一把 API key 提供單號與 query_code 或 phone_last4（二擇一）；查詢碼首次建單僅顯示一次，冪等重送不回明碼。查詢每分鐘 20 次，失敗每小時 10 次。狀態為 pending／confirmed_by_staff／rejected／cancelled；車況與價格待專人確認，本接口不代表成交、不處理付款。
+- 狀態查詢只接受 POST：同一把 API key 提供單號與 query_code 或 phone_last4（二擇一）；查詢碼首次建單僅顯示一次，冪等重送不回明碼。查詢每分鐘 20 次，失敗每小時 10 次。查詢回應的 status 與 review_status 同值，為 pending／confirmed_by_staff／rejected／cancelled；建單與冪等重送回應的 status 維持 pending_review，審核四態另用 review_status（新單為 pending）；車況與價格待專人確認，本接口不代表成交、不處理付款。
