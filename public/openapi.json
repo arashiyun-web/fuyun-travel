@@ -3,7 +3,7 @@
   "info": {
     "title": "Fuyun Travel AI API",
     "version": "1.0.0",
-    "description": "Owner-issued bearer key required. Shared limits per key: 30 requests/minute, 1,000/Taipei calendar day; 20 new booking requests/hour. No automatic confirmation or payment. Dates use Asia/Taipei."
+    "description": "Owner-issued bearer key required. Shared limits per key: 30 requests/minute, 1,000/Taipei calendar day; 20 new booking requests/hour. Status queries: 20/minute and 10 failed verifications/hour. No automatic confirmation or payment. Dates use Asia/Taipei."
   },
   "servers": [
     {
@@ -173,7 +173,7 @@
     "/api/public/v1/bookings": {
       "post": {
         "operationId": "create_booking",
-        "description": "Creates a pending-review request only. No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry.",
+        "description": "Creates a pending-review request only. No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry. The query_code is shown only on the first response; a replay returns query_code=null. Preserve it securely or use booking_number plus phone_last4.",
         "parameters": [
           {
             "in": "header",
@@ -221,6 +221,93 @@
           },
           "401": {
             "description": "Missing, invalid or disabled key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the exhausted shared window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/v1/bookings/status": {
+      "post": {
+        "operationId": "get_booking_status",
+        "description": "Read-only status for bookings created by the same API key. Supply booking_number and exactly one of query_code or phone_last4. POST keeps verification out of URLs. 20 status queries/minute; only failures consume the 10/hour failure quota. All missing, foreign and incorrect verifications return the same 404. Status is pending, confirmed_by_staff, rejected or cancelled; it never implies a sale or payment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/get_booking_statusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; human confirmation required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/get_booking_statusResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input; issues identify field paths",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or disabled key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No matching booking for the supplied booking number and verification",
             "content": {
               "application/json": {
                 "schema": {
@@ -877,10 +964,33 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending_review",
-              "confirmed",
-              "rejected"
+              "pending",
+              "confirmed_by_staff",
+              "rejected",
+              "cancelled"
             ]
+          },
+          "query_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "allOf": [
+                  {
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "pattern": "^fyq_[A-Za-z0-9_-]{43}$"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "query_code_note": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
           },
           "replay": {
             "type": "boolean"
@@ -904,11 +1014,171 @@
         "required": [
           "booking_number",
           "status",
+          "query_code",
+          "query_code_note",
           "replay",
           "is_test",
           "requires_human_confirmation",
           "note",
           "note_en"
+        ],
+        "additionalProperties": false
+      },
+      "get_booking_statusInput": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "booking_number": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[^\\u0000]*$"
+              },
+              "query_code": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^\\u0000]*$"
+              }
+            },
+            "required": [
+              "booking_number",
+              "query_code"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "booking_number": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[^\\u0000]*$"
+              },
+              "phone_last4": {
+                "type": "string",
+                "allOf": [
+                  {
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "pattern": "^[0-9]{4}$"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "booking_number",
+              "phone_last4"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "get_booking_statusResult": {
+        "type": "object",
+        "properties": {
+          "booking_number": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed_by_staff",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "status_label": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "is_test": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "status_updated_at": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "trip": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              "end_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "time": {
+                "type": "string",
+                "pattern": "^[^\\u0000]*$"
+              },
+              "passenger_count": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "vehicle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[^\\u0000]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "date",
+              "end_date",
+              "time",
+              "passenger_count",
+              "vehicle"
+            ],
+            "additionalProperties": false
+          },
+          "requires_human_confirmation": {
+            "type": "boolean",
+            "const": true
+          },
+          "disclaimer": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          },
+          "disclaimer_en": {
+            "type": "string",
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "required": [
+          "booking_number",
+          "status",
+          "status_label",
+          "is_test",
+          "created_at",
+          "status_updated_at",
+          "trip",
+          "requires_human_confirmation",
+          "disclaimer",
+          "disclaimer_en"
         ],
         "additionalProperties": false
       }
