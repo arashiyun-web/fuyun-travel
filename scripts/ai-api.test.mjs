@@ -49,7 +49,7 @@ for (const [index, name] of ['get_quote', 'check_availability', 'create_booking'
       const value = await ok.json();
       if (index === 0) { assert.equal(value.low, 9500); assert.equal(value.high, 11000); assert.equal(value.requires_human_confirmation, true); }
       if (index === 1) assert.equal(value.status, 'pending_human_confirmation');
-      if (index === 2) { assert.match(value.booking_number, /^FY-TEST-20991201-[A-Z0-9]{4}$/); assert.equal(value.status, 'pending'); }
+      if (index === 2) { assert.match(value.booking_number, /^FY-TEST-20991201-[A-Z0-9]{4}$/); assert.equal(value.status, 'pending_review'); assert.equal(value.review_status, 'pending'); }
       for (const invalid of [{ passenger_count: 0 }, { passenger_count: 61 }, { date: '2000-01-01' }, { date: '2099-02-30' }, ...(index === 2 ? [{ phone: 'abc' }] : [])]) {
         const res = await route.POST(request({ ...body, ...invalid })); assert.equal(res.status, 400);
         assert.ok((await res.json()).issues.some(issue => issue.path.length > 0));
@@ -72,7 +72,7 @@ for (const [index, name] of ['get_quote', 'check_availability', 'create_booking'
       const result = JSON.parse(value.result.content[0].text);
       if (index === 0) assert.equal(result.low, 9500);
       if (index === 1) assert.equal(result.status, 'pending_human_confirmation');
-      if (index === 2) assert.equal(result.status, 'pending');
+      if (index === 2) { assert.equal(result.status, 'pending_review'); assert.equal(result.review_status, 'pending'); }
       assert.equal((await call({ ...body, passenger_count: 0 })).status, 400);
       assert.equal((await call({ ...body, date: '1990-01-01' })).status, 400);
       await f.pg.query("UPDATE api_rate_counters SET count=30 WHERE scope='minute'");
@@ -356,7 +356,7 @@ test('query code is shown once, stored only as hash and hidden on replay', async
   } finally { await f.pg.close(); }
 });
 
-const statusKeys = ['booking_number','status','status_label','is_test','created_at','status_updated_at','trip','requires_human_confirmation','disclaimer','disclaimer_en'].sort();
+const statusKeys = ['booking_number','status','review_status','status_label','is_test','created_at','status_updated_at','trip','requires_human_confirmation','disclaimer','disclaimer_en'].sort();
 const noMatch = { error: 'No matching booking for the supplied booking number and verification' };
 function assertStatusOnly(value) {
   assert.deepEqual(Object.keys(value).sort(), statusKeys);
@@ -385,7 +385,7 @@ test('REST and MCP status share strict verification and a non-PII whitelist for 
       for (const [index, call] of calls.entries()) {
         const response = await call({ booking_number:created.booking_number,query_code:created.query_code }); assert.equal(response.status,200);
         const value = await statusValue(response,index); assertStatusOnly(value);
-        assert.equal(value.status,publicStatus); assert.equal(value.status_label,label); assert.equal(value.status_updated_at,'2099-12-01T01:00:00.000Z');
+        assert.equal(value.status,publicStatus); assert.equal(value.review_status,value.status); assert.equal(value.status_label,label); assert.equal(value.status_updated_at,'2099-12-01T01:00:00.000Z');
         assert.equal(value.disclaimer.includes('車況與價格一律待專人確認'),true);
         assert.equal(value.disclaimer.includes('本接口不處理付款'),internal === 'confirmed');
       }
@@ -530,4 +530,32 @@ test('status minute quota also counts malformed authenticated REST and MCP attem
     for(let n=0;n<20;n++) assert.equal((await calls[n%2]({phone_last4:'bad'})).status,400);
     const response=await calls[0]({phone_last4:'bad'});assert.equal(response.status,429);assert.equal(response.headers.get('Retry-After'),'60');
   }finally{await f.pg.close();}
+});
+
+
+// Required names and primitive types copied from be85317 public/openapi.json create_bookingResult.
+const legacyBookingFields = { booking_number:'string', status:'string', replay:'boolean', is_test:'boolean', requires_human_confirmation:'boolean', note:'string', note_en:'string' };
+for (const channel of ['REST','MCP']) test(channel + ': create/replay keep legacy booking fields and pending_review with public review_status', async()=>{
+  const f=await fixture();
+  try {
+    const send=()=>channel==='REST'
+      ? f.routes[2].POST(request(booking,token,{'Idempotency-Key':'v2-compatible'}))
+      : f.mcp.POST(request({jsonrpc:'2.0',id:22,method:'tools/call',params:{name:'create_booking',arguments:booking}},token,{Accept:'application/json, text/event-stream','Idempotency-Key':'v2-compatible'}));
+    const read=async()=>{const response=await send();assert.equal(response.status,200);const body=await response.json();return channel==='REST'?body:JSON.parse(body.result.content[0].text);};
+    const {bookingResultSchema}=await import('../lib/aiApi/schema.mjs');
+    const assertCompatible=value=>{
+      for(const [field,type] of Object.entries(legacyBookingFields)){assert.ok(Object.hasOwn(value,field),field);assert.equal(typeof value[field],type,field);}
+      assert.equal(value.status,'pending_review');assert.equal(value.requires_human_confirmation,true);
+      assert.equal(bookingResultSchema.safeParse(value).success,true);
+    };
+    const first=await read();assertCompatible(first);assert.equal(first.review_status,'pending');assert.equal(first.replay,false);assert.match(first.query_code,/^fyq_[A-Za-z0-9_-]{43}$/);
+    const replay=await read();assertCompatible(replay);assert.equal(replay.review_status,'pending');assert.equal(replay.replay,true);assert.equal(replay.booking_number,first.booking_number);assert.equal(replay.query_code,null);assert.equal(replay.query_code_note,first.query_code_note);
+    for(const field of ['is_test','requires_human_confirmation','note','note_en'])assert.equal(replay[field],first[field]);
+    for(const [internal,review] of [['confirmed','confirmed_by_staff'],['rejected','rejected'],['cancelled','cancelled']]) {
+      await f.pg.query('UPDATE ai_bookings SET status=$1 WHERE booking_number=$2',[internal,first.booking_number]);
+      const current=await read();assertCompatible(current);assert.equal(current.review_status,review);assert.equal(current.replay,true);assert.equal(current.query_code,null);
+      assert.equal((await f.pg.query('SELECT status FROM ai_bookings WHERE booking_number=$1',[first.booking_number])).rows[0].status,internal,'replay must not change staff state');
+    }
+    assert.equal(f.notices(),1);
+  } finally {await f.pg.close();}
 });

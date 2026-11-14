@@ -29,3 +29,18 @@ test('OpenAPI 3.1 validates with Redocly structural and reference checks', async
   const problems = await lintFromString({ source: readFileSync('public/openapi.json', 'utf8'), absoluteRef: new URL('../public/openapi.json', import.meta.url).pathname, config });
   assert.deepEqual(problems, []);
 });
+
+
+test('booking status schema keeps the be85317 string enum and review_status uses the four public states',async()=>{
+  const {buildOpenApi}=await import('./ai-api-openapi.mjs');
+  const schemas=buildOpenApi().components.schemas;
+  assert.deepEqual(schemas.create_bookingResult.properties.status,{type:'string',enum:['pending_review','confirmed','rejected']});
+  const legacyFields={booking_number:'string',status:'string',replay:'boolean',is_test:'boolean',requires_human_confirmation:'boolean',note:'string',note_en:'string'};
+  for(const [field,type] of Object.entries(legacyFields)){assert.ok(schemas.create_bookingResult.required.includes(field),field);assert.equal(schemas.create_bookingResult.properties[field].type,type,field);}
+  assert.equal(schemas.create_bookingResult.properties.requires_human_confirmation.const,true);
+  for(const name of ['create_bookingResult','get_booking_statusResult']) {
+    assert.ok(schemas[name].required.includes('review_status'));
+    assert.deepEqual(schemas[name].properties.review_status.enum,['pending','confirmed_by_staff','rejected','cancelled']);
+  }
+  assert.deepEqual(schemas.get_booking_statusResult.properties.status.enum,['pending','confirmed_by_staff','rejected','cancelled']);
+});

@@ -173,7 +173,7 @@
     "/api/public/v1/bookings": {
       "post": {
         "operationId": "create_booking",
-        "description": "Creates a pending-review request only. No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry. The query_code is shown only on the first response; a replay returns query_code=null. Preserve it securely or use booking_number plus phone_last4.",
+        "description": "Creates a pending-review request only. Creation and replay acknowledgements keep legacy status=pending_review; review_status carries the current public review state (pending for a new request). No payment or confirmed sale. TEST- key names produce FY-TEST- numbers. Same API key and Idempotency-Key replay the same request for 24 hours; a new request may be created after expiry. The query_code is shown only on the first response; a replay returns query_code=null. Preserve it securely or use booking_number plus phone_last4.",
         "parameters": [
           {
             "in": "header",
@@ -264,7 +264,7 @@
     "/api/public/v1/bookings/status": {
       "post": {
         "operationId": "get_booking_status",
-        "description": "Read-only status for bookings created by the same API key. Supply booking_number and exactly one of query_code or phone_last4. POST keeps verification out of URLs. 20 status queries/minute; only failures consume the 10/hour failure quota. All missing, foreign and incorrect verifications return the same 404. Status is pending, confirmed_by_staff, rejected or cancelled; it never implies a sale or payment.",
+        "description": "Read-only status for bookings created by the same API key. Supply booking_number and exactly one of query_code or phone_last4. POST keeps verification out of URLs. 20 status queries/minute; only failures consume the 10/hour failure quota. All missing, foreign and incorrect verifications return the same 404. Status and review_status are identical: pending, confirmed_by_staff, rejected or cancelled; it never implies a sale or payment.",
         "requestBody": {
           "required": true,
           "content": {
@@ -964,6 +964,14 @@
           "status": {
             "type": "string",
             "enum": [
+              "pending_review",
+              "confirmed",
+              "rejected"
+            ]
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
               "pending",
               "confirmed_by_staff",
               "rejected",
@@ -1014,6 +1022,7 @@
         "required": [
           "booking_number",
           "status",
+          "review_status",
           "query_code",
           "query_code_note",
           "replay",
@@ -1084,6 +1093,15 @@
             "pattern": "^[^\\u0000]*$"
           },
           "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed_by_staff",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "review_status": {
             "type": "string",
             "enum": [
               "pending",
@@ -1171,6 +1189,7 @@
         "required": [
           "booking_number",
           "status",
+          "review_status",
           "status_label",
           "is_test",
           "created_at",
